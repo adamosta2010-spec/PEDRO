@@ -1,0 +1,21 @@
+Settings and Teach were opening behind the dashboard, and answers now start sooner
+
+Tapping Settings or Teach did nothing visible because the panels sit at z-index
+31 and the dashboard, which is opaque and fills the screen, sits at 70 - so they
+opened underneath it. Checked by rendering the page and reading the values, not
+by reading the CSS. The overlay and panels now sit above every full-screen view,
+the website's drawer was raised with them, and the layering guard has been
+taught the new order so it cannot drift back.
+
+Speed: the voice path never streamed. It waited for the whole answer and then
+started speaking, which is where the wait was. It now reads the answer as it
+arrives and speaks each finished sentence while the rest is still being written,
+queued so they never overlap, and asks for a shorter answer when it is going to
+be spoken aloud.
+
+Simulations happen in the ball now rather than on another screen: the globe
+fades back, whatever he built fades in inside the same circle, and tapping it
+brings the globe back. It is still sandboxed with no way into the app, and he is
+asked for something small that fits a circle so it arrives quickly.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>

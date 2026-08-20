@@ -591,5 +591,29 @@ function nativeFrom(cap, exp){
   t("the orb fits a phone screen", inPage("--orb:min(300px, 78vw, 34vh)"), true);
 }
 
+
+/* ---- answering sooner, and drawing in the ball ---- */
+{
+  const inSrc = bit => src.indexOf(bit) > -1;
+  const page = require("fs").readFileSync("index.html", "utf8");
+  const whole = new Function(grab("wholeSentences") + "; return wholeSentences;")();
+
+  t("it speaks each sentence as it arrives", inSrc("function askStream"), true);
+  t("the voice path uses it", inSrc("askStream(c, function(acc){"), true);
+  t("a finished sentence is found", whole("Hello there. And then"), "Hello there.");
+  t("an unfinished one is not spoken yet", whole("Hello there and then"), "");
+  t("two sentences come back together", whole("One. Two. Three"), "One. Two.");
+  t("what is spoken is queued, not overlapped", inSrc("function sayNext"), true);
+  t("stopping empties the queue", inSrc("function sayStop"), true);
+  t("spoken answers ask for less", inSrc("voiceMode ? 320 : 8000"), true);
+  t("a provider that cannot stream still answers", inSrc("if(isDevice() || !isGemini()) return askOnce(c);"), true);
+
+  t("the simulation runs inside the ball", page.indexOf('id="orbViz"') > -1, true);
+  t("the globe fades back while it plays", page.indexOf("#hfOrb.showing .globe") > -1, true);
+  t("it is still walled off", page.indexOf('id="orbViz" sandbox="allow-scripts"') > -1, true);
+  t("tapping the ball puts the globe back", inSrc("if(vizStop()) return;"), true);
+  t("and stops whatever was running", grab("vizStop").indexOf("srcdoc = ''") > -1, true);
+}
+
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " mic/image tests passed");
 process.exit(fail ? 1 : 0);

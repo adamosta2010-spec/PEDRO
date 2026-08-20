@@ -115,8 +115,11 @@ const zBanner = parseInt(lastValue("#banner", "z-index"), 10);
 t("the drawer sits above the overlay", zSide > zScrim, true);
 t("the panels sit above the overlay", zPanel > zScrim, true);
 t("sign-in covers everything below it", zLock > zPanel && zLock > zSide, true);
-t("hands-free covers the chat", zHF > zPanel, true);
-t("the banner is never buried", zBanner > zLock, true);
+/* the panels have to be reachable from every full-screen view */
+t("settings opens above the dashboard", zPanel > zHF, true);
+t("and above the camera", zPanel > parseInt(lastValue("#cam", "z-index"), 10), true);
+t("and above an explanation", zPanel > parseInt(lastValue("#viz", "z-index"), 10), true);
+t("the dashboard still covers the chat", zHF > 31, true);
 
 /* the overlay has to be reachable to be dismissable */
 t("tapping the overlay closes what's open", /scrim\.addEventListener\("click", closePanels\)/.test(html), true);

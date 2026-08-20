@@ -276,10 +276,12 @@
   }
 
   /* ============ panels ============ */
-  .scrim{position:fixed;inset:0;background:#000b;backdrop-filter:blur(3px);z-index:30;
+  /* Above the dashboard, the camera and the explanation panel - all of which
+     fill the screen and are opaque. Below the sign-in screen and the banner. */
+  .scrim{position:fixed;inset:0;background:#000b;backdrop-filter:blur(3px);z-index:76;
     opacity:0;pointer-events:none;transition:opacity .2s}
   .scrim.on{opacity:1;pointer-events:auto}
-  .panel{position:fixed;z-index:31;background:var(--bg1);border:1px solid var(--line);
+  .panel{position:fixed;z-index:77;background:var(--bg1);border:1px solid var(--line);
     transition:transform .26s cubic-bezier(.3,.8,.4,1);display:flex;flex-direction:column}
   #settings,#tools,#teach{left:0;right:0;bottom:0;max-height:88dvh;border-radius:22px 22px 0 0;
     transform:translateY(102%);padding-bottom:var(--safe-b)}
@@ -532,6 +534,18 @@
     0%,100%{transform:scale(1);filter:brightness(1)}
     50%{transform:scale(1.05);filter:brightness(1.25)}}
 
+  /* Whatever he builds runs inside the ball itself: the globe fades back, the
+     drawing fades in, and it is still walled off in its own frame. */
+  #orbViz{position:absolute;inset:6%;width:88%;height:88%;border:0;border-radius:50%;
+    background:#0b0d12;opacity:0;transform:scale(.7);pointer-events:none;
+    transition:opacity .45s ease, transform .45s cubic-bezier(.2,.9,.3,1)}
+  #hfOrb.showing #orbViz{opacity:1;transform:scale(1);pointer-events:auto}
+  #hfOrb.showing .globe,
+  #hfOrb.showing .core,
+  #hfOrb.showing .spokes{opacity:0;transition:opacity .4s ease}
+  #hfOrb.showing .ticks{opacity:.5}
+  #hfOrb .globe,#hfOrb .core{transition:opacity .4s ease}
+
   /* the bars only move while he is actually talking, so you can see it is him */
   #hfOrb .wave{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
     gap:4px;pointer-events:none}
@@ -641,14 +655,14 @@
   #lock input:focus{border-color:var(--a1)}
   #lock .btn{width:min(250px,72vw)}
   #lock .msg2{color:var(--danger);font-size:13px;height:18px;margin-top:10px}
-  #shade{position:fixed;inset:0;z-index:75;background:#000e;display:none;align-items:center;
+  #shade{position:fixed;inset:0;z-index:79;background:#000e;display:none;align-items:center;
     justify-content:center;padding:16px}
   #shade.on{display:flex}
   #shade img{max-width:100%;max-height:100%;border-radius:12px}
 
   /* ============ phone ============ */
   @media(max-width:899px){
-    .side{position:fixed;top:0;bottom:0;left:0;z-index:31;width:min(290px,84vw);
+    .side{position:fixed;top:0;bottom:0;left:0;z-index:77;width:min(290px,84vw);
       border-radius:0 20px 20px 0;transform:translateX(-102%);
       transition:transform .26s cubic-bezier(.3,.8,.4,1)}
     .side.on{transform:none}
@@ -1140,6 +1154,7 @@
           <span class="ball"></span>
         </span>
         <span class="wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+        <iframe id="orbViz" sandbox="allow-scripts" referrerpolicy="no-referrer" title="Explanation"></iframe>
       </div>
       <div id="hfState">Say &ldquo;Pedro&rdquo;</div>
       <div id="hfHeard"></div>
@@ -2822,7 +2837,8 @@ function geminiRequest(msgs){
         return { role: m.role === "assistant" ? "model" : "user",
                  parts: geminiParts(m) };
       }),
-      generationConfig: { maxOutputTokens: 8000 }
+      /* spoken answers are short by design, and asking for less comes back sooner */
+      generationConfig: { maxOutputTokens: voiceMode ? 320 : 8000 }
     }
   };
 }
@@ -3729,18 +3745,19 @@ function vizBuild(about){
   if(viz.busy) return;
   viz.busy = true;
   viz.lastAsk = about;
-  vizOpen();
-  $('viz').classList.add('busy');
-  $('vizTitle').textContent = about;
-  $('vizSaid').textContent = '';
+  /* stay where you are - it happens in the ball */
+  hfSet('busy', 'Building ' + about);
+  hudLog('him', 'Building ' + about + '…', false);
 
+  /* it is shown in a circle the size of the ball, and it needs to arrive fast */
   var ask = 'Show ' + about + ' as a small animation that runs by itself.' +
-    ' Reply with one short sentence explaining it in plain speech, then a single' +
-    ' fenced html block containing a complete self-contained page.' +
-    ' Rules for the page: no external files, no network, no images, no libraries;' +
-    ' use canvas or inline SVG and plain JavaScript; it must start animating' +
-    ' immediately and loop; dark background; draw in cyan #38e1f0 on #0b0d12;' +
-    ' label the parts; fit any screen size. Keep it under 100 lines.';
+    ' Reply with one short sentence in plain speech, then one fenced html block:' +
+    ' a complete self-contained page, no external files, no network, no images,' +
+    ' no libraries. Use a canvas and plain JavaScript. It must start animating at' +
+    ' once and loop forever. Transparent or #0b0d12 background, draw in cyan' +
+    ' #38e1f0 with white highlights. It is displayed inside a CIRCLE, so keep' +
+    ' everything within the middle and do not put anything in the corners.' +
+    ' Keep it under 45 lines and make it quick to produce.';
 
   var only = { messages: [{ role:'user', content: ask, t:Date.now() }] };
   var wasVoice = voiceMode;
@@ -3748,26 +3765,39 @@ function vizBuild(about){
   askOnce(only).then(function(answer){
     voiceMode = wasVoice;
     viz.busy = false;
-    $('viz').classList.remove('busy');
     var parts = vizExtract(answer);
     if(!parts.html){
-      $('vizTitle').textContent = about;
-      $('vizSaid').textContent = parts.say || 'He could not draw that one.';
+      hfSet('wait', hfIdleLabel());
+      hfSaid.textContent = parts.say || 'I could not draw that one.';
       speak(parts.say || 'I could not draw that one.');
       return;
     }
     viz.last = parts.html;
-    $('vizFrame').srcdoc = vizPage(parts.html);
-    $('vizSaid').textContent = parts.say;
+    $('orbViz').srcdoc = vizPage(parts.html);
+    $('hfOrb').classList.add('showing');
+    hfSet('talk', about);
+    hfSaid.textContent = parts.say + ' — tap it to go back.';
+    hudLog('him', parts.say, false);
     if(parts.say) speak(parts.say);
   }).catch(function(e){
     voiceMode = wasVoice;
     viz.busy = false;
-    $('viz').classList.remove('busy');
+    hfSet('wait', hfIdleLabel());
     var why = String(e && e.message || e);
-    $('vizSaid').textContent = why;
+    hfSaid.textContent = why;
     speak(why);
   });
+}
+
+/* tap the ball to put the globe back */
+function vizStop(){
+  var orb = $('hfOrb');
+  if(!orb.classList.contains('showing')) return false;
+  orb.classList.remove('showing');
+  $('orbViz').srcdoc = '';        /* stop whatever was running */
+  hfSet(hf.want ? 'hear' : 'wait', hf.want ? 'Listening…' : hfIdleLabel());
+  hfSaid.textContent = '';
+  return true;
 }
 
 $('vizClose').addEventListener('click', vizClose);
@@ -4868,6 +4898,7 @@ $("btnMicTest").addEventListener("click", testMic);
 
 /* one button, whichever thing is happening */
 $("vbStop").addEventListener("click", function(){
+  sayStop();
   if(elevenAudio){ try{ elevenAudio.pause(); }catch(e){} }
   if(Native && Native.stopSpeaking) Native.stopSpeaking().catch(function(){});
   if(window.speechSynthesis && speechSynthesis.speaking){ speechSynthesis.cancel(); }
@@ -5241,8 +5272,21 @@ function hfAsk(question){
   save();
 
   voiceMode = true;
-  askOnce(c).then(function(answer){
+  sayStop();
+  var spoken = 0;
+  askStream(c, function(acc){
+    /* say each finished sentence while the rest is still being written */
+    var done = wholeSentences(acc);
+    if(done.length > spoken){
+      var chunk = done.slice(spoken);
+      spoken = done.length;
+      if(hf.phase !== "talk"){ hfSet("talk", "Speaking"); hf.talking = true; }
+      hfSaid.textContent = done;
+      sayChunk(chunk);
+    }
+  }).then(function(answer){
     voiceMode = false;
+    if(answer.length > spoken) sayChunk(answer.slice(spoken));
     hfSaid.textContent = answer;
     hudLogDone();
     hudLog("him", answer, false);
@@ -5268,6 +5312,75 @@ function hfAsk(question){
 }
 
 /* one non-streaming request; resolves with the answer text */
+/* ==================== answering out loud, as it arrives ====================
+   The answer used to be waited for in full and then spoken. Now it is read as
+   it streams in and each finished sentence is spoken while the rest is still
+   being written, which is most of the wait gone. */
+var sayQueue = [], saying = false;
+function sayNext(){
+  if(saying || !sayQueue.length) return;
+  saying = true;
+  var line = sayQueue.shift();
+  speak(line, function(){ saying = false; sayNext(); });
+}
+function sayChunk(text){
+  text = String(text || '').trim();
+  if(!text) return;
+  sayQueue.push(text);
+  sayNext();
+}
+function sayStop(){ sayQueue = []; saying = false; }
+
+/* everything up to the last finished sentence */
+function wholeSentences(text){
+  var m = String(text || '').match(/^[\s\S]*[.!?](?=\s|$)/);
+  return m ? m[0] : '';
+}
+
+/* Read the answer as it comes. Falls back to asking once if anything about the
+   streaming goes wrong, so a bad connection never means no answer. */
+function askStream(c, onText){
+  if(isDevice() || !isGemini()) return askOnce(c);   /* only Gemini streams here */
+  var req = buildRequest(c.messages);
+  abortCtl = new AbortController();
+  return fetch(req.url, {
+    method: 'POST', headers: req.headers,
+    body: JSON.stringify(req.body), signal: abortCtl.signal
+  }).then(function(res){
+    if(!res.ok || !res.body){
+      return res.text().then(function(t){ throw new Error(apiError(res.status, t)); });
+    }
+    var reader = res.body.getReader(), dec = new TextDecoder(), buf = '', acc = '';
+    function pump(){
+      return reader.read().then(function(r){
+        if(r.done) return acc;
+        buf += dec.decode(r.value, { stream: true });
+        var lines = buf.split('\n');
+        buf = lines.pop();
+        lines.forEach(function(line){
+          line = line.trim();
+          if(line.indexOf('data:') !== 0) return;
+          var payload = line.slice(5).trim();
+          if(!payload || payload === '[DONE]') return;
+          var ev;
+          try{ ev = JSON.parse(payload); }catch(e){ return; }
+          var d = readDelta(ev);
+          if(d.text){ acc += d.text; if(onText) onText(acc, d.text); }
+        });
+        return pump();
+      });
+    }
+    return pump();
+  }).then(function(text){
+    var out = String(text || '').trim();
+    if(!out) throw new Error('empty answer');
+    c.messages.push({ role:'assistant', content: out, t: Date.now() });
+    if(c.messages.length === 2) c.title = c.messages[0].content.slice(0, 40);
+    save();
+    return out;
+  });
+}
+
 function askOnce(c){
   /* The phone's own model answers here too. Voice and camera used to skip this
      entirely and ask the network, which is why choosing it changed nothing. */
@@ -5310,6 +5423,7 @@ $("btnHF").addEventListener("click", hfOpen);
 
 /* tap the circle to cut it off mid-sentence and talk over it */
 hfOrb.addEventListener("click", function(){
+  if(vizStop()) return;              /* a simulation is running - put the globe back */
   if(!hf.on) return;
   if(hf.talking || (window.speechSynthesis && speechSynthesis.speaking)){
     speechSynthesis.cancel();
@@ -5336,7 +5450,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-20.50";
+var BUILD = "2026-08-20.51";
 
 function banner(kind, html){
   var b = $("banner");
