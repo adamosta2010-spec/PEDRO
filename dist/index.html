@@ -2832,11 +2832,30 @@ function claudeRequest(msgs){
   };
 }
 
+/* The quickest good model this key has - flash answers in about a second where
+   pro takes several, and a spoken answer does not need pro. */
+function fastGeminiModel(){
+  var list = [];
+  try{
+    var sel = $("setGemModel");
+    for(var i = 0; i < sel.options.length; i++) list.push(sel.options[i].value);
+  }catch(e){}
+  var flash = list.filter(function(id){
+    return /flash/i.test(id) && !/lite|preview|exp|thinking/i.test(id);
+  });
+  if(flash.length) return bestModel(flash);
+  return "gemini-2.5-flash";
+}
+/* thinking out loud is for the written answers */
+function activeGeminiModel(){
+  return voiceMode ? fastGeminiModel() : store.settings.geminiModel;
+}
+
 function geminiRequest(msgs){
   var s = store.settings;
   return {
     url: "https://generativelanguage.googleapis.com/v1beta/models/" +
-         encodeURIComponent(s.geminiModel) + ":streamGenerateContent?alt=sse&key=" +
+         encodeURIComponent(activeGeminiModel()) + ":streamGenerateContent?alt=sse&key=" +
          encodeURIComponent(apiKeyNow()),
     headers: { "content-type": "application/json" },
     body: {
@@ -2846,8 +2865,12 @@ function geminiRequest(msgs){
         return { role: m.role === "assistant" ? "model" : "user",
                  parts: geminiParts(m) };
       }),
-      /* spoken answers are short by design, and asking for less comes back sooner */
-      generationConfig: { maxOutputTokens: voiceMode ? 320 : 8000 }
+      /* Spoken answers are short by design, and asking for less comes back
+         sooner. Turning the thinking budget off is the rest of the wait: it
+         stops the model reasoning silently before it says anything. */
+      generationConfig: voiceMode
+        ? { maxOutputTokens: 320, thinkingConfig: { thinkingBudget: 0 } }
+        : { maxOutputTokens: 8000 }
     }
   };
 }
@@ -5318,7 +5341,9 @@ function hfAsk(question){
     hfSet("talk", "Speaking");
     hf.talking = true;
     hf.turns++;
-    hfSpeak(answer, function(){
+    /* it has been speaking all along - wait for the last sentence, do not
+       start the whole answer again */
+    sayWhenDone(function(){
       hf.talking = false;
       if(!hf.want) return;
       /* straight back to listening - this is what makes it a conversation */
@@ -5329,10 +5354,17 @@ function hfAsk(question){
     renderAll();
   }).catch(function(err){
     voiceMode = false;
-    hfSaid.textContent = String(err && err.message || err);
+    sayStop();
+    hf.talking = false;
+    var why = String(err && err.message || err);
+    hfSaid.textContent = why;
     hfSet("talk", "Sorry");
-    hfSpeak(navigator.onLine ? "Sorry, that didn't work." : "I need a connection to answer that.",
-      function(){ hfSet("wait", hfIdleLabel()); });
+    /* the real reason, briefly - a timeout and a refusal are different problems */
+    hfSpeak(navigator.onLine ? why.slice(0, 120) : "I need a connection to answer that.",
+      function(){
+        hfSet(hf.want ? "hear" : "wait", hf.want ? "Listening…" : hfIdleLabel());
+        if(hf.want) hfQuietTimer();
+      });
   });
 }
 
@@ -5341,9 +5373,15 @@ function hfAsk(question){
    The answer used to be waited for in full and then spoken. Now it is read as
    it streams in and each finished sentence is spoken while the rest is still
    being written, which is most of the wait gone. */
-var sayQueue = [], saying = false;
+var sayQueue = [], saying = false, sayDone = null;
+function sayWhenDone(fn){ sayDone = fn; sayNext(); }
 function sayNext(){
-  if(saying || !sayQueue.length) return;
+  if(saying) return;
+  if(!sayQueue.length){
+    var f = sayDone; sayDone = null;
+    if(f) f();
+    return;
+  }
   saying = true;
   var line = sayQueue.shift();
   speak(line, function(){ saying = false; sayNext(); });
@@ -5354,7 +5392,7 @@ function sayChunk(text){
   sayQueue.push(text);
   sayNext();
 }
-function sayStop(){ sayQueue = []; saying = false; }
+function sayStop(){ sayQueue = []; saying = false; sayDone = null; }
 
 /* everything up to the last finished sentence */
 function wholeSentences(text){
@@ -5368,6 +5406,20 @@ function askStream(c, onText){
   if(isDevice() || !isGemini()) return askOnce(c);   /* only Gemini streams here */
   var req = buildRequest(c.messages);
   abortCtl = new AbortController();
+
+  /* Give up rather than hang. Waiting for a first word that never comes is the
+     one failure that looks exactly like thinking. */
+  var gotSomething = false, gaveUp = false;
+  var firstWord = setTimeout(function(){
+    if(gotSomething) return;
+    gaveUp = true;
+    try{ abortCtl.abort(); }catch(e){}
+  }, 9000);
+  var wholeThing = setTimeout(function(){
+    gaveUp = true;
+    try{ abortCtl.abort(); }catch(e){}
+  }, 30000);
+  function stopWaiting(){ clearTimeout(firstWord); clearTimeout(wholeThing); }
   return fetch(req.url, {
     method: 'POST', headers: req.headers,
     body: JSON.stringify(req.body), signal: abortCtl.signal
@@ -5390,19 +5442,33 @@ function askStream(c, onText){
           var ev;
           try{ ev = JSON.parse(payload); }catch(e){ return; }
           var d = readDelta(ev);
-          if(d.text){ acc += d.text; if(onText) onText(acc, d.text); }
+          if(d.text){
+            gotSomething = true;
+            clearTimeout(firstWord);
+            acc += d.text;
+            if(onText) onText(acc, d.text);
+          }
         });
         return pump();
       });
     }
     return pump();
   }).then(function(text){
+    stopWaiting();
     var out = String(text || '').trim();
     if(!out) throw new Error('empty answer');
     c.messages.push({ role:'assistant', content: out, t: Date.now() });
     if(c.messages.length === 2) c.title = c.messages[0].content.slice(0, 40);
     save();
     return out;
+  }, function(err){
+    stopWaiting();
+    if(gaveUp){
+      throw new Error(gotSomething
+        ? "That answer stopped halfway. Ask me again."
+        : "No answer came back in time. Check the signal and ask me again.");
+    }
+    throw err;
   });
 }
 
@@ -5475,7 +5541,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-20.52";
+var BUILD = "2026-08-21.53";
 
 function banner(kind, html){
   var b = $("banner");

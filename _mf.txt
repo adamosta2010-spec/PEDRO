@@ -1,0 +1,17 @@
+The thinking was the model, and nothing ever gave up
+
+Two causes for the wait. The model being used for speech was the one chosen for
+quality - on Gemini that is pro, which reasons silently before it answers, and
+for a spoken reply that reasoning is the whole delay. Talking now uses the
+quickest good model the key has, with the thinking budget set to zero.
+
+And nothing had a time limit. If the connection stalled, the stream simply never
+delivered another byte and it sat on Thinking for good - the one failure that
+looks exactly like working. There is now a limit on waiting for the first word
+and on the whole answer, and giving up says which happened rather than sulking.
+
+Also fixed something I had just broken: streaming speaks each sentence as it
+arrives, and the old code then spoke the entire answer again at the end. It now
+waits for the last sentence to finish instead.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>

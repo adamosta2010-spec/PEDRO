@@ -605,7 +605,12 @@ function nativeFrom(cap, exp){
   t("two sentences come back together", whole("One. Two. Three"), "One. Two.");
   t("what is spoken is queued, not overlapped", inSrc("function sayNext"), true);
   t("stopping empties the queue", inSrc("function sayStop"), true);
-  t("spoken answers ask for less", inSrc("voiceMode ? 320 : 8000"), true);
+  t("spoken answers ask for less", inSrc("maxOutputTokens: 320"), true);
+  t("and stop it thinking first", inSrc("thinkingConfig: { thinkingBudget: 0 }"), true);
+  t("talking uses the quick model", inSrc("voiceMode ? fastGeminiModel()"), true);
+  t("it gives up rather than hanging", inSrc("No answer came back in time"), true);
+  t("a half answer says so", inSrc("That answer stopped halfway"), true);
+  t("the first word stops the clock", inSrc("clearTimeout(firstWord)"), true);
   t("a provider that cannot stream still answers", inSrc("if(isDevice() || !isGemini()) return askOnce(c);"), true);
 
   t("the simulation runs inside the ball", page.indexOf('id="orbViz"') > -1, true);
@@ -613,6 +618,19 @@ function nativeFrom(cap, exp){
   t("it is still walled off", page.indexOf('id="orbViz" sandbox="allow-scripts"') > -1, true);
   t("tapping the ball puts the globe back", inSrc("if(vizStop()) return;"), true);
   t("and stops whatever was running", grab("vizStop").indexOf("srcdoc = ''") > -1, true);
+}
+
+
+/* ---- not saying everything twice, and never getting stuck ---- */
+{
+  const inSrc = bit => src.indexOf(bit) > -1;
+  const ask = grab("hfAsk");
+  t("the answer is not spoken twice", ask.indexOf("hfSpeak(answer,") === -1, true);
+  t("it waits for the last sentence instead", ask.indexOf("sayWhenDone(") > -1, true);
+  t("a failure says the real reason", ask.indexOf("why.slice(0, 120)") > -1, true);
+  t("and goes back to listening", ask.indexOf('hfSet(hf.want ? "hear" : "wait"') > -1, true);
+  t("a failure clears anything queued", ask.indexOf("sayStop();") > -1, true);
+  t("stopping forgets the callback too", grab("sayStop").indexOf("sayDone = null") > -1, true);
 }
 
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " mic/image tests passed");

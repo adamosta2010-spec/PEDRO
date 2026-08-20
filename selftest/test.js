@@ -14,7 +14,7 @@ function grab(name){
 }
 /* the prompt names the apps Pedro can open; the list itself is not what these test */
 const appList = () => "maps, music, spotify, messages, phone, web";
-const names = ["studies","studyFor","studyOf","forgetStudy","shortContext","providerLabel","apiErrorBody","noKeyYet","trimImages","memories","recallFor","isDevice","inApp","isGemini","isGroq","isLocal","isOpenAIStyle","allKeys","apiKeyNow","activeModel","systemPrompt","taughtBlock","pickLessons","relevance","lessons","facts",
+const names = ["activeGeminiModel","fastGeminiModel","bestModel","modelTier","modelVersion","studies","studyFor","studyOf","forgetStudy","shortContext","providerLabel","apiErrorBody","noKeyYet","trimImages","memories","recallFor","isDevice","inApp","isGemini","isGroq","isLocal","isOpenAIStyle","allKeys","apiKeyNow","activeModel","systemPrompt","taughtBlock","pickLessons","relevance","lessons","facts",
                "claudeContent","geminiParts","claudeRequest","geminiRequest","buildRequest","readDelta","stopNote",
                "apiError","aiName","wakeRe","parseKeyPayload"];
 let store = { settings:{ provider:"gemini", aiName:"Pedro", apiKey:"", geminiKey:"AIzaTEST",
