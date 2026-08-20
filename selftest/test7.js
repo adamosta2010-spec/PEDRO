@@ -790,7 +790,12 @@ function nativeFrom(cap, exp){
   t("the ball can be turned with a finger", grab("handsOn").indexOf("grip.spinY += dx") > -1, true);
   t("two fingers pinch it", grab("handsOn").indexOf("grip.startDist") > -1, true);
   t("and carry it somewhere else", grab("handsOn").indexOf("grip.x = grip.fromX") > -1, true);
-  t("it cannot be pinched to nothing", grab("handsOn").indexOf("Math.max(140") > -1, true);
+  t("it cannot be pinched to nothing", grab("handsOn").indexOf("Math.max(0.55") > -1, true);
+  t("nor blown up past the screen", grab("handsOn").indexOf("Math.min(2.2") > -1, true);
+  t("it scales rather than resizing, which is what made it lag",
+    grab("gripApply").indexOf("scale(") > -1 && grab("gripApply").indexOf("--orb") === -1, true);
+  t("and writes the change once a frame", grab("gripApply").indexOf("requestAnimationFrame") > -1, true);
+  t("the ball and its words move together", grab("gripApply").indexOf(".hudcentre") > -1, true);
   t("where it was left is remembered", inSrc("function gripSave"), true);
   t("and restored next time", inSrc("gripLoad();"), true);
 

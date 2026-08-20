@@ -363,8 +363,10 @@
   .hudgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr) minmax(0,1fr);
     gap:12px;height:100%;position:relative;z-index:1}
   .hudcol{display:flex;flex-direction:column;gap:10px;min-width:0}
+  /* the whole middle moves and scales as one, from its own centre */
   .hudcentre{display:flex;flex-direction:column;align-items:center;justify-content:center;
-    gap:16px;text-align:center;min-width:0}
+    gap:16px;text-align:center;min-width:0;
+    transform-origin:50% 50%;touch-action:none}
 
   /* Panels stay out of the way until asked for, and once shown they can be
      picked up and put wherever suits. */
@@ -4722,7 +4724,7 @@ function rememberFrom(text){
    drag it somewhere else. Any panel showing can be picked up and moved. Where
    things are left is remembered. */
 var grip = {
-  spinX: 0, spinY: 0, size: 0, x: 0, y: 0,
+  spinX: 0, spinY: 0, scale: 1, x: 0, y: 0, pending: false,
   pointers: {}, count: 0,
   startDist: 0, startSize: 0, startX: 0, startY: 0,
   fromX: 0, fromY: 0, lastX: 0, lastY: 0, turned: false
@@ -4730,26 +4732,38 @@ var grip = {
 
 function gripSave(){
   store.settings.orbGrip = { spinX: grip.spinX, spinY: grip.spinY,
-    size: grip.size, x: grip.x, y: grip.y };
+    scale: grip.scale, x: grip.x, y: grip.y };
   save();
 }
 function gripLoad(){
   var g = store.settings.orbGrip;
   if(!g) return;
+  /* it used to be saved as a width in pixels; that no longer means anything */
+  if(g.size && !g.scale){ delete g.size; g.scale = 1; }
   grip.spinX = g.spinX || 0; grip.spinY = g.spinY || 0;
-  grip.size = g.size || 0; grip.x = g.x || 0; grip.y = g.y || 0;
+  grip.scale = g.scale || 1; grip.x = g.x || 0; grip.y = g.y || 0;
   gripApply();
 }
 function gripApply(){
-  var orb = $("hfOrb");
-  if(!orb) return;
-  if(grip.size) orb.style.setProperty("--orb", Math.round(grip.size) + "px");
-  orb.style.transform = "translate(" + Math.round(grip.x) + "px," + Math.round(grip.y) + "px)";
-  var globe = orb.querySelector(".globe");
-  if(globe){
-    globe.style.transform = "rotateX(" + grip.spinX.toFixed(1) + "deg) rotateY(" +
-      grip.spinY.toFixed(1) + "deg)";
-  }
+  /* One transform, on the whole middle, written once a frame. Scaling is free
+     for the browser; changing the width is not, and the ball is a hundred
+     animated rings. Moving the group keeps the ball and its words together. */
+  if(grip.pending) return;
+  grip.pending = true;
+  requestAnimationFrame(function(){
+    grip.pending = false;
+    var stage = document.querySelector('.hudcentre');
+    if(!stage) return;
+    var s = grip.scale || 1;
+    stage.style.willChange = 'transform';
+    stage.style.transform =
+      'translate3d(' + Math.round(grip.x) + 'px,' + Math.round(grip.y) + 'px,0) scale(' + s.toFixed(3) + ')';
+    var globe = document.querySelector('#hfOrb .globe');
+    if(globe){
+      globe.style.transform = 'rotateX(' + grip.spinX.toFixed(1) + 'deg) rotateY(' +
+        grip.spinY.toFixed(1) + 'deg)';
+    }
+  });
 }
 function gripDistance(){
   var ids = Object.keys(grip.pointers);
@@ -4776,7 +4790,7 @@ function handsOn(){
     grip.lastX = ev.clientX; grip.lastY = ev.clientY;
     if(grip.count === 2){
       grip.startDist = gripDistance();
-      grip.startSize = orb.getBoundingClientRect().width;
+      grip.startScale = grip.scale || 1;
       var mid = gripMiddle();
       grip.startX = mid.x; grip.startY = mid.y;
       grip.fromX = grip.x; grip.fromY = grip.y;
@@ -4790,8 +4804,8 @@ function handsOn(){
     if(grip.count >= 2){
       var dist = gripDistance();
       if(grip.startDist > 10 && dist > 10){
-        var want = grip.startSize * (dist / grip.startDist);
-        grip.size = Math.max(140, Math.min(window.innerWidth * 0.92, want));
+        var want = grip.startScale * (dist / grip.startDist);
+        grip.scale = Math.max(0.55, Math.min(2.2, want));
       }
       var mid = gripMiddle();
       grip.x = grip.fromX + (mid.x - grip.startX);
@@ -6289,7 +6303,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.60";
+var BUILD = "2026-08-21.61";
 
 function banner(kind, html){
   var b = $("banner");
