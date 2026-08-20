@@ -12,16 +12,25 @@ function grab(name){
   }
 }
 const names = ["lessons","facts","relevance","pickLessons","taughtBlock","addLesson","addFact",
-               "isGemini","isGroq","isLocal","allKeys","apiKeyNow","systemPrompt"];
+               "isGemini","isGroq","isLocal","allKeys","apiKeyNow","providerLabel",
+               "memories","recallFor","sameMemory","addMemory","forgetMemory","rememberFrom",
+               "systemPrompt"];
 let store = { settings:{ provider:"gemini", aiName:"Pedro", name:"Adam", about:"",
   apiKey:"", geminiKey:"", groqKey:"", model:"claude-opus-5", geminiModel:"g",
-  effort:"low", facts:[], lessons:[] } };
+  effort:"low", facts:[], lessons:[], memories:[] } };
 let voiceMode = false, lastUserText = "";
 const isLocked = () => false;
 let saved = 0;
 const save = () => { saved++; };
 const uid = () => "id" + Math.random().toString(36).slice(2, 7);
-eval(names.map(grab).join("\n"));
+/* MEMORY_RULES and the two command patterns are plain vars, not functions */
+function grabVar(name){
+  const i = src.indexOf("var " + name);
+  const j = name === "MEMORY_RULES" ? src.indexOf("];", i) + 2 : src.indexOf(";", i) + 1;
+  return src.slice(i, j);
+}
+eval(["MEMORY_RULES", "REMEMBER_RE", "FORGET_RE"].map(grabVar).join("\n") +
+     "\n" + names.map(grab).join("\n"));
 
 let fail = 0, pass = 0;
 const t = (n, g, w) => {
@@ -78,6 +87,60 @@ t("pickLessons copes with nothing", pickLessons("hello", 6), []);
 t("longer words score higher",
   relevance("zfighting", {q:"how do I fix z-fighting", tag:""}) >= 0, true);
 t("no overlap scores zero", relevance("bananas", {q:"roblox scripting", tag:""}), 0);
+
+
+/* ---- memory ---- */
+{
+  store.settings.memories = [];
+  const said = t => rememberFrom(t);
+
+  t("it keeps a name when told one", said("my name is Adam"), ["Their name is Adam."]);
+  t("where they live", said("i live in London"), ["They live in London."]);
+  t("what they are", said("i am a student"), ["They are a student."]);
+  t("what they like", said("i love roblox games"), ["They like roblox games."]);
+  t("what they are working on",
+    said("i am building a shooter game"), ["They are working on a shooter game."]);
+  t("told outright, it keeps the words as given",
+    said("remember that the bins go out on Tuesday"), ["the bins go out on Tuesday"]);
+
+  t("the same thing twice is one memory", said("i live in London"), []);
+  t("a question is asking, not telling", said("where do i live?"), []);
+  t("nothing at all is safe", said(""), []);
+  t("small talk is not hoarded", said("thanks that is great"), []);
+
+  t("it has kept exactly what it should", store.settings.memories.length, 6);
+
+  /* recall puts the relevant ones first */
+  const back = recallFor("what games do i like", 3);
+  t("recall leads with what was asked about", /roblox/i.test(back[0]), true);
+  t("recall respects the limit", recallFor("anything", 2).length, 2);
+  t("recall with no memories is empty", (function(){
+    const keep = store.settings.memories; store.settings.memories = [];
+    const r = recallFor("anything", 5); store.settings.memories = keep; return r;
+  })(), []);
+
+  /* and it can be told to forget */
+  t("forgetting removes it", forgetMemory("roblox") > 0, true);
+  t("and it is really gone",
+    store.settings.memories.some(m => /roblox/i.test(m.text)), false);
+  t("forgetting something it never knew changes nothing", forgetMemory("submarines"), 0);
+  t("forget as a sentence works too", (function(){
+    rememberFrom("forget that i live in London");
+    return store.settings.memories.some(m => /London/i.test(m.text));
+  })(), false);
+
+  /* what the model actually sees */
+  t("memories reach the prompt", /What you remember about/.test(taughtBlock("hello")), true);
+  t("and it is told not to parrot them",
+    /not recite them back/i.test(taughtBlock("hello")), true);
+  t("an empty memory adds nothing to the prompt", (function(){
+    const keep = store.settings.memories; store.settings.memories = [];
+    const out = taughtBlock("hello"); store.settings.memories = keep;
+    return /What you remember/.test(out);
+  })(), false);
+
+  store.settings.memories = [];
+}
 
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " teaching tests passed");
 process.exit(fail ? 1 : 0);

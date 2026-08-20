@@ -831,7 +831,8 @@ var KEY = "pocketai.v1";
 var DEF = {
   provider:"gemini", aiName:"Pedro", theme:"dark", accent:"blue",                 /* "gemini" (free) or "claude" (paid) */
   apiKey:"", model:"claude-opus-5", effort:"low",
-  geminiKey:"", geminiModel:"gemini-2.5-flash", imageModel:"gemini-2.5-flash-image",
+  geminiKey:"", geminiModel:"gemini-2.5-pro", imageModel:"gemini-2.5-flash-image",
+  smarterPicked:false,   /* the old default chose the fastest model, not the best one */
   groqKey:"", groqModel:"llama-3.3-70b-versatile",
   localUrl:"http://localhost:11434", localModel:"qwen2.5:7b",
   deviceSeen:false,               /* the phone's own model has answered at least once */
@@ -1485,17 +1486,26 @@ function pickModels(d){
   return { chat: chat, image: image };
 }
 /* prefer a stable "flash" build for chat - fast and the cheapest on the free tier */
+/* How good a model is likely to be, in the order that matters here:
+   pro thinks properly, flash is quick, lite is quick and little else. */
+function modelTier(id){
+  if(/lite/i.test(id))  return 1;
+  if(/flash/i.test(id)) return 2;
+  if(/pro/i.test(id))   return 3;
+  return 2;                               /* unfamiliar names sit with flash */
+}
+function modelVersion(id){
+  return parseFloat((id.match(/(\d+\.?\d*)/) || [0, 0])[1]) || 0;
+}
 function bestModel(list){
   if(!list.length) return "";
   var stable = list.filter(function(id){ return !/preview|exp|experimental|thinking|tuning/i.test(id); });
   var pool = stable.length ? stable : list;
-  var flash = pool.filter(function(id){ return /flash/i.test(id); });
-  var byVersion = (flash.length ? flash : pool).slice().sort(function(a, b){
-    var va = parseFloat((a.match(/(\d+\.?\d*)/) || [0, 0])[1]);
-    var vb = parseFloat((b.match(/(\d+\.?\d*)/) || [0, 0])[1]);
-    return vb - va;                       /* highest version number wins */
-  });
-  return byVersion[0];
+  return pool.slice().sort(function(a, b){
+    var ta = modelTier(a), tb = modelTier(b);
+    if(ta !== tb) return tb - ta;         /* the one that thinks best comes first */
+    return modelVersion(b) - modelVersion(a);
+  })[0];
 }
 
 function loadGeminiModels(silent){
@@ -1534,13 +1544,26 @@ function loadGeminiModels(silent){
         sel.value = keep;
         return keep;
       }
+      /* whoever was set up under the old rule got the fastest model rather than
+         the best one - move them across once, quietly */
+      if(!store.settings.smarterPicked){
+        var better = best(txtIds);
+        if(better && better !== store.settings.geminiModel &&
+           modelTier(better) > modelTier(store.settings.geminiModel)){
+          store.settings.geminiModel = better;
+        }
+        store.settings.smarterPicked = true;
+      }
       store.settings.geminiModel = fill($("setGemModel"), txtIds, store.settings.geminiModel);
       store.settings.imageModel  = fill($("setImgModel"), imgIds, store.settings.imageModel);
       store.settings.modelsLoaded = Date.now();
       save(); syncProviderUI();
 
       if(hint) hint.textContent = txtIds.length + " chat models, " + imgIds.length +
-        " picture model(s) on your key. Using " + store.settings.geminiModel + ".";
+        " picture model(s) on your key. Using " + store.settings.geminiModel + ". " +
+        (modelTier(store.settings.geminiModel) >= 3
+          ? "Pro thinks hardest; Flash is faster with a bigger free allowance."
+          : "Flash is fast; Pro answers better if your key allows it.");
       if(!silent) toast("Model list updated");
       return { chat: txtIds, image: imgIds };
     })
@@ -2015,8 +2038,8 @@ function systemPrompt(){
   /* who he is, as distinct from whatever is answering for him today */
   p += "This app was built by " + (s.name || "the person using it") +
     ", for their own use - you are theirs, not a product of any company. " +
-    "Behind you is a language model that can be swapped at any time " +
-    "(right now: " + providerLabel(s.provider) + "), which is a detail of how you run, " +
+    "Behind you is a language model that can be swapped at any time, " +
+    "which is a detail of how you run, " +
     "not who you are. Asked who made you, say " + (s.name || "they") + " did.\n";
   if(s.about) p += "What they've told you about themselves:\n" + s.about + "\n";
   p += "\nYou are read on a phone screen, so keep responses focused, brief, and concise. " +
@@ -2250,6 +2273,8 @@ function send(){
   }
   if(scroll.querySelector(".empty")) scroll.innerHTML = "";
 
+  /* listen for anything worth keeping before the message goes off */
+  var learned = rememberFrom(text);
   var msg = { role:"user", content:text, t:Date.now() };
   if(pending.length){ msg.images = pending.slice(); }
   var shotsForImage = pending.slice();
@@ -2258,6 +2283,7 @@ function send(){
   c.messages.push(msg);
   addBubble(msg, c.messages.length-1);
   input.value = ""; autosize(); save(); jump(true);
+  if(learned.length) toast(learned.length === 1 ? "Remembered that" : "Remembered " + learned.length + " things");
 
   /* they clearly asked for a picture, but this provider can't make one */
   if(!wantsPicture(text) && DRAW_RE.test(text.trim()) && !isGemini()){
@@ -2851,6 +2877,126 @@ function decorateCode(el){
 
 function lessons(){ return store.settings.lessons || (store.settings.lessons = []); }
 function facts(){ return store.settings.facts || (store.settings.facts = []); }
+function memories(){ return store.settings.memories || (store.settings.memories = []); }
+
+/* ==================== memory ====================
+   Things worth keeping tend to be said in a handful of shapes. Catching them
+   here means no extra request, nothing leaves the phone, and it still works
+   with no internet at all. Each rule turns what was said into how Pedro should
+   remember it. */
+var MEMORY_RULES = [
+  { re: /(?:my name is|i am called|i\'m called|call me)\s+([a-z][\w'-]{1,24})/i,
+    say: function(m){ return "Their name is " + m[1] + "."; } },
+  { re: /my (?:birthday|bday) is\s+([^.!?,;]{2,30})/i,
+    say: function(m){ return "Their birthday is " + m[1].trim() + "."; } },
+  { re: /i live in\s+([^.!?,;]{2,40})/i,
+    say: function(m){ return "They live in " + m[1].trim() + "."; } },
+  { re: /i (?:work at|work for)\s+([^.!?,;]{2,40})/i,
+    say: function(m){ return "They work at " + m[1].trim() + "."; } },
+  { re: /i(?:\'m| am) (?:a|an)\s+([^.!?,;]{2,40})/i,
+    say: function(m){ return "They are a " + m[1].trim() + "."; } },
+  { re: /i(?:\'m| am) (?:building|making|working on|learning|studying)\s+([^.!?,;]{2,50})/i,
+    say: function(m){ return "They are working on " + m[1].trim() + "."; } },
+  { re: /i (?:really )?(?:like|love|enjoy)\s+([^.!?,;]{2,50})/i,
+    say: function(m){ return "They like " + m[1].trim() + "."; } },
+  { re: /i (?:hate|dislike|can\'t stand)\s+([^.!?,;]{2,50})/i,
+    say: function(m){ return "They don\'t like " + m[1].trim() + "."; } },
+  { re: /i (?:prefer|always|usually)\s+([^.!?,;]{2,60})/i,
+    say: function(m){ return "They usually " + m[1].trim() + "."; } },
+  { re: /i have (?:a|an)\s+([^.!?,;]{2,40})/i,
+    say: function(m){ return "They have a " + m[1].trim() + "."; } }
+];
+
+/* said outright - this wins over the patterns, and keeps the words as given */
+var REMEMBER_RE = /^(?:please\s+)?(?:remember|note|keep in mind)(?:\s+that)?[:,]?\s+(.{3,140})$/i;
+var FORGET_RE   = /^(?:please\s+)?forget(?:\s+that|\s+about)?[:,]?\s+(.{2,140})$/i;
+
+/* the same thing said twice is not two memories */
+function sameMemory(a, b){
+  var tidy = function(x){ return String(x).toLowerCase().replace(/[^a-z0-9 ]/g, "").trim(); };
+  a = tidy(a); b = tidy(b);
+  if(!a || !b) return false;
+  return a === b || (a.length > 12 && b.indexOf(a) >= 0) || (b.length > 12 && a.indexOf(b) >= 0);
+}
+
+function addMemory(text){
+  text = String(text || "").trim();
+  if(text.length < 3) return false;
+  var m = memories();
+  for(var i = 0; i < m.length; i++){
+    if(sameMemory(m[i].text, text)){ m[i].t = Date.now(); save(); return false; }
+  }
+  m.push({ id: uid(), text: text, t: Date.now() });
+  /* keep the newest - this shares localStorage with the chats */
+  if(m.length > 200) m.splice(0, m.length - 200);
+  save();
+  return true;
+}
+
+function forgetMemory(about){
+  var m = memories();
+  var before = m.length;
+  var needle = String(about || "").toLowerCase().trim();
+  /* what is said is first person, what is stored is third - so compare on the
+     words that carry the meaning rather than the exact phrasing */
+  var skip = " i my me the a an that about is are was were in on at of to and or it this ".split(" ");
+  var words = (needle.match(/[a-z0-9']+/g) || []).filter(function(w){
+    return w.length > 2 && skip.indexOf(w) < 0;
+  });
+  store.settings.memories = m.filter(function(x){
+    var t = x.text.toLowerCase();
+    if(sameMemory(x.text, about)) return false;
+    if(needle && t.indexOf(needle) >= 0) return false;
+    if(words.length && words.every(function(w){ return t.indexOf(w) >= 0; })) return false;
+    return true;
+  });
+  save();
+  return before - store.settings.memories.length;
+}
+
+/* Read one message and keep anything worth keeping. Returns what was learned,
+   so the app can say so rather than hoarding quietly. */
+function rememberFrom(text){
+  var said = String(text || "").trim();
+  if(!said) return [];
+  var got = [];
+
+  var f = said.match(FORGET_RE);
+  if(f){ forgetMemory(f[1].trim()); return []; }
+
+  var r = said.match(REMEMBER_RE);
+  if(r){
+    var asked = r[1].trim().replace(/[.!]+$/, "");
+    if(addMemory(asked)) got.push(asked);
+    return got;
+  }
+
+  /* a question is usually asking, not telling */
+  if(/\?\s*$/.test(said)) return [];
+
+  for(var i = 0; i < MEMORY_RULES.length; i++){
+    var m = said.match(MEMORY_RULES[i].re);
+    if(!m) continue;
+    var line = MEMORY_RULES[i].say(m).replace(/\s+/g, " ").trim();
+    if(addMemory(line)) got.push(line);
+  }
+  return got;
+}
+
+/* what to put in front of the model: whatever bears on this question, newest
+   first, kept short so it does not crowd out the conversation */
+function recallFor(text, max){
+  var m = memories();
+  if(!m.length) return [];
+  var scored = m.map(function(x){
+    return { text: x.text, t: x.t || 0, score: relevance(text || "", { q: x.text }) };
+  });
+  scored.sort(function(a, b){
+    if(b.score !== a.score) return b.score - a.score;
+    return b.t - a.t;
+  });
+  return scored.slice(0, max || 12).map(function(x){ return x.text; });
+}
 
 /* crude but effective: how much do two bits of text overlap? */
 function relevance(text, lesson){
@@ -2867,7 +3013,6 @@ function relevance(text, lesson){
   return score;
 }
 
-/* the lessons worth sending for this particular message */
 function pickLessons(text, max){
   var all = lessons();
   if(!all.length) return [];
@@ -2879,9 +3024,16 @@ function pickLessons(text, max){
   return scored.slice(0, max).map(function(x){ return x.l; });
 }
 
-/* the block that gets appended to the system prompt */
 function taughtBlock(text){
   var out = "";
+  /* whatever Pedro has picked up that bears on this question */
+  var mem = recallFor(text || "", 12);
+  if(mem.length){
+    out += "\n\nWhat you remember about " + (store.settings.name || "them") +
+           " from earlier conversations:\n";
+    for(var k = 0; k < mem.length; k++) out += "- " + mem[k] + "\n";
+    out += "Use these when they matter. Do not recite them back unprompted." + "\n";
+  }
   var f = facts();
   if(f.length){
     out += "\n\nThings " + (store.settings.name || "the user") + " has told you to remember:\n";
@@ -2927,7 +3079,18 @@ function renderTeach(){
   var f = facts(), l = lessons();
   var html = "";
 
-  html += '<div class="secttl" style="padding-left:0">Facts (' + f.length + ')</div>';
+  var mem = memories().slice().sort(function(a, b){ return (b.t || 0) - (a.t || 0); });
+  html += '<div class="secttl" style="padding-left:0">Remembered by itself (' + mem.length + ')</div>';
+  if(!mem.length) html += '<div class="hint" style="margin:0 0 10px">Nothing yet. Say things like ' +
+    '<b>my name is…</b>, <b>I live in…</b> or <b>remember that…</b> and it keeps them. ' +
+    'Say <b>forget…</b> to take one back.</div>';
+  for(var q = 0; q < mem.length; q++){
+    html += '<div class="taught"><div class="tt">' + esc(mem[q].text) + '</div>' +
+            '<button data-dm="' + esc(mem[q].id) + '" aria-label="Forget">&times;</button></div>';
+  }
+  if(mem.length) html += '<button class="btn ghost" id="btnForgetAll" style="margin-top:8px">Forget everything</button>';
+
+  html += '<div class="secttl" style="padding-left:0;margin-top:14px">Facts (' + f.length + ')</div>';
   if(!f.length) html += '<div class="hint" style="margin:0 0 10px">Nothing yet. Facts are always sent - keep them short and true.</div>';
   for(var i=0;i<f.length;i++){
     html += '<div class="taught"><div class="tt">' + esc(f[i]) + '</div>' +
@@ -2946,7 +3109,8 @@ function renderTeach(){
 
   var n = f.length + l.length;
   var badge = $("teachCount");
-  if(badge) badge.textContent = n ? (n + " taught") : "nothing taught yet";
+  if(badge) badge.textContent = (n ? (n + " taught") : "nothing taught yet") +
+    (mem.length ? " · " + mem.length + " remembered" : "");
 }
 
 $("teachList").addEventListener("click", function(ev){
@@ -2954,6 +3118,12 @@ $("teachList").addEventListener("click", function(ev){
   if(!b) return;
   if(b.dataset.df !== undefined){
     facts().splice(parseInt(b.dataset.df, 10), 1); save(); renderTeach();
+  } else if(b.dataset.dm){
+    store.settings.memories = memories().filter(function(x){ return x.id !== b.dataset.dm; });
+    save(); renderTeach(); toast("Forgotten");
+  } else if(b.id === "btnForgetAll"){
+    store.settings.memories = [];
+    save(); renderTeach(); toast("Memory cleared");
   } else if(b.dataset.dl){
     store.settings.lessons = lessons().filter(function(x){ return x.id !== b.dataset.dl; });
     save(); renderTeach();
@@ -3379,7 +3549,7 @@ $("hfExit").addEventListener("click", hfClose);
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-20.26";
+var BUILD = "2026-08-20.27";
 
 function banner(kind, html){
   var b = $("banner");

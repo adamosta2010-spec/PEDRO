@@ -12,7 +12,7 @@ function grab(name){
     else if(src[k] === "}"){ d--; if(!d) return src.slice(i, k + 1); }
   }
 }
-const names = ["onHostMachine","guessLocalUrl","isDevice","inApp","isGemini","isGroq","isLocal","isOpenAIStyle","allKeys","apiKeyNow","activeModel",
+const names = ["memories","recallFor","onHostMachine","guessLocalUrl","isDevice","inApp","isGemini","isGroq","isLocal","isOpenAIStyle","allKeys","apiKeyNow","activeModel",
                "systemPrompt","taughtBlock","pickLessons","relevance","lessons","facts","claudeContent","geminiParts","claudeRequest","geminiRequest",
                "groqRequest","localRequest","buildRequest","readDelta","apiError",
                "usableProviders","nextProvider","providerLabel","isBusy"];
@@ -20,7 +20,7 @@ let store = { settings:{ provider:"gemini", aiName:"Pedro",
   apiKey:"", geminiKey:"", groqKey:"", model:"claude-opus-5",
   geminiModel:"gemini-2.5-flash", imageModel:"gemini-2.5-flash-image",
   groqModel:"llama-3.3-70b-versatile", localUrl:"http://localhost:11434",
-  localModel:"qwen2.5:7b", localSeen:false, effort:"low", name:"", about:"", facts:[], lessons:[] } };
+  localModel:"qwen2.5:7b", localSeen:false, effort:"low", name:"", about:"", facts:[], lessons:[], memories:[] } };
 let voiceMode = false;
 const isLocked = () => false;
 eval(names.map(grab).join("\n"));

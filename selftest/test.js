@@ -12,12 +12,12 @@ function grab(name){
     else if(src[k] === "}"){ d--; if(!d) return src.slice(i, k + 1); }
   }
 }
-const names = ["isDevice","inApp","isGemini","isGroq","isLocal","isOpenAIStyle","allKeys","apiKeyNow","activeModel","systemPrompt","taughtBlock","pickLessons","relevance","lessons","facts",
+const names = ["memories","recallFor","isDevice","inApp","isGemini","isGroq","isLocal","isOpenAIStyle","allKeys","apiKeyNow","activeModel","systemPrompt","taughtBlock","pickLessons","relevance","lessons","facts",
                "claudeContent","geminiParts","claudeRequest","geminiRequest","buildRequest","readDelta","stopNote",
                "apiError","aiName","wakeRe","parseKeyPayload"];
 let store = { settings:{ provider:"gemini", aiName:"Pedro", apiKey:"", geminiKey:"AIzaTEST",
   model:"claude-opus-5", geminiModel:"gemini-2.5-flash", effort:"low", groqKey:"", groqModel:"llama-3.3-70b-versatile", localUrl:"http://localhost:11434", localModel:"qwen2.5:7b",
-  name:"Adam", about:"Builds Roblox games.", facts:[], lessons:[] } };
+  name:"Adam", about:"Builds Roblox games.", facts:[], lessons:[], memories:[] } };
 let voiceMode = false;
 const isLocked = () => false;
 eval(names.map(grab).join("\n"));

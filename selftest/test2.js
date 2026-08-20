@@ -11,11 +11,11 @@ function grab(name){
     else if(src[k] === "}"){ d--; if(!d) return src.slice(i, k + 1); }
   }
 }
-const names = ["isDevice","inApp","isGemini","isGroq","isLocal","isOpenAIStyle","allKeys","apiKeyNow","systemPrompt","taughtBlock","pickLessons","relevance","lessons","facts","claudeContent","geminiParts",
+const names = ["memories","recallFor","isDevice","inApp","isGemini","isGroq","isLocal","isOpenAIStyle","allKeys","apiKeyNow","systemPrompt","taughtBlock","pickLessons","relevance","lessons","facts","claudeContent","geminiParts",
                "claudeRequest","geminiRequest","buildRequest","wantsPicture","esc","shots"];
 let store = { settings:{ provider:"gemini", aiName:"Pedro", apiKey:"sk-x", geminiKey:"AIzaTEST",
   model:"claude-opus-5", geminiModel:"gemini-2.5-flash", imageModel:"gemini-2.5-flash-image",
-  effort:"low", groqKey:"", groqModel:"llama-3.3-70b-versatile", localUrl:"http://localhost:11434", localModel:"qwen2.5:7b", name:"Adam", about:"", facts:[], lessons:[] } };
+  effort:"low", groqKey:"", groqModel:"llama-3.3-70b-versatile", localUrl:"http://localhost:11434", localModel:"qwen2.5:7b", name:"Adam", about:"", facts:[], lessons:[], memories:[] } };
 let voiceMode = false, imgMode = false;
 const isLocked = () => false;
 /* DRAW_RE lives at module scope in the app */

@@ -9,7 +9,7 @@ function grab(name){
     else if(src[k] === "}"){ d--; if(!d) return src.slice(i, k + 1); }
   }
 }
-eval(grab("pickModels") + "\n" + grab("bestModel"));
+eval([grab("pickModels"), grab("modelTier"), grab("modelVersion"), grab("bestModel")].join("\n"));
 
 let fail = 0, pass = 0;
 const t = (n, g, w) => {
@@ -40,14 +40,23 @@ t("image models split out", s.image, ["gemini-3-flash-image","imagen-4.0-generat
 t("chat models keep the rest",
   s.chat, ["gemini-3-pro","gemini-3-flash","gemini-2.5-flash","gemini-2.5-pro","gemini-3-flash-preview"]);
 
-/* the whole point: pick something real, and prefer the newest stable flash */
-t("picks newest stable flash", bestModel(s.chat), "gemini-3-flash");
-t("skips preview builds", bestModel(["gemini-4-flash-preview","gemini-3-flash"]), "gemini-3-flash");
-t("falls back to preview if that's all there is",
+/* the whole point: pick something real, and prefer the model that thinks
+   rather than the one that answers fastest - speed is worth little if the
+   answers are poor */
+t("prefers pro over flash", bestModel(s.chat), "gemini-3-pro");
+t("newest pro wins among pros",
+  bestModel(["gemini-2.5-pro","gemini-3-pro"]), "gemini-3-pro");
+t("flash beats lite", bestModel(["gemini-3-flash-lite","gemini-2.5-flash"]), "gemini-2.5-flash");
+t("lite is the last resort", bestModel(["gemini-3-lite"]), "gemini-3-lite");
+t("newest flash when there is no pro",
+  bestModel(["gemini-2.5-flash","gemini-3-flash"]), "gemini-3-flash");
+t("skips preview builds", bestModel(["gemini-4-pro-preview","gemini-3-pro"]), "gemini-3-pro");
+t("falls back to preview if that is all there is",
   bestModel(["gemini-4-flash-preview"]), "gemini-4-flash-preview");
-t("no flash? take newest anything", bestModel(["gemini-2.5-pro","gemini-3-pro"]), "gemini-3-pro");
 t("empty list is safe", bestModel([]), "");
 t("single option", bestModel(["gemini-9-flash"]), "gemini-9-flash");
+t("an unknown name ranks with flash, not above pro",
+  bestModel(["gemini-3-something","gemini-2.5-pro"]), "gemini-2.5-pro");
 
 /* a key with nothing usable must not silently pick garbage */
 const none = pickModels({ models:[{ name:"models/text-embedding-004", supportedGenerationMethods:["embedContent"] }] });
