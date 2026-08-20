@@ -3889,61 +3889,94 @@ function vizExtract(answer){
   return out;
 }
 
+/* what he has already built, so asking twice is instant */
+function sims(){ return store.settings.sims || (store.settings.sims = []); }
+function simFor(about){
+  var key = String(about || '').toLowerCase().trim();
+  return sims().filter(function(s){ return s.topic === key; })[0] || null;
+}
+function simKeep(about, html, say){
+  var key = String(about || '').toLowerCase().trim();
+  var was = simFor(key);
+  if(was){ was.html = html; was.say = say; was.t = Date.now(); }
+  else sims().push({ topic: key, html: html, say: say, t: Date.now() });
+  if(sims().length > 12) sims().splice(0, sims().length - 12);
+  save();
+}
+
+function vizShow(about, html, say){
+  viz.last = html;
+  $('orbViz').srcdoc = vizPage(html);
+  $('hfOrb').classList.add('showing');
+  hfSet('talk', about);
+  hfSaid.textContent = (say || '') + ' - tap it to go back.';
+  if(say){ hudLog('him', say, false); speak(say); }
+}
+
 function vizBuild(about){
   if(viz.busy) return;
-  viz.busy = true;
   viz.lastAsk = about;
-  /* stay where you are - it happens in the ball */
+
+  /* built this before - put it straight up */
+  var had = simFor(about);
+  if(had){
+    vizShow(about, had.html, had.say);
+    return;
+  }
+
+  viz.busy = true;
   hfSet('busy', 'Building ' + about);
-  hudLog('him', 'Building ' + about + '…', false);
-  /* something in the circle straight away, rather than a blank hole */
+  hudLog('him', 'Building ' + about + '...', false);
   $('orbViz').srcdoc = vizPage(vizWaiting(about));
   $('hfOrb').classList.add('showing');
 
-  /* it is shown in a circle the size of the ball, and it needs to arrive fast */
   var ask = 'Show ' + about + ' as a small animation that runs by itself.' +
-    ' Reply with one short sentence in plain speech, then one fenced html block:' +
-    ' a complete self-contained page, no external files, no network, no images,' +
-    ' no libraries. Use a canvas and plain JavaScript. It must start animating at' +
-    ' once and loop forever. Transparent or #0b0d12 background, draw in cyan' +
-    ' #38e1f0 with white highlights. It is displayed inside a CIRCLE, so keep' +
-    ' everything within the middle and do not put anything in the corners.' +
-    ' Every separate part must be draggable with a finger: listen for pointerdown,' +
-    ' pointermove and pointerup, work out which part was touched, and move that part' +
-    ' with the finger. Show a label on whatever is being held.' +
-    ' Keep it under 60 lines, and draw the first frame before anything else so it' +
-    ' appears at once.';
+    ' One short sentence in plain speech, then one fenced html block: a complete' +
+    ' self-contained page, no external files, no network, no images, no libraries.' +
+    ' Use a canvas and plain JavaScript. Start animating at once and loop.' +
+    ' Draw in cyan #38e1f0 on #0b0d12. It is shown inside a CIRCLE, so keep' +
+    ' everything near the middle. Let each part be dragged with pointerdown,' +
+    ' pointermove and pointerup. Under 40 lines. Nothing after the code block.';
 
   var only = { messages: [{ role:'user', content: ask, t:Date.now() }] };
   var wasVoice = voiceMode;
-  voiceMode = false;               /* this one needs the code, not a spoken sentence */
-  fastMode = true;                 /* but quickly - the quick model, no thinking */
-  withTimeout(askOnce(only), 25000,
-    "That took too long to build. Ask me again.").then(function(answer){
+  voiceMode = false;
+  fastMode = true;
+
+  var seen = '', enough = false, lines = 0;
+  function done(text){
     voiceMode = wasVoice;
     fastMode = false;
     viz.busy = false;
-    var parts = vizExtract(answer);
+    var parts = vizExtract(text);
     if(!parts.html){
+      vizStop();
       hfSet('wait', hfIdleLabel());
-      hfSaid.textContent = parts.say || 'I could not draw that one.';
       speak(parts.say || 'I could not draw that one.');
       return;
     }
-    viz.last = parts.html;
-    $('orbViz').srcdoc = vizPage(parts.html);
-    $('hfOrb').classList.add('showing');
-    hfSet('talk', about);
-    hfSaid.textContent = parts.say + ' — tap it to go back.';
-    hudLog('him', parts.say, false);
-    if(parts.say) speak(parts.say);
-  }).catch(function(e){
+    simKeep(about, parts.html, parts.say);
+    vizShow(about, parts.html, parts.say);
+  }
+
+  askStream(only, function(acc){
+    seen = acc;
+    var n = (acc.match(/\n/g) || []).length;
+    if(n !== lines){ lines = n; hfSet('busy', 'Writing it - ' + n + ' lines'); }
+    /* the code block has closed: everything after it is chatter we do not need */
+    var first = acc.indexOf('```');
+    if(first > -1 && acc.indexOf('```', first + 3) > -1 && !enough){
+      enough = true;
+      try{ if(abortCtl) abortCtl.abort(); }catch(e){}
+    }
+  }).then(done, function(err){
+    if(enough && seen){ done(seen); return; }   /* we stopped it on purpose */
     voiceMode = wasVoice;
     fastMode = false;
     viz.busy = false;
     vizStop();
     hfSet('wait', hfIdleLabel());
-    var why = String(e && e.message || e);
+    var why = String(err && err.message || err);
     hfSaid.textContent = why;
     speak(why);
   });
@@ -6306,7 +6339,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.62";
+var BUILD = "2026-08-21.63";
 
 function banner(kind, html){
   var b = $("banner");

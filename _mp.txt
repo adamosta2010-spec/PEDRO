@@ -1,0 +1,13 @@
+Building an engine took too long and then gave up
+
+It waited for the entire reply - including whatever the model wrote after the
+code - and abandoned the attempt at twenty-five seconds, which is roughly how
+long a careful answer takes. So the usual outcome was a wait and then nothing.
+
+It reads the code as it arrives now and stops the moment the block closes, since
+everything after that is chatter. The ask is shorter: under forty lines, keep it
+in the circle, let the parts be dragged. While it writes, the screen says how
+many lines have arrived rather than sitting still. And what it builds is kept -
+asking for the same thing again puts it up instantly.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>

@@ -653,11 +653,15 @@ function nativeFrom(cap, exp){
   t("it builds with the quick model", build.indexOf("fastMode = true;") > -1, true);
   t("and puts that back afterwards", build.indexOf("fastMode = false;") > -1, true);
   t("the quick path has its own budget", inSrc("maxOutputTokens: 1600"), true);
-  t("it gives up rather than building forever", build.indexOf("withTimeout(askOnce(only), 25000") > -1, true);
-  t("giving up clears the ball", build.indexOf("vizStop();") > -1, true);
+  /* the watchdog lives in the streaming reader now, not around the call */
+  t("it gives up rather than building forever",
+    grab("askStream").indexOf("No answer came back in time") > -1, true);
+  t("it stops as soon as the code block closes", build.indexOf("abortCtl.abort()") > -1, true);
+  t("and keeps what it already has", build.indexOf("if(enough && seen)") > -1, true);
+  t("asking for the same thing twice is instant", inSrc("function simFor"), true);
+  t("it shows how far along it is", build.indexOf("lines") > -1, true);
   t("the parts can be taken hold of", inSrc("pointerdown"), true);
-  t("and it says what is being held", inSrc("Show a label on whatever is being held"), true);
-  t("the first frame is drawn before anything else", inSrc("draw the first frame before anything else"), true);
+  t("the parts can still be dragged", inSrc("pointermove"), true);
 }
 
 
