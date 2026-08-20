@@ -525,5 +525,34 @@ function nativeFrom(cap, exp){
   t("it can be run again", inSrc("if(viz.lastAsk) vizBuild(viz.lastAsk);"), true);
 }
 
+
+/* ---- the reactor, the dock, and how long he makes you wait ---- */
+{
+  const page = require("fs").readFileSync("index.html", "utf8");
+  const inSrc = bit => src.indexOf(bit) > -1;
+  const inPage = bit => page.indexOf(bit) > -1;
+
+  t("the reactor is drawn, not borrowed", inPage('<span class="ball"></span>'), true);
+  t("nothing in the middle depends on an icon",
+    inPage('<span class="core"><svg><use href="#bot"/></svg></span>'), false);
+  t("the ball glows", inPage("box-shadow:") && inPage("ballGlow"), true);
+  t("it has reactor segments", inPage("conic-gradient"), true);
+  t("it reacts while he listens", inPage("#hfOrb.hear .ball"), true);
+  t("and while he talks", inPage("#hfOrb.talk .ball"), true);
+
+  t("there is a dock", inPage('id="dock"'), true);
+  t("it opens a panel", inSrc("function dockToggle"), true);
+  t("with the voice in it", inPage('id="dockVoice"'), true);
+  t("with volume", inPage('id="dockVol"'), true);
+  t("with speed", inPage('id="dockRate"'), true);
+  t("with background listening", inPage('id="dockBg"'), true);
+  t("and a way to the rest", inSrc('$("dockMore")'), true);
+
+  t("the pause before he answers is shorter", inSrc("}, 900);"), true);
+  t("the new voice is the default", inSrc('elevenVoice:"Pno1sSZ9LihyDUpvtooA"'), true);
+  t("and anyone on the old one is moved across",
+    inSrc('store.settings.elevenVoice === "wDsJlOXPqcvIUKdLXjDs"'), true);
+}
+
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " mic/image tests passed");
 process.exit(fail ? 1 : 0);

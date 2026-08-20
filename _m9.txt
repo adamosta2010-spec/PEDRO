@@ -1,0 +1,18 @@
+A reactor you can actually see, a dock, and less waiting
+
+The middle of the screen was black because the core borrowed an icon that was
+not drawing. It is drawn here now: a blue ball lit from inside, with a glow, a
+ring of reactor segments turning around it, and its own behaviour for listening,
+thinking and talking.
+
+Along the bottom there is a dock - voice, look, teach, settings - and the voice
+button opens a panel with the things worth changing without going hunting: which
+voice, volume, speed, and listening in the background.
+
+The pause after you stop talking is down from 1.7 seconds to 0.9 - long enough
+to read as a pause, short enough not to feel like a wait.
+
+And the ElevenLabs voice is the new one you picked. Anyone already carrying the
+old id is moved across on first run rather than being stuck with it.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
