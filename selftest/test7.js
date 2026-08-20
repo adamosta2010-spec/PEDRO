@@ -152,5 +152,26 @@ function nativeFrom(cap, exp){
     nativeFrom({ Plugins: {} }, { registerPlugin: n => ({ name: n }) })[1], "registerPlugin");
 }
 
+
+/* ---- the talking face ---- */
+{
+  const ui = grab("voiceUI");
+  const inIt = (src, bit) => src.indexOf(bit) > -1;
+  t("the face listens while you talk", inIt(ui, 'mode === "listen"'), true);
+  t("and speaks while he answers", inIt(ui, 'mode === "speak"'), true);
+  t("off hides it rather than leaving it blank", inIt(ui, "bar.hidden = true"), true);
+  t("off clears both states", inIt(ui, 'classList.remove("listening", "speaking")'), true);
+  t("it calls him by whatever name he has been given", inIt(ui, "aiName()"), true);
+
+  t("talking shows the words where you type",
+    src.indexOf('voiceUI("listen", text)') > -1 && src.indexOf("input.value = base + text") > -1, true);
+  t("speaking aloud turns the face on", src.indexOf('voiceUI("speak"') > -1, true);
+  t("finishing turns it off again", src.indexOf('if(!hf.on) voiceUI("off")') > -1, true);
+  t("stopping the microphone hides it",
+    grab("stopListening").indexOf('voiceUI("off")') > -1, true);
+  t("the big hands-free face is not doubled up",
+    src.indexOf('if(!hf.on) voiceUI("speak"') > -1, true);
+}
+
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " mic/image tests passed");
 process.exit(fail ? 1 : 0);
