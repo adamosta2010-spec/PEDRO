@@ -1,4 +1,5 @@
 global.window = {};
+global.location = { hostname: "localhost", protocol: "http:" };
 /* Provider routing, local model, and the failover chain. */
 const fs = require("fs");
 const src = fs.readFileSync(process.argv[2], "utf8");
@@ -11,7 +12,7 @@ function grab(name){
     else if(src[k] === "}"){ d--; if(!d) return src.slice(i, k + 1); }
   }
 }
-const names = ["isDevice","inApp","isGemini","isGroq","isLocal","isOpenAIStyle","allKeys","apiKeyNow","activeModel",
+const names = ["onHostMachine","guessLocalUrl","isDevice","inApp","isGemini","isGroq","isLocal","isOpenAIStyle","allKeys","apiKeyNow","activeModel",
                "systemPrompt","taughtBlock","pickLessons","relevance","lessons","facts","claudeContent","geminiParts","claudeRequest","geminiRequest",
                "groqRequest","localRequest","buildRequest","readDelta","apiError",
                "usableProviders","nextProvider","providerLabel","isBusy"];
@@ -116,6 +117,28 @@ t("missing local model tells you the pull command",
 
   t("a stranded 'device' setting is repaired at startup",
     /function fixStrandedProvider/.test(src2) && /fixStrandedProvider\(\);/.test(src2), true);
+}
+
+
+/* ---- the local model is tied to the machine it runs on ---- */
+{
+  const at = (host, proto) => {
+    global.location = { hostname: host, protocol: proto || "http:" };
+    return onHostMachine();
+  };
+  t("localhost counts as the host machine", at("localhost"), true);
+  t("127.0.0.1 counts too", at("127.0.0.1"), true);
+  t("a phone on the LAN does not", at("192.168.0.176"), false);
+  t("the hosted site does not", at("super-starlight-52f7d8.netlify.app", "https:"), false);
+  t("opened as a file counts as the host", at("", "file:"), true);
+
+  global.location = { hostname: "192.168.0.176", protocol: "http:" };
+  t("off-host, the model address follows the server",
+    guessLocalUrl(), "http://192.168.0.176:11434");
+
+  global.location = { hostname: "localhost", protocol: "http:" };
+  t("on the host, the configured address is used",
+    guessLocalUrl(), "http://localhost:11434");
 }
 
 console.log(fail ? String.fromCharCode(10) + fail + " FAILURES" : String.fromCharCode(10) + "All " + pass + " provider tests passed");

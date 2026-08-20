@@ -29,10 +29,17 @@ http.createServer((req, res) => {
 
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404, {"content-type":"text/plain"}).end("Not found: " + rel); return; }
-    res.writeHead(200, {
-      "content-type": TYPES[path.extname(file).toLowerCase()] || "application/octet-stream",
+    const ext = path.extname(file).toLowerCase();
+    const headers = {
+      "content-type": TYPES[ext] || "application/octet-stream",
       "cache-control": "no-store"          // always serve the newest build
-    });
+    };
+    // Safari mangles the name of an unknown download; force it to keep .ipa
+    if (ext === ".ipa") {
+      headers["content-type"] = "application/octet-stream";
+      headers["content-disposition"] = "attachment; filename=\"Pedro.ipa\"";
+    }
+    res.writeHead(200, headers);
     res.end(data);
   });
 }).listen(PORT, () => {

@@ -838,6 +838,18 @@ function isLocked(){ return !!(store.settings.lock); }
 function isGemini(){ return store.settings.provider === "gemini"; }
 function isGroq(){ return store.settings.provider === "groq"; }
 function isLocal(){ return store.settings.provider === "local"; }
+
+/* The local model runs on one computer. Opened from a phone or a hosted
+   address, "localhost" means that device, which has no Ollama on it. */
+function onHostMachine(){
+  var h = location.hostname;
+  return h === "localhost" || h === "127.0.0.1" || h === "" || location.protocol === "file:";
+}
+/* if the app is served from the PC over the network, the model is on that same PC */
+function guessLocalUrl(){
+  if(onHostMachine()) return store.settings.localUrl || "http://localhost:11434";
+  return location.protocol + "//" + location.hostname + ":11434";
+}
 /* "device" = the model inside the iPhone. isDevice() lives in the native module. */
 /* Groq and Ollama both speak the OpenAI chat format */
 function isOpenAIStyle(){ return isGroq() || isLocal(); }
@@ -1319,6 +1331,13 @@ function syncProviderUI(){
                 groq:"Groq", claude:"Claude" };
   var pnote = { device:"Free · no internet needed", local:"Free · private · offline",
                 gemini:"Free tier", groq:"Free tier", claude:"Pay as you go" };
+  var ol = document.querySelector('#setProvider option[value="local"]');
+  if(ol){
+    var canLocal = onHostMachine();
+    ol.hidden = !canLocal;
+    ol.disabled = !canLocal;
+    if(!canLocal && ol.parentNode) ol.parentNode.removeChild(ol);
+  }
   var od = $("optDevice");
   if(od){
     var canDevice = inApp() && deviceModel.available;
@@ -1915,10 +1934,12 @@ function systemPrompt(){
     "When they send a photo, look at it properly and answer about what's actually in it.";
   p += taughtBlock(lastUserText);
   if(voiceMode){
-    p += "\n\nRIGHT NOW you are being spoken out loud and the person is not reading a screen. " +
-      "Answer in one to three short sentences of plain speech. No markdown, no lists, " +
-      "no code, no headings, no emoji - just words someone can follow by ear. " +
-      "If the answer really needs detail, give the short version and offer the rest.";
+    p += "\n\nRIGHT NOW you are being spoken out loud in a back-and-forth conversation, and " +
+      "the person is not reading a screen. Answer in one or two short sentences of plain speech - " +
+      "the length you'd actually say out loud, not a written answer read aloud. " +
+      "No markdown, no lists, no code, no headings, no emoji. " +
+      "If something needs detail, give the headline and offer the rest. " +
+      "It's a conversation, so it's fine to ask a short question back.";
   }
   return p;
 }
@@ -2009,7 +2030,8 @@ function localRequest(msgs){
   });
   out.unshift({ role:"system", content: systemPrompt() });
   return {
-    url: (store.settings.localUrl || "http://localhost:11434").replace(/\/+$/, "") +
+    url: (onHostMachine() ? (store.settings.localUrl || "http://localhost:11434")
+                          : guessLocalUrl()).replace(/\/+$/, "") +
          "/v1/chat/completions",
     headers: { "content-type": "application/json" },
     body: { model: store.settings.localModel, messages: out, stream: true }
@@ -2380,9 +2402,10 @@ function stream(c, opts){
 
       showError(netFail
         ? (isLocal()
-            ? (location.protocol === "https:" && location.hostname !== "localhost"
-                ? "This is the online version, so it can't reach the model on your PC. Open Settings and switch to Gemini."
-                : "Can't reach Ollama. Is it running? Open a terminal and run: ollama serve")
+            ? (!onHostMachine()
+                ? "The local model runs on your PC, and this device can't reach it. " +
+                  "Open Settings and switch to Gemini - that works from anywhere."
+                : "Can't reach Ollama on this PC. Make sure it's running.")
             : "Couldn't reach " + who + ". Check your connection.")
         : who + " is overloaded and there's no other provider set up. Add a second one in Settings, or try again shortly.");
       return;
@@ -2445,6 +2468,15 @@ function isDevice(){ return store.settings.provider === "device" && !!Native; }
 /* Someone could have this stored from a previous pick, or from imported settings.
    Outside the app it can never work, so fall back to something that can. */
 function fixStrandedProvider(){
+  /* the local model selected on a phone can never work - move on quietly */
+  if(store.settings.provider === "local" && !onHostMachine()){
+    var kk = allKeys();
+    store.settings.provider = kk.gemini ? "gemini" : (kk.groq ? "groq" : "claude");
+    save();
+    banner("warn", "<b>The local model only works on the PC it runs on.</b> Switched to " +
+      esc(providerLabel(store.settings.provider)) + ".");
+    return;
+  }
   if(store.settings.provider !== "device" || Native) return;
   var k = allKeys();
   store.settings.provider = k.gemini ? "gemini" : (k.groq ? "groq" : (k.claude ? "claude" : "local"));
@@ -2952,7 +2984,9 @@ var hfEl=$("hf"), hfOrb=$("hfOrb"), hfState=$("hfState"),
     hfHeard=$("hfHeard"), hfSaid=$("hfSaid"), hfWarn=$("hfWarn");
 
 var hf = { on:false, phase:"wait", rec:null, restart:null, quiet:null,
-           want:false, answering:false };
+           want:false, answering:false,
+           talking:false,      /* Pedro is speaking - used for barge-in */
+           turns:0 };          /* how many exchanges this session */
 
 function aiName(){ return (store.settings.aiName || "Pedro").trim(); }
 
@@ -2985,11 +3019,13 @@ function hfOpen(){
   hf.on = true; hf.want = true; hf.answering = false;
   hfEl.classList.add("on");
   hfHeard.textContent = ""; hfSaid.textContent = "";
-  hfWarn.textContent = "Keep this screen open - phones stop web apps listening once the screen "
-    + "locks. Speaking works offline; answering needs a connection.";
-  hfSet("wait", hfIdleLabel());
+  hf.turns = 0;
+  hfWarn.textContent = "Just talk - it answers, then listens again. Tap the circle to interrupt. "
+    + "Keep this screen open; phones stop web apps listening once the screen locks.";
+  hfSet("hear", "Listening…");         /* straight into the conversation */
   keepAwake(true);
   hfListen();
+  hfQuietTimer();
 }
 function hfClose(){
   hf.on = false; hf.want = false;
@@ -3094,8 +3130,11 @@ function hfPause(){
 function hfQuietTimer(){
   clearTimeout(hf.quiet);
   hf.quiet = setTimeout(function(){
-    if(hf.phase === "hear"){ hfSet("wait", hfIdleLabel()); hfHeard.textContent = ""; }
-  }, 7000);
+    if(hf.phase === "hear"){
+      hfSet("wait", hf.turns ? "Say “" + aiName() + "” to carry on" : hfIdleLabel());
+      hfHeard.textContent = "";
+    }
+  }, 12000);   /* long enough to gather your thoughts mid-conversation */
 }
 
 /* --- speak without hearing ourselves --- */
@@ -3125,9 +3164,15 @@ function hfAsk(question){
     voiceMode = false;
     hfSaid.textContent = answer;
     hfSet("talk", "Speaking");
+    hf.talking = true;
+    hf.turns++;
     hfSpeak(answer, function(){
-      hfSet("wait", hfIdleLabel());
+      hf.talking = false;
+      if(!hf.want) return;
+      /* straight back to listening - this is what makes it a conversation */
+      hfSet("hear", "Listening…");
       hfHeard.textContent = "";
+      hfQuietTimer();
     });
     renderAll();
   }).catch(function(err){
@@ -3168,12 +3213,36 @@ function askOnce(c){
 }
 
 $("btnHF").addEventListener("click", hfOpen);
+
+/* tap the circle to cut it off mid-sentence and talk over it */
+hfOrb.addEventListener("click", function(){
+  if(!hf.on) return;
+  if(hf.talking || (window.speechSynthesis && speechSynthesis.speaking)){
+    speechSynthesis.cancel();
+    hf.talking = false;
+    hfSet("hear", "Listening…");
+    hfHeard.textContent = "";
+    if(hf.want) setTimeout(hfListen, 150);
+    hfQuietTimer();
+    return;
+  }
+  if(hf.phase === "hear"){          /* pause it */
+    hfPause();
+    hfSet("wait", "Paused - tap to carry on");
+    return;
+  }
+  if(hf.phase === "wait"){          /* resume */
+    hfSet("hear", "Listening…");
+    hfListen();
+    hfQuietTimer();
+  }
+});
 $("hfExit").addEventListener("click", hfClose);
 
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-20.14";
+var BUILD = "2026-08-20.15";
 
 function banner(kind, html){
   var b = $("banner");

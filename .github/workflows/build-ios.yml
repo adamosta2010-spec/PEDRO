@@ -80,6 +80,9 @@ jobs:
           exec > >(tee -a build.log) 2>&1
           cp native/PedroNative.swift ios/App/App/PedroNative.swift
           ls -l ios/App/App/
+          # a copied file is not a built file - register it with the Xcode project
+          sudo gem install xcodeproj --no-document || gem install xcodeproj --no-document
+          ruby native/add_source.rb
 
       - name: Microphone and speech permissions
         run: |
@@ -103,6 +106,16 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             ONLY_ACTIVE_ARCH=NO \
             build
+
+      - name: Verify the native code is actually in the binary
+        run: |
+          exec > >(tee -a build.log) 2>&1
+          BIN=ios/App/build/Build/Products/Release-iphoneos/App.app/App
+          echo "checking $BIN"
+          for s in PedroNative FoundationModels SFSpeechRecognizer; do
+            if strings "$BIN" | grep -q "$s"; then echo "  FOUND    $s"; else echo "  MISSING  $s"; fi
+          done
+          strings "$BIN" | grep -q PedroNative || { echo "native bridge did not compile in"; exit 1; }
 
       - name: Package as .ipa
         run: |
