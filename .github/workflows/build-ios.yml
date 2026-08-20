@@ -28,15 +28,24 @@ jobs:
           test -f dist/index.html || { echo "dist/index.html missing"; exit 1; }
           grep -o 'var BUILD = "[^"]*"' dist/index.html | head -1
 
+      - name: Show the toolchain
+        run: |
+          echo "node   $(node -v)"
+          echo "npm    $(npm -v)"
+          echo "xcode  $(xcodebuild -version | head -1)"
+          echo "pod    $(pod --version 2>/dev/null || echo missing)"
+          echo "sdks:"; xcodebuild -showsdks | grep -i ios || true
+          echo "ios/ present before add: $(test -d ios && echo YES || echo no)"
+
       - name: Create the iOS project
-        run: npx cap add ios
+        run: npx cap add ios --verbose
 
       - name: Copy the web app into it
         run: npx cap sync ios
 
       - name: Add the native bridge (on-device model + speech)
         run: |
-          cp ios/native/PedroNative.swift ios/App/App/PedroNative.swift
+          cp native/PedroNative.swift ios/App/App/PedroNative.swift
           ls -l ios/App/App/
 
       - name: Allow microphone and speech recognition
