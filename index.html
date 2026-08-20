@@ -2362,6 +2362,10 @@ function localRequest(msgs){
 function buildRequest(msgs){
   for(var i = msgs.length - 1; i >= 0; i--)
     if(msgs[i].role === "user"){ lastUserText = msgs[i].content || ""; break; }
+  /* falling through to Claude for a provider that is not Claude produced a key
+     error under someone else's name - say what actually happened instead */
+  if(store.settings.provider === "device")
+    throw new Error("The phone's own model doesn't use the network - this is a bug, tell Claude.");
   if(isGemini()) return geminiRequest(msgs);
   if(isGroq())   return groqRequest(msgs);
   if(isLocal())  return localRequest(msgs);
@@ -4163,6 +4167,17 @@ function hfAsk(question){
 
 /* one non-streaming request; resolves with the answer text */
 function askOnce(c){
+  /* The phone's own model answers here too. Voice and camera used to skip this
+     entirely and ask the network, which is why choosing it changed nothing. */
+  if(isDevice()){
+    return askDevice(c.messages).then(function(text){
+      var out = String(text || "").trim() || "I didn't get an answer that time.";
+      c.messages.push({ role:"assistant", content:out, t:Date.now() });
+      if(c.messages.length === 2) c.title = c.messages[0].content.slice(0, 40);
+      save();
+      return out;
+    });
+  }
   var req = buildRequest(c.messages);
   if(isGemini()) req.url = req.url.replace(":streamGenerateContent?alt=sse&", ":generateContent?");
   else req.body.stream = false;
@@ -4219,7 +4234,7 @@ $("hfExit").addEventListener("click", hfClose);
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-20.36";
+var BUILD = "2026-08-20.37";
 
 function banner(kind, html){
   var b = $("banner");

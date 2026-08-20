@@ -1,0 +1,12 @@
+Voice never used the phone's own model at all
+
+askOnce - which voice mode and camera mode both go through - built a network
+request without ever checking whether the phone was answering for itself. With
+the iPhone's own model chosen it fell through to the Claude branch, came back
+401, and the error was labelled with the provider you had picked: the iPhone's
+own model reporting a rejected API key it never needed.
+
+It now answers on the device, and buildRequest refuses a provider it cannot
+serve instead of quietly pretending it is Claude.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>

@@ -150,5 +150,26 @@ t("missing local model tells you the pull command",
     guessLocalUrl(), "http://localhost:11434");
 }
 
+
+/* ---- the phone's own model has to be used, not just offered ---- */
+{
+  const src2 = require("fs").readFileSync(process.argv[2], "utf8");
+  const once = (function(){
+    const i = src2.indexOf("function askOnce(");
+    let d = 0;
+    for(let k = src2.indexOf("{", i); k < src2.length; k++){
+      if(src2[k] === "{") d++;
+      else if(src2[k] === "}"){ d--; if(!d) return src2.slice(i, k + 1); }
+    }
+  })();
+  t("voice uses the phone's model instead of the network",
+    once.indexOf("if(isDevice()){") > -1 && once.indexOf("askDevice(c.messages)") > -1, true);
+  t("it checks before building a request",
+    once.indexOf("isDevice()") < once.indexOf("buildRequest"), true);
+  t("an unknown provider is not quietly treated as Claude",
+    src2.indexOf('provider === "device"') > -1 &&
+    src2.indexOf("doesn't use the network") > -1, true);
+}
+
 console.log(fail ? String.fromCharCode(10) + fail + " FAILURES" : String.fromCharCode(10) + "All " + pass + " provider tests passed");
 process.exit(fail ? 1 : 0);
