@@ -2707,7 +2707,15 @@ function stream(c, opts){
     if(!body && did.actions.length) body = "Done.";
     if(!body && !aborted) body = "(empty response)";
     if(!body){ el.remove(); endStreamUI(); return; }
-    if(!aborted) runActions(did.actions);
+    if(!aborted){
+      /* If the model said it would and then did not, do it anyway - asking for
+         an app by name is not ambiguous. */
+      if(!did.actions.length){
+        var meant = intentFrom(lastUserText);
+        if(meant) did.actions = [meant];
+      }
+      runActions(did.actions);
+    }
     bubEl.innerHTML = md(body);
     var m = { role:"assistant", content:body, t:Date.now() };
     if(think) m.thinking = think;
@@ -2917,12 +2925,73 @@ var APPS = {
   roblox:    function(){ return "roblox://"; },
   web:       function(q){
     q = String(q || "").trim();
-    if(!q) return "https://duckduckgo.com";
+    if(!q) return "https://www.google.com";     /* just "open safari" */
     return /^https?:/i.test(q) ? q : "https://duckduckgo.com/?q=" + encodeURIComponent(q);
   }
 };
 
 function appList(){ return Object.keys(APPS).join(', '); }
+
+/* People do not call apps by the names in the code. */
+var APP_ALIASES = {
+  safari:"web", browser:"web", google:"web", chrome:"web", internet:"web", search:"web",
+  "apple maps":"maps", map:"maps", navigation:"directions", directions:"directions",
+  "apple music":"music", itunes:"music", songs:"music",
+  imessage:"messages", message:"messages", text:"messages", texts:"messages", sms:"messages",
+  call:"phone", dial:"phone", telephone:"phone",
+  email:"mail", gmail:"mail", inbox:"mail",
+  photo:"camera", pictures:"photos", gallery:"photos", "camera roll":"photos",
+  note:"notes", reminder:"reminders", alarm:"clock", timer:"clock",
+  yt:"youtube", insta:"instagram", ig:"instagram", whats:"whatsapp", wa:"whatsapp"
+};
+function appNamed(name){
+  var n = String(name || "").trim().toLowerCase().replace(/[.!?]+$/, "");
+  if(APPS[n]) return n;
+  if(APP_ALIASES[n]) return APP_ALIASES[n];
+  return null;
+}
+
+/* What they plainly asked for, read from their own words - so it works whether
+   or not the model remembers to say it in brackets. */
+var INTENTS = [
+  { re: /^(?:open|launch|start|go to|bring up)\s+(?:the\s+|up\s+)?(.{1,60})$/i,
+    make: function(m){
+      var app = appNamed(m[1]);
+      return app ? { kind: app, arg: "" } : { kind: "web", arg: m[1] };
+    } },
+  { re: /^(?:play)\s+(.{1,60}?)(?:\s+on\s+(spotify|music|youtube))?$/i,
+    make: function(m){ return { kind: (m[2] || "spotify").toLowerCase(), arg: m[1] }; } },
+  { re: /^(?:take me to|directions to|navigate to|how do i get to)\s+(.{1,60})$/i,
+    make: function(m){ return { kind: "directions", arg: m[1] }; } },
+  { re: /^(?:call|ring|phone)\s+(.{1,40})$/i,
+    make: function(m){ return { kind: "phone", arg: m[1] }; } },
+  { re: /^(?:text|message)\s+(.{1,80})$/i,
+    make: function(m){ return { kind: "messages", arg: m[1] }; } },
+  { re: /^(?:email|mail)\s+(.{1,80})$/i,
+    make: function(m){ return { kind: "mail", arg: m[1] }; } },
+  { re: /^(?:search|look up|google|find)\s+(?:for\s+)?(.{1,60})$/i,
+    make: function(m){ return { kind: "web", arg: m[1] }; } },
+  { re: /^run\s+(?:my\s+|the\s+)?(.{1,60}?)\s+shortcut$/i,
+    make: function(m){ return { kind: "shortcut", arg: m[1] }; } },
+  { re: /^run\s+shortcut\s+(.{1,60})$/i,
+    make: function(m){ return { kind: "shortcut", arg: m[1] }; } }
+];
+
+function intentFrom(text){
+  var t = String(text || "").trim();
+  /* they often say his name first */
+  t = t.replace(/^(?:hey\s+)?pedro[,!.]?\s+/i, "").trim();
+  t = t.replace(/[.!]+$/, "").trim();
+  if(!t) return null;
+  for(var i = 0; i < INTENTS.length; i++){
+    var m = t.match(INTENTS[i].re);
+    if(!m) continue;
+    var want = INTENTS[i].make(m);
+    var url = actionUrl(want.kind, want.arg);
+    if(url) return { kind: want.kind, arg: want.arg, url: url };
+  }
+  return null;
+}
 
 /* turn one instruction into a URL iOS understands */
 function actionUrl(kind, arg){
@@ -3859,7 +3928,7 @@ $("hfExit").addEventListener("click", hfClose);
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-20.32";
+var BUILD = "2026-08-20.33";
 
 function banner(kind, html){
   var b = $("banner");

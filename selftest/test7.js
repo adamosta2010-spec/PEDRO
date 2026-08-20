@@ -288,5 +288,47 @@ function nativeFrom(cap, exp){
   t("closing disarms it", inIt(grab("hfClose"), "clearTimeout(hf.settle)"), true);
 }
 
+
+/* ---- acting on what was actually said ---- */
+/* "open safari" got a cheerful "sure thing" and nothing else, because Safari
+   was not in the list and the whole thing relied on the model remembering to
+   emit a marker. Neither is true any more. */
+{
+  function chunk(a, b){
+    const i = src.indexOf(a), j = src.indexOf(b, i) + b.length;
+    return src.slice(i, j);
+  }
+  const code = [
+    chunk("var APPS = {", "};"),
+    chunk("var APP_ALIASES = {", "};"),
+    grab("appNamed"), grab("actionUrl"),
+    chunk("var INTENTS = [", "];"), grab("intentFrom")
+  ].join("\n");
+  const intentFrom = new Function(code + "; return intentFrom;")();
+  const kindOf = t => { const r = intentFrom(t); return r ? r.kind : null; };
+
+  t("open safari does something", kindOf("open safari"), "web");
+  t("his name in front is ignored", kindOf("Pedro, open safari"), "web");
+  t("open up works as well as open", kindOf("open up safari"), "web");
+  t("a real app opens itself", kindOf("open spotify"), "spotify");
+  t("the definite article is fine", kindOf("open the camera"), "camera");
+  t("play goes to music", kindOf("play blinding lights"), "spotify");
+  t("play on youtube goes there", kindOf("play blinding lights on youtube"), "youtube");
+  t("take me to gives directions", kindOf("take me to camden town"), "directions");
+  t("search goes to the web", kindOf("search for tide times"), "web");
+  t("a shortcut by name", kindOf("run my lights off shortcut"), "shortcut");
+  t("and the other way round", kindOf("run shortcut Goodnight"), "shortcut");
+
+  t("a question is not an instruction", kindOf("what is the capital of france"), null);
+  t("small talk is not an instruction", kindOf("how are you today"), null);
+  t("nothing at all is safe", kindOf(""), null);
+
+  t("the browser opens on its own with no search", intentFrom("open safari").url.indexOf("google.com") > -1, true);
+  t("a search still searches", intentFrom("search for tide times").url.indexOf("q=tide") > -1, true);
+
+  t("the reply doing nothing falls back to what was said",
+    src.indexOf("var meant = intentFrom(lastUserText);") > -1, true);
+}
+
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " mic/image tests passed");
 process.exit(fail ? 1 : 0);
