@@ -686,7 +686,7 @@ function nativeFrom(cap, exp){
 
   t("you can ask about what is playing", inSrc("function vizAsk"), true);
   t("questions go there while it plays",
-    inSrc('if($("hfOrb").classList.contains("showing") && !CLOSE_RE.test'), true);
+    grab("hfAsk").indexOf("vizAsk(question);") > -1, true);
   t("the answer appears over it", inSrc("function orbInfo"), true);
   t("and it knows what you are watching", grab("vizAsk").indexOf("viz.lastAsk") > -1, true);
 
