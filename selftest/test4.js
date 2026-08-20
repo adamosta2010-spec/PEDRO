@@ -111,7 +111,14 @@ t("missing local model tells you the pull command",
 
   const syncSrc = (() => {
     const i = src2.indexOf("function syncProviderUI(");
-    return src2.slice(i, i + 2000);
+    /* the whole function, however long it grows - a fixed slice used to cut
+       the end off and fail for no reason to do with the app */
+    let d = 0;
+    for(let k = src2.indexOf("{", i); k < src2.length; k++){
+      if(src2[k] === "{") d++;
+      else if(src2[k] === "}"){ d--; if(!d) return src2.slice(i, k + 1); }
+    }
+    return src2.slice(i);
   })();
   t("the option is removed, not just hidden", /removeChild\(od\)/.test(syncSrc), true);
 
