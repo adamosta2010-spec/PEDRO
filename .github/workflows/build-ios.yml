@@ -99,6 +99,9 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'Pedro uses the camera when you take a photo to send it.'" "$PLIST" || true
           /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 'Pedro opens your photos when you attach one.'" "$PLIST" || true
           /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryAddUsageDescription string 'Pedro saves pictures it makes for you.'" "$PLIST" || true
+          # listening while the app is behind something else needs this declared
+          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" "$PLIST" || true
+          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:0 string 'audio'" "$PLIST" || true
           echo "--- permissions now declared ---"
           /usr/libexec/PlistBuddy -c "Print" "$PLIST" | grep -i usagedescription || true
 
@@ -134,6 +137,8 @@ jobs:
           strings "$BIN" | grep -q MainViewController || { echo "the plugin registration did not compile in"; exit 1; }
           strings "$BIN" | grep -q registerPluginInstance || { echo "nothing registers the plugin"; exit 1; }
           echo "  the plugin is registered with the bridge"
+          /usr/libexec/PlistBuddy -c "Print :UIBackgroundModes" "$PL" | grep -q audio || { echo "background audio is not declared"; exit 1; }
+          echo "  background listening is declared"
           # a permission the app never declares is a crash the moment it is used
           PL=ios/App/build/Build/Products/Release-iphoneos/App.app/Info.plist
           for k in NSMicrophoneUsageDescription NSSpeechRecognitionUsageDescription NSCameraUsageDescription NSPhotoLibraryUsageDescription; do

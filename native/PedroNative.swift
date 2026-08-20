@@ -25,7 +25,8 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "available",     returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "ask",           returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "startListening", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "stopListening",  returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "stopListening",  returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setBackground",  returnType: CAPPluginReturnPromise)
     ]
 
     // MARK: - on-device model
@@ -120,6 +121,27 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
+    /// Hold the audio session open so listening survives leaving the app.
+    /// Without the audio background mode in Info.plist iOS suspends us anyway,
+    /// so this is only half the story - the build adds the other half.
+    private var keepAlive = false
+
+    @objc func setBackground(_ call: CAPPluginCall) {
+        let on = call.getBool("enabled") ?? false
+        keepAlive = on
+        do {
+            let session = AVAudioSession.sharedInstance()
+            if on {
+                try session.setCategory(.playAndRecord, mode: .spokenAudio,
+                                        options: [.duckOthers, .defaultToSpeaker, .allowBluetooth])
+                try session.setActive(true, options: .notifyOthersOnDeactivation)
+            }
+            call.resolve(["enabled": on])
+        } catch {
+            call.reject("couldn't hold the audio session: (error.localizedDescription)")
+        }
+    }
+
     private func beginListening(_ call: CAPPluginCall) {
         stopEverything()
 
@@ -185,6 +207,8 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin {
         task?.cancel()
         request = nil
         task = nil
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        if !keepAlive {
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
     }
 }

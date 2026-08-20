@@ -688,6 +688,18 @@
       <div class="lb">Speak replies aloud<small>Reads answers using your phone&rsquo;s voice</small></div>
       <div class="sw" id="swTts"></div>
     </div>
+    <div class="field">
+      <label for="setVoice">Voice</label>
+      <select id="setVoice"></select>
+      <button class="btn ghost" id="btnHearVoice" style="margin-top:8px">Hear it</button>
+      <div class="hint" id="voiceHint">Phones ship several. The ones marked Enhanced or Siri
+        sound like a person; the plain ones sound like a machine.</div>
+    </div>
+    <div class="row">
+      <div class="lb">Keep listening in the background<small>Carries on hearing you while you use
+        other apps. Uses more battery.</small></div>
+      <div class="sw" id="swBackground"></div>
+    </div>
     <div class="row">
       <div class="lb">Talk, don&rsquo;t type<small>Using the microphone sends straight away and reads the answer back</small></div>
       <div class="sw" id="swVoiceTalk"></div>
@@ -822,6 +834,8 @@ var DEF = {
   name:"", about:"",
   tts:false, showThink:false, enterSends:true,
   voiceTalk:true,  /* talking sends straight away and the answer is read back */
+  voiceName:"",    /* which of the phone's voices to speak with */
+  background:false, /* keep listening while the app is not on screen */
   lock:null,       /* when set: {salt, iv, ct} - your API keys, encrypted with your password */
   authEmail:"",    /* not a secret - just so you don't retype it every time */
 };
@@ -842,12 +856,17 @@ function load(){
 function save(){
   try{ localStorage.setItem(KEY, JSON.stringify(store)); return; }
   catch(e){}
-  /* out of room - drop the oldest pictures (keeping the words) and try again */
+  /* Out of room - shed old pictures rather than messages. Chats are newest
+     first, so walking backwards starts with the oldest; and the picture just
+     attached is never the one thrown away, or it would vanish before it could
+     be sent. */
   var freed = 0;
   outer:
   for(var i = store.chats.length - 1; i >= 0; i--){
     var ms = store.chats[i].messages;
+    var live = store.chats[i].id === store.activeId;
     for(var j = 0; j < ms.length; j++){
+      if(live && j >= ms.length - 2) continue;   /* leave the last exchange alone */
       if(ms[j].images && ms[j].images.length){
         delete ms[j].images; freed++;
         try{ localStorage.setItem(KEY, JSON.stringify(store));
@@ -1344,6 +1363,8 @@ function fillSettings(){
   var mh = $("micHint");
   if(mh) mh.textContent = runningWhere().text;
   sw($("swVoiceTalk"), s.voiceTalk !== false);
+  sw($("swBackground"), s.background);
+  fillVoices();
   sw($("swLock"), isLocked()); syncLockSub();
   syncProviderUI();
   /* Apple Intelligence can still be downloading - ask again each time this opens */
@@ -1676,6 +1697,44 @@ function bindSwitch(id, key, after){
 }
 bindSwitch("swTts","tts", syncSpeakBtn);
 bindSwitch("swVoiceTalk","voiceTalk");
+bindSwitch("swBackground","background", applyBackground);
+
+/* Every phone ships a different set, so build the list from what is actually
+   installed - best-sounding first, since that is what people want. */
+function fillVoices(){
+  var sel = $("setVoice");
+  if(!sel) return;
+  var all = allVoices();
+  if(!all.length){ sel.innerHTML = '<option value="">Loading the phone’s voices…</option>'; return; }
+  var want = (navigator.language || "en-US").slice(0, 2).toLowerCase();
+  var mine = all.filter(function(v){ return (v.lang || "").slice(0, 2).toLowerCase() === want; });
+  var pool = (mine.length ? mine : all).slice().sort(function(a, b){
+    var ga = voiceIsGood(a) ? 1 : 0, gb = voiceIsGood(b) ? 1 : 0;
+    if(ga !== gb) return gb - ga;
+    return a.name.localeCompare(b.name);
+  });
+  sel.innerHTML = '<option value="">Best available (' +
+    esc((pickVoice() || {}).name || "none") + ')</option>';
+  pool.forEach(function(v){
+    var o = document.createElement("option");
+    o.value = v.name;
+    o.textContent = v.name + (voiceIsGood(v) ? " · sounds human" : "") +
+      (v.lang ? "  (" + v.lang + ")" : "");
+    sel.appendChild(o);
+  });
+  sel.value = store.settings.voiceName || "";
+}
+
+$("setVoice").addEventListener("change", function(){
+  store.settings.voiceName = this.value;
+  chosenVoice = null;                       /* pick again with the new choice */
+  save();
+  var v = pickVoice();
+  $("voiceHint").textContent = v ? ("Now speaking as " + v.name + ".") : "No voices on this device yet.";
+});
+$("btnHearVoice").addEventListener("click", function(){
+  speak("Hello, I'm " + aiName() + ". This is how I sound.");
+});
 bindSwitch("swThink","showThink", renderAll);
 bindSwitch("swEnter","enterSends");
 bindSwitch("swFail","autoFailover");
@@ -1998,17 +2057,26 @@ function voiceUI(mode, text){
 /* The default voice is the robotic one. Apple ships better ones; find the most
    human of whatever this phone has, and remember it. */
 var chosenVoice = null;
+function allVoices(){
+  if(!window.speechSynthesis || !speechSynthesis.getVoices) return [];
+  return speechSynthesis.getVoices() || [];
+}
+/* the better voices announce themselves in their names */
+function voiceIsGood(v){ return /siri|premium|enhanced|natural|neural/i.test(v.name); }
+
 function pickVoice(){
   if(chosenVoice) return chosenVoice;
-  if(!window.speechSynthesis || !speechSynthesis.getVoices) return null;
-  var all = speechSynthesis.getVoices() || [];
+  var all = allVoices();
   if(!all.length) return null;              /* they load late - try again next time */
+  /* a voice chosen by hand always wins */
+  if(store.settings.voiceName){
+    var mine = all.filter(function(v){ return v.name === store.settings.voiceName; })[0];
+    if(mine){ chosenVoice = mine; return chosenVoice; }
+  }
   var want = (navigator.language || "en-US").slice(0, 2).toLowerCase();
   var mine = all.filter(function(v){ return (v.lang || "").slice(0, 2).toLowerCase() === want; });
   var pool = mine.length ? mine : all;
-  var human = pool.filter(function(v){
-    return /siri|premium|enhanced|natural|neural/i.test(v.name);
-  });
+  var human = pool.filter(voiceIsGood);
   chosenVoice = human[0] || pool.filter(function(v){ return v.default; })[0] || pool[0];
   return chosenVoice;
 }
@@ -3396,6 +3464,29 @@ function hfClose(){
   keepAwake(false);
 }
 
+/* Listening while the app is behind something else. iOS only permits this for
+   apps genuinely using audio, which a microphone session is - the app declares
+   that, and the native side holds the session open. It costs battery, so it is
+   off unless asked for. */
+function applyBackground(){
+  var on = !!store.settings.background;
+  if(on && !inApp()){
+    store.settings.background = false;
+    save();
+    var el = $("swBackground"); if(el) sw(el, false);
+    banner("warn", "<b>Background listening only works in the installed app.</b> " +
+      "A web page is stopped the moment you look at something else.");
+    return;
+  }
+  if(Native && Native.setBackground){
+    Native.setBackground({ enabled: on }).catch(function(e){
+      banner("warn", "Couldn't set up background listening: " + esc(String(e && e.message || e)));
+    });
+  }
+  keepAwake(on);
+  if(on) toast("It will keep listening in the background");
+}
+
 /* --- keep the screen awake so it can keep listening --- */
 var wakeLock = null;
 function keepAwake(want){
@@ -3601,7 +3692,7 @@ $("hfExit").addEventListener("click", hfClose);
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-20.29";
+var BUILD = "2026-08-20.30";
 
 function banner(kind, html){
   var b = $("banner");
@@ -3642,6 +3733,7 @@ if(!store.chats.length) newChat();
 if(!store.activeId) store.activeId = store.chats[0].id;
 applyTheme();
 fixStrandedProvider();
+applyBackground();       /* restore whatever was chosen last time */
 if(inApp()){
   checkDeviceModel().then(function(d){
     syncProviderUI();

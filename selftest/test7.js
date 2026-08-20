@@ -197,5 +197,32 @@ function nativeFrom(cap, exp){
     grab("hfListenNative").indexOf("nothing is reaching the app") > -1, true);
 }
 
+
+/* ---- choosing a voice, and listening in the background ---- */
+{
+  const inSrc = bit => src.indexOf(bit) > -1;
+  const pv = grab("pickVoice");
+  t("a chosen voice beats the automatic pick", pv.indexOf("store.settings.voiceName") > -1, true);
+  t("the automatic pick prefers the human-sounding ones", pv.indexOf("voiceIsGood") > -1, true);
+  t("one place decides what sounds human",
+    grab("voiceIsGood").indexOf("siri|premium|enhanced|natural|neural") > -1, true);
+  t("choosing again re-picks rather than keeping the old one",
+    inSrc("chosenVoice = null;"), true);
+  t("the list is built from what the phone actually has",
+    grab("fillVoices").indexOf("allVoices()") > -1, true);
+  t("you can hear one before choosing", inSrc("btnHearVoice"), true);
+
+  const bg = grab("applyBackground");
+  t("background listening asks the native side", bg.indexOf("Native.setBackground") > -1, true);
+  t("it refuses on a web page instead of pretending", bg.indexOf("only works in the installed app") > -1, true);
+  t("and turns itself back off there", bg.indexOf("store.settings.background = false") > -1, true);
+  t("it keeps the screen awake while on", bg.indexOf("keepAwake(on)") > -1, true);
+  t("the choice survives a restart", inSrc("applyBackground();"), true);
+
+  const sv = grab("save");
+  t("the picture just attached is never the one binned",
+    sv.indexOf("j >= ms.length - 2") > -1, true);
+}
+
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " mic/image tests passed");
 process.exit(fail ? 1 : 0);
