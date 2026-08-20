@@ -101,7 +101,8 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryAddUsageDescription string 'Pedro saves pictures it makes for you.'" "$PLIST" || true
           # listening while the app is behind something else needs this declared
           /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" "$PLIST" || true
-          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:0 string 'audio'" "$PLIST" || true
+          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:0 string audio" "$PLIST" ||
+            /usr/libexec/PlistBuddy -c "Set :UIBackgroundModes:0 audio" "$PLIST"
           echo "--- permissions now declared ---"
           /usr/libexec/PlistBuddy -c "Print" "$PLIST" | grep -i usagedescription || true
 
@@ -127,15 +128,15 @@ jobs:
           BIN=ios/App/build/Build/Products/Release-iphoneos/App.app/App
           echo "checking $BIN"
           for s in PedroNative FoundationModels SFSpeechRecognizer; do
-            if strings "$BIN" | grep -q "$s"; then echo "  FOUND    $s"; else echo "  MISSING  $s"; fi
+            if strings -a "$BIN" | grep -q "$s"; then echo "  FOUND    $s"; else echo "  MISSING  $s"; fi
           done
-          strings "$BIN" | grep -q PedroNative || { echo "native bridge did not compile in"; exit 1; }
+          strings -a "$BIN" | grep -q PedroNative || { echo "native bridge did not compile in"; exit 1; }
           APP=ios/App/build/Build/Products/Release-iphoneos/App.app
           test -f "$APP/public/capacitor.js" || { echo "capacitor.js never made it into the app"; exit 1; }
           grep -q 'src="capacitor.js"' "$APP/public/index.html" || { echo "the page does not load capacitor.js"; exit 1; }
           echo "  the page loads Capacitor's JavaScript"
-          strings "$BIN" | grep -q MainViewController || { echo "the plugin registration did not compile in"; exit 1; }
-          strings "$BIN" | grep -q registerPluginInstance || { echo "nothing registers the plugin"; exit 1; }
+          strings -a "$BIN" | grep -q MainViewController || { echo "the plugin registration did not compile in"; exit 1; }
+          strings -a "$BIN" | grep -q registerPluginInstance || { echo "nothing registers the plugin"; exit 1; }
           echo "  the plugin is registered with the bridge"
           /usr/libexec/PlistBuddy -c "Print :UIBackgroundModes" "$PL" | grep -q audio || { echo "background audio is not declared"; exit 1; }
           echo "  background listening is declared"
