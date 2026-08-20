@@ -100,9 +100,11 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 'Pedro opens your photos when you attach one.'" "$PLIST" || true
           /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryAddUsageDescription string 'Pedro saves pictures it makes for you.'" "$PLIST" || true
           # listening while the app is behind something else needs this declared
-          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" "$PLIST" || true
-          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:0 string audio" "$PLIST" ||
-            /usr/libexec/PlistBuddy -c "Set :UIBackgroundModes:0 audio" "$PLIST"
+          plutil -replace UIBackgroundModes -json '["audio"]' "$PLIST"
+          echo "--- background modes in the source plist ---"
+          /usr/libexec/PlistBuddy -c "Print :UIBackgroundModes" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Print :UIBackgroundModes" "$PLIST" | grep -q audio || {
+            echo "could not declare background audio in $PLIST"; exit 1; }
           echo "--- permissions now declared ---"
           /usr/libexec/PlistBuddy -c "Print" "$PLIST" | grep -i usagedescription || true
 
