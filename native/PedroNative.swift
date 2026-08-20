@@ -31,7 +31,8 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
         CAPPluginMethod(name: "openURL",        returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "speak",          returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopSpeaking",   returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "warm",           returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "warm",           returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setWords",       returnType: CAPPluginReturnPromise)
     ]
 
     // MARK: - on-device model
@@ -130,6 +131,17 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
     }
 
     // MARK: - speech recognition
+
+    /// Words the recogniser should expect. The web app sets these - his name,
+    /// and whatever the person is called - because those are the ones that
+    /// matter and the ones a general model is most likely to get wrong.
+    private var wakeWords: [String] = ["Pedro"]
+
+    @objc func setWords(_ call: CAPPluginCall) {
+        let words = call.getArray("words", String.self) ?? []
+        wakeWords = words.isEmpty ? ["Pedro"] : words
+        call.resolve(["words": wakeWords])
+    }
 
     private var recognizer: SFSpeechRecognizer?
     private var request: SFSpeechAudioBufferRecognitionRequest?
@@ -271,6 +283,9 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
 
         let req = SFSpeechAudioBufferRecognitionRequest()
         req.shouldReportPartialResults = true
+        req.taskHint = .dictation
+        if #available(iOS 16.0, *) { req.addsPunctuation = true }
+        req.contextualStrings = wakeWords
         // keeps it working with no internet, and keeps audio on the device
         if recognizer.supportsOnDeviceRecognition { req.requiresOnDeviceRecognition = true }
         request = req
@@ -342,6 +357,9 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
         guard let recognizer = recognizer, recognizer.isAvailable else { return }
         let req = SFSpeechAudioBufferRecognitionRequest()
         req.shouldReportPartialResults = true
+        req.taskHint = .dictation
+        if #available(iOS 16.0, *) { req.addsPunctuation = true }
+        req.contextualStrings = wakeWords
         if recognizer.supportsOnDeviceRecognition { req.requiresOnDeviceRecognition = true }
         request = req
         do {

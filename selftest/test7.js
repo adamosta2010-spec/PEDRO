@@ -683,5 +683,28 @@ function nativeFrom(cap, exp){
   t("speaking sends a much shorter prompt", inSrc("speaking out loud. Today is"), true);
 }
 
+
+/* ---- learning with an estimate, and a microphone that knows what to expect ---- */
+{
+  const inSrc = bit => src.indexOf(bit) > -1;
+  const pace = new Function('store', 'save', grab("learnPace") + grab("learnPaceUpdate") +
+    grab("saySeconds") + "; return { learnPace:learnPace, learnPaceUpdate:learnPaceUpdate, saySeconds:saySeconds };")
+    ({ settings: {} }, function(){});
+
+  t("learning is done in passes", inSrc("var LEARN_PASSES"), true);
+  t("three of them", (src.match(/{ name: /g) || []).length >= 3, true);
+  t("there is an estimate", inSrc("saySeconds(estimate)"), true);
+  t("it counts down while it works", inSrc("saySeconds(left)"), true);
+  t("and says which pass it is on", inSrc("pass + ' of ' + LEARN_PASSES.length"), true);
+  t("a fresh estimate is sensible", pace.saySeconds(pace.learnPace() * 3), "about 21 seconds");
+  t("the estimate is measured, not invented", inSrc("learnPaceUpdate(Date.now() - passBegan)"), true);
+  t("minutes are said as minutes", pace.saySeconds(125000), "about 2 minutes");
+  t("it says how long it actually took", inSrc("in ' + took + 's."), true);
+
+  t("the recogniser is told what to expect", inSrc("function tellMicTheWords"), true);
+  t("starting with his own name", grab("tellMicTheWords").indexOf("aiName()") > -1, true);
+  t("it is told before every turn", inSrc("tellMicTheWords();"), true);
+}
+
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " mic/image tests passed");
 process.exit(fail ? 1 : 0);

@@ -2167,7 +2167,7 @@ $("btnLocalCheck").addEventListener("click", function(){
 });
 bindInput("setImgModel","imageModel");
 bindInput("setEffort","effort");
-bindInput("setAiName","aiName", renderAll);
+bindInput("setAiName","aiName", function(){ renderAll(); tellMicTheWords(); });
 bindInput("setName","name", renderAll);
 bindInput("setAbout","about");
 
@@ -3562,6 +3562,17 @@ var micHandlers = { text: null, done: null };
 var micWired = false;
 var micHeardAnything = false;
 
+/* The recogniser guesses better when it knows which words to expect. His name
+   is the one that matters - mishearing it is the difference between answering
+   and ignoring you. */
+function tellMicTheWords(){
+  if(!Native || !Native.setWords) return;
+  var words = [aiName()];
+  if(store.settings.name) words.push(store.settings.name);
+  studies().slice(-3).forEach(function(s){ words.push(s.topic); });
+  Native.setWords({ words: words.slice(0, 12) }).catch(function(){});
+}
+
 function wireNativeMic(){
   if(micWired || !Native || !Native.addListener) return;
   micWired = true;
@@ -3588,6 +3599,7 @@ function wireNativeMic(){
 function nativeMicStart(onText, onDone){
   if(!Native) return Promise.reject(new Error("not in the app"));
   wireNativeMic();
+  tellMicTheWords();
   micHandlers.text = onText;
   micHandlers.done = onDone;
   micHeardAnything = false;
@@ -4668,33 +4680,99 @@ function studyOf(topic){
 }
 
 /* Ask for the groundwork, not an essay: short facts that answer later questions. */
+/* The ground to cover. Three passes rather than one, because asking for
+   everything at once gets a shallow list of headlines. */
+var LEARN_PASSES = [
+  { name: 'the basics',   ask: 'what it is, the words used for it, and the ideas someone must have before the rest makes sense' },
+  { name: 'how it works', ask: 'the parts, how they work together, and the rules or laws that govern it' },
+  { name: 'using it',     ask: 'what it is used for in practice, the common mistakes, and the things people get wrong' }
+];
+
+/* How long a pass has taken lately, so the estimate is measured, not guessed. */
+function learnPace(){
+  var ms = parseInt(store.settings.learnMs, 10);
+  return (isNaN(ms) || ms < 1500) ? 7000 : ms;
+}
+function learnPaceUpdate(ms){
+  var was = learnPace();
+  store.settings.learnMs = Math.round(was * 0.6 + ms * 0.4);   /* leans on the recent */
+  save();
+}
+function saySeconds(ms){
+  var s = Math.max(1, Math.round(ms / 1000));
+  if(s < 60) return 'about ' + s + ' seconds';
+  var m = Math.round(s / 60);
+  return 'about ' + m + (m === 1 ? ' minute' : ' minutes');
+}
+
 function learnAbout(topic, onDone){
-  topic = String(topic || "").replace(/[.?!]+$/, "").trim();
+  topic = String(topic || '').replace(/[.?!]+$/, '').trim();
   if(!topic) return;
-  hfSet("busy", "Reading up on " + topic);
-  hudLog("him", "Reading up on " + topic + "…", false);
 
-  var ask = "Teach yourself " + topic + ", well enough to answer questions about it later. " +
-    "Reply with ONLY a JSON array of 14 short factual notes, each one sentence, no numbering: " +
-    '["...","..."] . Cover the ideas someone would actually ask about: what it is, the parts, ' +
-    "how they work, the rules or laws involved, the common mistakes, and the words used.";
+  var notes = [];
+  var pass = 0;
+  var began = Date.now();
+  var estimate = learnPace() * LEARN_PASSES.length;
 
-  var only = { messages: [{ role:"user", content: ask, t:Date.now() }] };
-  var wasVoice = voiceMode;
-  voiceMode = false;
-  askOnce(only).then(function(answer){
-    voiceMode = wasVoice;
-    var notes = [];
-    try{
-      var txt = String(answer);
-      var a = txt.indexOf("["), z = txt.lastIndexOf("]");
-      if(a > -1 && z > a) notes = JSON.parse(txt.slice(a, z + 1));
-    }catch(e){ notes = []; }
-    notes = (Array.isArray(notes) ? notes : []).filter(function(n){ return typeof n === "string" && n.trim(); })
-                                               .map(function(n){ return n.trim(); }).slice(0, 20);
+  hudLog('him', 'Learning ' + topic + ' - ' + saySeconds(estimate) + '.', false);
+  speak('Reading up on ' + topic + '. Give me ' + saySeconds(estimate) + '.');
+
+  /* the countdown on screen, so the wait is a known length rather than a void */
+  var tick = setInterval(function(){
+    var left = estimate - (Date.now() - began);
+    var doneEnough = pass + ' of ' + LEARN_PASSES.length;
+    hfSet('busy', left > 0
+      ? (topic + ' - ' + doneEnough + ', ' + saySeconds(left) + ' left')
+      : (topic + ' - ' + doneEnough + ', nearly there'));
+  }, 900);
+  function stopTicking(){ clearInterval(tick); }
+
+  function runPass(){
+    if(pass >= LEARN_PASSES.length) return finish();
+    var p = LEARN_PASSES[pass];
+    var passBegan = Date.now();
+    var ask = 'Teach yourself ' + topic + ', covering ' + p.ask + '. ' +
+      'Reply with ONLY a JSON array of 8 short factual notes, each one sentence: ' +
+      '["...","..."]';
+    var only = { messages: [{ role:'user', content: ask, t:Date.now() }] };
+    var wasVoice = voiceMode;
+    voiceMode = false;
+    fastMode = true;                 /* the quick model - this is groundwork, not prose */
+    withTimeout(askOnce(only), 30000, 'That is taking too long. Ask me again in a moment.')
+      .then(function(answer){
+        voiceMode = wasVoice;
+        fastMode = false;
+        learnPaceUpdate(Date.now() - passBegan);
+        try{
+          var txt = String(answer);
+          var a = txt.indexOf('['), z = txt.lastIndexOf(']');
+          if(a > -1 && z > a){
+            JSON.parse(txt.slice(a, z + 1)).forEach(function(n){
+              if(typeof n === 'string' && n.trim()) notes.push(n.trim());
+            });
+          }
+        }catch(e){}
+        pass++;
+        estimate = (Date.now() - began) + learnPace() * (LEARN_PASSES.length - pass);
+        runPass();
+      }, function(e){
+        voiceMode = wasVoice;
+        fastMode = false;
+        stopTicking();
+        hfSet('wait', hfIdleLabel());
+        var why = String(e && e.message || e);
+        hudLog('him', why, false);
+        speak(why);
+        if(onDone) onDone(false);
+      });
+  }
+
+  function finish(){
+    stopTicking();
+    notes = notes.slice(0, 30);
     if(!notes.length){
-      hfSet("wait", hfIdleLabel());
-      speak("I could not get anywhere with " + topic + ". Try again in a moment.");
+      hfSet('wait', hfIdleLabel());
+      speak('I could not get anywhere with ' + topic + '.');
       if(onDone) onDone(false);
       return;
     }
@@ -4704,18 +4782,14 @@ function learnAbout(topic, onDone){
     if(studies().length > 40) studies().splice(0, studies().length - 40);
     save();
     hudSync();
-    hudLog("him", "Learned " + notes.length + " things about " + topic + ".", false);
-    hfSet("wait", hfIdleLabel());
+    var took = Math.round((Date.now() - began) / 1000);
+    hudLog('him', 'Learned ' + notes.length + ' things about ' + topic + ' in ' + took + 's.', false);
+    hfSet('wait', hfIdleLabel());
     speak("Right, I've read up on " + topic + ". Ask me anything about it.");
     if(onDone) onDone(true);
-  }).catch(function(e){
-    voiceMode = wasVoice;
-    hfSet("wait", hfIdleLabel());
-    var why = String(e && e.message || e);
-    hudLog("him", why, false);
-    speak(why);
-    if(onDone) onDone(false);
-  });
+  }
+
+  runPass();
 }
 
 function forgetStudy(topic){
@@ -5722,7 +5796,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.55";
+var BUILD = "2026-08-21.56";
 
 function banner(kind, html){
   var b = $("banner");

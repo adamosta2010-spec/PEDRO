@@ -1,0 +1,17 @@
+An estimate while he learns, and a microphone that knows what to expect
+
+Learning was one request and a shrug. It is now three passes over different
+ground - the basics, how it works, and using it in practice - which is both
+better groundwork and something an estimate can be given for. The estimate is
+measured rather than invented: each pass updates a running average, so a fresh
+install says about twenty-one seconds and it becomes truer the more he learns.
+While he works, the screen counts down and says which pass he is on, and at the
+end he says how long it actually took.
+
+The microphone was running on defaults. It is now told that it is being spoken
+to rather than dictated at, to punctuate what it hears, and - most usefully -
+which words to expect: his own name first, since mishearing that is the
+difference between answering and ignoring you, along with yours and whatever he
+has recently studied.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
