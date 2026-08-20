@@ -19,6 +19,7 @@ let store = { settings:{ provider:"gemini", aiName:"Pedro", apiKey:"sk-x", gemin
   model:"claude-opus-5", geminiModel:"gemini-2.5-flash", imageModel:"gemini-2.5-flash-image",
   effort:"low", groqKey:"", groqModel:"llama-3.3-70b-versatile", localUrl:"http://localhost:11434", localModel:"qwen2.5:7b", name:"Adam", about:"", facts:[], lessons:[], memories:[], studies:[] } };
 let voiceMode = false, imgMode = false;
+let fastMode = false;   /* the quick path, used for building animations */
 const isLocked = () => false;
 /* DRAW_RE lives at module scope in the app */
 const DRAW_SRC = src.match(/var DRAW_RE = (\/.*\/i);/)[1];

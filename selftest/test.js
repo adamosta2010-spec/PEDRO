@@ -21,6 +21,7 @@ let store = { settings:{ provider:"gemini", aiName:"Pedro", apiKey:"", geminiKey
   model:"claude-opus-5", geminiModel:"gemini-2.5-flash", effort:"low", groqKey:"", groqModel:"llama-3.3-70b-versatile", localUrl:"http://localhost:11434", localModel:"qwen2.5:7b",
   name:"Adam", about:"Builds Roblox games.", facts:[], lessons:[], memories:[], studies:[] } };
 let voiceMode = false;
+let fastMode = false;   /* the quick path, used for building animations */
 const isLocked = () => false;
 eval(names.map(grab).join("\n"));
 

@@ -1,0 +1,16 @@
+Simulations: quick, visible at once, and you can take hold of the parts
+
+They were being built by the model chosen for quality, with its thinking on and
+room for eight thousand tokens, which is why they took so long - and nothing
+appeared until the whole thing arrived, so the wait looked like a blank ball.
+
+There is now a quick path of its own, separate from the spoken one: the fast
+model, no thinking, a tight budget, and a limit of twenty-five seconds before it
+gives up and says so. The moment you ask, the ball fills with a holding pattern
+drawn by the app itself rather than a hole in the middle of the screen.
+
+And the parts can be taken hold of. He is asked to make every separate piece
+draggable with a finger, to label whatever is being held, and to draw the first
+frame before anything else so it appears immediately.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>

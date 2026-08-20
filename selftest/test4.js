@@ -24,6 +24,7 @@ let store = { settings:{ provider:"gemini", aiName:"Pedro",
   groqModel:"llama-3.3-70b-versatile", localUrl:"http://localhost:11434",
   localModel:"qwen2.5:7b", localSeen:false, effort:"low", name:"", about:"", facts:[], lessons:[], memories:[], studies:[] } };
 let voiceMode = false;
+let fastMode = false;   /* the quick path, used for building animations */
 const isLocked = () => false;
 eval(names.map(grab).join("\n"));
 

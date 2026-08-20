@@ -607,7 +607,7 @@ function nativeFrom(cap, exp){
   t("stopping empties the queue", inSrc("function sayStop"), true);
   t("spoken answers ask for less", inSrc("maxOutputTokens: 320"), true);
   t("and stop it thinking first", inSrc("thinkingConfig: { thinkingBudget: 0 }"), true);
-  t("talking uses the quick model", inSrc("voiceMode ? fastGeminiModel()"), true);
+  t("talking uses the quick model", inSrc("(voiceMode || fastMode) ? fastGeminiModel()"), true);
   t("it gives up rather than hanging", inSrc("No answer came back in time"), true);
   t("a half answer says so", inSrc("That answer stopped halfway"), true);
   t("the first word stops the clock", inSrc("clearTimeout(firstWord)"), true);
@@ -631,6 +631,23 @@ function nativeFrom(cap, exp){
   t("and goes back to listening", ask.indexOf('hfSet(hf.want ? "hear" : "wait"') > -1, true);
   t("a failure clears anything queued", ask.indexOf("sayStop();") > -1, true);
   t("stopping forgets the callback too", grab("sayStop").indexOf("sayDone = null") > -1, true);
+}
+
+
+/* ---- simulations: quick, visible, and you can take hold of them ---- */
+{
+  const inSrc = bit => src.indexOf(bit) > -1;
+  const build = grab("vizBuild");
+  t("something appears the instant you ask", build.indexOf("vizWaiting(about)") > -1, true);
+  t("the holding pattern is drawn by us, not by him", grab("vizWaiting").indexOf("requestAnimationFrame") > -1, true);
+  t("it builds with the quick model", build.indexOf("fastMode = true;") > -1, true);
+  t("and puts that back afterwards", build.indexOf("fastMode = false;") > -1, true);
+  t("the quick path has its own budget", inSrc("maxOutputTokens: 1600"), true);
+  t("it gives up rather than building forever", build.indexOf("withTimeout(askOnce(only), 25000") > -1, true);
+  t("giving up clears the ball", build.indexOf("vizStop();") > -1, true);
+  t("the parts can be taken hold of", inSrc("pointerdown"), true);
+  t("and it says what is being held", inSrc("Show a label on whatever is being held"), true);
+  t("the first frame is drawn before anything else", inSrc("draw the first frame before anything else"), true);
 }
 
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " mic/image tests passed");

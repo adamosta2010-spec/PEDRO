@@ -2846,9 +2846,13 @@ function fastGeminiModel(){
   if(flash.length) return bestModel(flash);
   return "gemini-2.5-flash";
 }
+/* Some answers are not spoken but still want speed over depth - building a
+   little animation, for one. */
+var fastMode = false;
+
 /* thinking out loud is for the written answers */
 function activeGeminiModel(){
-  return voiceMode ? fastGeminiModel() : store.settings.geminiModel;
+  return (voiceMode || fastMode) ? fastGeminiModel() : store.settings.geminiModel;
 }
 
 function geminiRequest(msgs){
@@ -2870,7 +2874,9 @@ function geminiRequest(msgs){
          stops the model reasoning silently before it says anything. */
       generationConfig: voiceMode
         ? { maxOutputTokens: 320, thinkingConfig: { thinkingBudget: 0 } }
-        : { maxOutputTokens: 8000 }
+        : (fastMode
+            ? { maxOutputTokens: 1600, thinkingConfig: { thinkingBudget: 0 } }
+            : { maxOutputTokens: 8000 })
     }
   };
 }
@@ -3780,6 +3786,9 @@ function vizBuild(about){
   /* stay where you are - it happens in the ball */
   hfSet('busy', 'Building ' + about);
   hudLog('him', 'Building ' + about + '…', false);
+  /* something in the circle straight away, rather than a blank hole */
+  $('orbViz').srcdoc = vizPage(vizWaiting(about));
+  $('hfOrb').classList.add('showing');
 
   /* it is shown in a circle the size of the ball, and it needs to arrive fast */
   var ask = 'Show ' + about + ' as a small animation that runs by itself.' +
@@ -3789,13 +3798,20 @@ function vizBuild(about){
     ' once and loop forever. Transparent or #0b0d12 background, draw in cyan' +
     ' #38e1f0 with white highlights. It is displayed inside a CIRCLE, so keep' +
     ' everything within the middle and do not put anything in the corners.' +
-    ' Keep it under 45 lines and make it quick to produce.';
+    ' Every separate part must be draggable with a finger: listen for pointerdown,' +
+    ' pointermove and pointerup, work out which part was touched, and move that part' +
+    ' with the finger. Show a label on whatever is being held.' +
+    ' Keep it under 60 lines, and draw the first frame before anything else so it' +
+    ' appears at once.';
 
   var only = { messages: [{ role:'user', content: ask, t:Date.now() }] };
   var wasVoice = voiceMode;
-  voiceMode = false;               /* this one needs the long answer, not a spoken one */
-  askOnce(only).then(function(answer){
+  voiceMode = false;               /* this one needs the code, not a spoken sentence */
+  fastMode = true;                 /* but quickly - the quick model, no thinking */
+  withTimeout(askOnce(only), 25000,
+    "That took too long to build. Ask me again.").then(function(answer){
     voiceMode = wasVoice;
+    fastMode = false;
     viz.busy = false;
     var parts = vizExtract(answer);
     if(!parts.html){
@@ -3813,12 +3829,31 @@ function vizBuild(about){
     if(parts.say) speak(parts.say);
   }).catch(function(e){
     voiceMode = wasVoice;
+    fastMode = false;
     viz.busy = false;
+    vizStop();
     hfSet('wait', hfIdleLabel());
     var why = String(e && e.message || e);
     hfSaid.textContent = why;
     speak(why);
   });
+}
+
+/* Something to look at while he writes it - drawn here, not by him, so it
+   appears the instant you ask. */
+function vizWaiting(about){
+  return '<canvas id="w"></canvas>' +
+    '<script>' +
+    'var c=document.getElementById("w"),g=c.getContext("2d"),t=0;' +
+    'function s(){c.width=c.clientWidth;c.height=c.clientHeight;}' +
+    'addEventListener("resize",s);s();' +
+    'function f(){t+=0.05;g.clearRect(0,0,c.width,c.height);' +
+    'var x=c.width/2,y=c.height/2,r=Math.min(x,y)*0.55;' +
+    'g.strokeStyle="#38e1f0";g.lineWidth=2;' +
+    'for(var i=0;i<3;i++){g.globalAlpha=0.25+0.25*Math.sin(t+i);' +
+    'g.beginPath();g.arc(x,y,r-i*10,t+i,t+i+2.2);g.stroke();}' +
+    'g.globalAlpha=1;requestAnimationFrame(f);}f();' +
+    '<' + '/script>';
 }
 
 /* tap the ball to put the globe back */
@@ -5472,6 +5507,18 @@ function askStream(c, onText){
   });
 }
 
+/* Waiting with no limit is how a stall becomes a hang. */
+function withTimeout(promise, ms, whenSlow){
+  var timer;
+  return Promise.race([
+    promise,
+    new Promise(function(_, reject){
+      timer = setTimeout(function(){ reject(new Error(whenSlow)); }, ms);
+    })
+  ]).then(function(v){ clearTimeout(timer); return v; },
+          function(e){ clearTimeout(timer); throw e; });
+}
+
 function askOnce(c){
   /* The phone's own model answers here too. Voice and camera used to skip this
      entirely and ask the network, which is why choosing it changed nothing. */
@@ -5541,7 +5588,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.53";
+var BUILD = "2026-08-21.54";
 
 function banner(kind, html){
   var b = $("banner");
