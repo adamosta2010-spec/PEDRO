@@ -1,0 +1,3230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#0e0f13">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pedro">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon.png">
+<title>Pedro</title>
+<style>
+  /* ============ theme ============ */
+  :root{
+    --a1:#3b82f6; --a2:#8b5cf6; --eye:#22d3ee;
+    --bg:#04060f; --bg1:#080c18; --bg2:#0d1322; --bg3:#141b2e;
+    --line:#1c2740; --line2:#2a3category;
+    --tx:#e8ecf8; --tx2:#8b96b4; --tx3:#5d6885;
+    --danger:#f87171; --ok:#34d399;
+    --safe-b: env(safe-area-inset-bottom, 0px);
+    --safe-t: env(safe-area-inset-top, 0px);
+    --glow: 0 0 24px -4px color-mix(in srgb, var(--a1) 55%, transparent);
+  }
+  :root[data-accent="purple"]{ --a1:#8b5cf6; --a2:#d946ef; --eye:#c4b5fd }
+  :root[data-accent="cyan"]  { --a1:#06b6d4; --a2:#3b82f6; --eye:#67e8f9 }
+  :root[data-accent="green"] { --a1:#10b981; --a2:#06b6d4; --eye:#6ee7b7 }
+  :root[data-accent="orange"]{ --a1:#f59e0b; --a2:#ef4444; --eye:#fcd34d }
+  :root[data-theme="light"]{
+    --bg:#eef1f8; --bg1:#ffffff; --bg2:#f4f6fc; --bg3:#e8ecf6;
+    --line:#dbe1ef; --tx:#0d1322; --tx2:#5d6885; --tx3:#8b96b4;
+  }
+
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{height:100%; margin:0; overscroll-behavior-y:none}
+  body{
+    background:var(--bg); color:var(--tx);
+    font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+    height:100dvh; overflow:hidden;
+  }
+  /* ambient glow behind everything */
+  body::before{
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background:
+      radial-gradient(70% 55% at 50% -10%, color-mix(in srgb, var(--a1) 22%, transparent), transparent 70%),
+      radial-gradient(50% 40% at 8% 100%, color-mix(in srgb, var(--a2) 16%, transparent), transparent 70%);
+  }
+  button{font:inherit; color:inherit; background:none; border:0; cursor:pointer}
+  input,textarea,select{font:inherit; color:inherit}
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-thumb{background:var(--line); border-radius:8px}
+
+  /* ============ shell ============ */
+  .app{display:flex; height:100dvh; position:relative; z-index:1}
+  .side{
+    width:250px; flex:none; display:flex; flex-direction:column; gap:4px;
+    background:color-mix(in srgb, var(--bg1) 88%, transparent);
+    border-right:1px solid var(--line);
+    padding:14px 12px calc(var(--safe-b) + 12px);
+    padding-top:calc(var(--safe-t) + 14px);
+    backdrop-filter:blur(14px);
+  }
+  .brand{display:flex; align-items:center; gap:9px; padding:2px 6px 16px}
+  .brand .mark{width:34px; height:34px; flex:none; filter:drop-shadow(0 0 10px color-mix(in srgb,var(--a1) 70%,transparent))}
+  .brand b{font-size:17px; letter-spacing:.16em; font-weight:700}
+  .newchat{
+    display:flex; align-items:center; justify-content:center; gap:8px; width:100%;
+    padding:12px; border-radius:13px; font-weight:600; font-size:14.5px; color:#fff;
+    background:linear-gradient(100deg,var(--a1),var(--a2)); box-shadow:var(--glow); margin-bottom:12px;
+  }
+  .newchat:active{transform:translateY(1px)}
+  .nav{display:flex; flex-direction:column; gap:2px}
+  .nav button{
+    display:flex; align-items:center; gap:11px; padding:11px 12px; border-radius:11px;
+    font-size:14.5px; color:var(--tx2); text-align:left; width:100%;
+  }
+  .nav button svg{width:19px;height:19px;flex:none;opacity:.9}
+  .nav button:hover{background:var(--bg2); color:var(--tx)}
+  .nav button.on{background:color-mix(in srgb,var(--a1) 16%,transparent); color:var(--tx)}
+  .nav button.on svg{color:var(--a1)}
+  .sidefoot{margin-top:auto; display:flex; flex-direction:column; gap:10px}
+  .card{
+    background:var(--bg2); border:1px solid var(--line); border-radius:14px; padding:13px;
+  }
+  .card .ct{display:flex; align-items:center; gap:7px; font-size:13.5px; font-weight:600; margin-bottom:7px}
+  .card .ct svg{width:15px;height:15px;color:var(--a1)}
+  .card p{margin:0; font-size:12px; color:var(--tx2); line-height:1.5}
+  .userrow{display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:13px;
+    background:var(--bg2); border:1px solid var(--line)}
+  .userrow .av{width:32px;height:32px;border-radius:50%;flex:none;display:grid;place-items:center;
+    background:linear-gradient(140deg,var(--a1),var(--a2)); color:#fff}
+  .userrow .av svg{width:17px;height:17px}
+  .userrow .nm{font-size:13.5px; font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .userrow .sb{font-size:11px; color:var(--tx2)}
+
+  .content{flex:1; min-width:0; display:flex; flex-direction:column}
+  .topbar{
+    display:flex; align-items:center; gap:10px; padding:12px 16px;
+    padding-top:calc(var(--safe-t) + 12px);
+    border-bottom:1px solid var(--line);
+    background:color-mix(in srgb, var(--bg) 70%, transparent); backdrop-filter:blur(12px);
+  }
+  .topbar .mark{width:26px;height:26px;flex:none;
+    filter:drop-shadow(0 0 8px color-mix(in srgb,var(--a1) 70%,transparent))}
+  .topbar .tt{flex:1; min-width:0}
+  .topbar h1{margin:0; font-size:15px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .topbar .sub{font-size:11px; color:var(--tx2); margin-top:1px}
+  #btnMenu{display:none}
+
+  .icobtn{
+    width:37px;height:37px;border-radius:11px;display:grid;place-items:center;flex:none;
+    background:var(--bg2); border:1px solid var(--line); color:var(--tx2); font-size:15px;
+  }
+  .icobtn svg{width:18px;height:18px}
+  .icobtn:hover{color:var(--tx); border-color:color-mix(in srgb,var(--a1) 45%,var(--line))}
+  .icobtn.act{background:linear-gradient(120deg,var(--a1),var(--a2)); color:#fff; border-color:transparent}
+
+  /* ============ chat ============ */
+  main{flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:22px 16px 6px}
+  .msg{max-width:820px; margin:0 auto 20px; display:flex; gap:11px; align-items:flex-start}
+  .msg.user{flex-direction:row-reverse}
+  .av{width:36px;height:36px;border-radius:50%;flex:none;display:grid;place-items:center;overflow:hidden}
+  .av.bot{background:radial-gradient(circle at 50% 35%, color-mix(in srgb,var(--a1) 40%,transparent), transparent 70%);
+    filter:drop-shadow(0 0 8px color-mix(in srgb,var(--a1) 60%,transparent))}
+  .av.me{background:linear-gradient(140deg,var(--a1),var(--a2)); color:#fff}
+  .av svg{width:100%;height:100%}
+  .av.me svg{width:18px;height:18px}
+  .wrap{min-width:0; max-width:calc(100% - 47px)}
+  .msg.user .wrap{display:flex; flex-direction:column; align-items:flex-end}
+  .who{display:flex; align-items:center; gap:9px; margin-bottom:6px; font-size:13px; font-weight:700;
+    letter-spacing:.02em; color:var(--a1)}
+  .who .time{font-weight:400; color:var(--tx3); font-size:11.5px; letter-spacing:0}
+  .bubble{padding:13px 16px; border-radius:16px; word-wrap:break-word; overflow-wrap:anywhere;
+    background:var(--bg2); border:1px solid var(--line)}
+  .msg.ai .bubble{
+    background:linear-gradient(180deg, color-mix(in srgb,var(--a1) 7%, var(--bg1)), var(--bg1));
+    border-color:color-mix(in srgb, var(--a1) 34%, var(--line));
+    box-shadow:0 0 26px -10px color-mix(in srgb,var(--a1) 70%,transparent), inset 0 1px 0 #ffffff08;
+    border-radius:16px;
+  }
+  .msg.user .bubble{background:var(--bg3); border-bottom-right-radius:5px}
+  .msg.user .time{font-size:11px; color:var(--tx3); margin-top:5px}
+  .bubble p{margin:0 0 .75em} .bubble p:last-child{margin-bottom:0}
+  .bubble ul,.bubble ol{margin:.2em 0 .75em; padding-left:1.3em}
+  .bubble li{margin:.2em 0}
+  .bubble code{background:#00000055; padding:2px 6px; border-radius:6px;
+    font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+  :root[data-theme="light"] .bubble code{background:#0000000f}
+  .bubble pre{position:relative; background:#05070f; border:1px solid var(--line); border-radius:12px;
+    padding:13px 14px; overflow-x:auto; margin:.5em 0 .75em}
+  .bubble pre code{background:none;padding:0;font-size:12.5px;line-height:1.55}
+  .bubble pre .cp{position:absolute; top:7px; right:7px; font-size:11px; color:var(--tx2);
+    background:var(--bg3); border:1px solid var(--line); border-radius:7px; padding:3px 9px}
+  .bubble h1,.bubble h2,.bubble h3{font-size:1em;margin:.7em 0 .35em;font-weight:700}
+  .bubble a{color:var(--a1)}
+  .bubble blockquote{margin:.5em 0;padding-left:11px;border-left:3px solid var(--line);color:var(--tx2)}
+  .bubble .shots{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 9px}
+  .bubble .shots img{max-width:100%;width:210px;border-radius:12px;display:block;
+    border:1px solid var(--line);cursor:zoom-in}
+  .bubble .shots.one img{width:min(340px,100%)}
+  .think{font-size:12.5px;color:var(--tx2);font-style:italic;margin-bottom:7px;padding-left:11px;
+    border-left:2px solid var(--line);white-space:pre-wrap;display:none}
+  .think.on{display:block}
+  .acts{display:flex;align-items:center;gap:4px;margin-top:9px;flex-wrap:wrap}
+  .acts button{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;color:var(--tx3)}
+  .acts button svg{width:15px;height:15px}
+  .acts button:hover{background:var(--bg3);color:var(--tx)}
+  .acts button.on{color:var(--a1)}
+  .acts .more{width:auto;padding:0 13px;height:32px;gap:6px;display:flex;align-items:center;
+    border:1px solid color-mix(in srgb,var(--a1) 40%,var(--line)); border-radius:9px;
+    color:var(--a1); font-size:12.5px; font-weight:600; margin-left:auto}
+  .caret{display:inline-block;width:7px;height:15px;background:var(--a1);vertical-align:-2px;
+    border-radius:2px;animation:bl 1s steps(2) infinite}
+  @keyframes bl{50%{opacity:0}}
+  .err{color:var(--danger);font-size:13.5px;border:1px solid #4a2b2b;background:#2a1a1a;
+    border-radius:13px;padding:11px 14px;max-width:820px;margin:0 auto 18px}
+  :root[data-theme="light"] .err{background:#fee2e2;border-color:#fecaca}
+
+  /* ============ welcome ============ */
+  .empty{max-width:760px;margin:0 auto;padding:14px 4px 0;text-align:center}
+  .empty h2{margin:0 0 6px;font-size:26px;letter-spacing:-.02em;font-weight:700}
+  .empty h2 b{background:linear-gradient(100deg,var(--a1),var(--a2));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .empty .lede{margin:0 0 4px;color:var(--tx2);font-size:15.5px}
+  .hero{width:190px;height:190px;margin:6px auto 20px;position:relative}
+  .hero svg{width:100%;height:100%;filter:drop-shadow(0 10px 34px color-mix(in srgb,var(--a1) 65%,transparent))}
+  .hero::after{content:"";position:absolute;left:12%;right:12%;bottom:2px;height:34px;
+    background:radial-gradient(ellipse at center, color-mix(in srgb,var(--a1) 45%,transparent), transparent 70%);
+    filter:blur(7px)}
+  .chips{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:10px;margin-top:6px}
+  .chip{display:flex;align-items:center;gap:9px;background:var(--bg1);border:1px solid var(--line);
+    border-radius:13px;padding:13px 14px;font-size:13.5px;color:var(--tx);text-align:left}
+  .chip:hover{border-color:color-mix(in srgb,var(--a1) 50%,var(--line));background:var(--bg2)}
+  .chip .ic{width:29px;height:29px;border-radius:9px;flex:none;display:grid;place-items:center;
+    background:color-mix(in srgb,var(--a1) 16%,transparent);color:var(--a1)}
+  .chip .ic svg{width:15px;height:15px}
+
+  /* ============ composer ============ */
+  footer{padding:10px 16px calc(var(--safe-b) + 12px)}
+  .cwrap{max-width:820px;margin:0 auto}
+  #attach{display:none;gap:8px;margin-bottom:9px;overflow-x:auto;padding-bottom:2px}
+  .thumb{position:relative;flex:none}
+  .thumb img{width:60px;height:60px;object-fit:cover;border-radius:11px;border:1px solid var(--line);display:block}
+  .thumb button{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;
+    background:var(--bg3);border:1px solid var(--line);font-size:11px;line-height:1;color:var(--tx)}
+  .composer{
+    background:var(--bg1); border:1px solid var(--line); border-radius:20px; padding:8px 8px 8px 16px;
+    display:flex; align-items:flex-end; gap:8px;
+    box-shadow:0 6px 30px -14px color-mix(in srgb,var(--a1) 80%,transparent);
+  }
+  .composer:focus-within{border-color:color-mix(in srgb,var(--a1) 55%,var(--line))}
+  textarea#input{flex:1;background:none;border:0;outline:none;resize:none;max-height:150px;
+    padding:9px 0;line-height:1.5;font-size:15.5px}
+  textarea#input::placeholder{color:var(--tx3)}
+  .ctools{display:flex;align-items:center;gap:2px}
+  .ctools button{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;color:var(--tx3)}
+  .ctools button svg{width:17px;height:17px}
+  .ctools button:hover{color:var(--tx);background:var(--bg2)}
+  .ctools button.act{color:#fff;background:linear-gradient(120deg,var(--a1),var(--a2))}
+  .ctools button.rec{color:#fff;background:var(--danger);animation:pulse 1.2s infinite}
+  @keyframes pulse{50%{opacity:.55}}
+  .send{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;flex:none;color:#fff;
+    background:linear-gradient(120deg,var(--a1),var(--a2));box-shadow:var(--glow);transition:opacity .15s}
+  .send svg{width:18px;height:18px;margin-left:-1px}
+  .send:disabled{opacity:.35;box-shadow:none}
+  .send.stop{background:var(--danger)}
+  .disc{text-align:center;font-size:11.5px;color:var(--tx3);margin-top:9px}
+
+  /* ============ banners ============ */
+  #banner{position:fixed; left:0; right:0; top:0; z-index:90; padding:11px 14px;
+    padding-top:calc(var(--safe-t) + 11px);
+    font-size:13px; line-height:1.5; display:none; align-items:flex-start; gap:10px}
+  #banner.on{display:flex}
+  #banner.warn{background:#3a2a08; color:#fde68a; border-bottom:1px solid #78500a}
+  #banner.bad{background:#3a1212; color:#fecaca; border-bottom:1px solid #7f1d1d}
+  #banner a{color:inherit; font-weight:700}
+  #banner .bx{margin-left:auto; flex:none; opacity:.7; font-size:16px; line-height:1; padding:0 4px}
+  #banner code{background:#0006; padding:1px 5px; border-radius:5px; font-size:12px}
+
+  /* ============ panels ============ */
+  .scrim{position:fixed;inset:0;background:#000b;backdrop-filter:blur(3px);z-index:30;
+    opacity:0;pointer-events:none;transition:opacity .2s}
+  .scrim.on{opacity:1;pointer-events:auto}
+  .panel{position:fixed;z-index:31;background:var(--bg1);border:1px solid var(--line);
+    transition:transform .26s cubic-bezier(.3,.8,.4,1);display:flex;flex-direction:column}
+  #settings,#tools,#teach{left:0;right:0;bottom:0;max-height:88dvh;border-radius:22px 22px 0 0;
+    transform:translateY(102%);padding-bottom:var(--safe-b)}
+  #settings.on,#tools.on,#teach.on{transform:none}
+  @media(min-width:900px){
+    #settings,#tools,#teach{left:auto;right:22px;bottom:22px;width:430px;border-radius:20px;
+      max-height:82dvh;transform:translateY(calc(100% + 40px))}
+  }
+  .phead{display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid var(--line)}
+  .phead h3{margin:0;font-size:15.5px;flex:1;font-weight:650}
+  .pbody{overflow-y:auto;padding:16px 18px 22px;flex:1}
+  .field{margin-bottom:17px}
+  .field label{display:block;font-size:11.5px;color:var(--tx2);margin-bottom:7px;
+    text-transform:uppercase;letter-spacing:.07em;font-weight:700}
+  .field input,.field textarea,.field select{width:100%;background:var(--bg2);border:1px solid var(--line);
+    border-radius:12px;padding:12px 13px;outline:none;font-size:15px}
+  .field input:focus,.field textarea:focus{border-color:var(--a1)}
+  .field textarea{resize:vertical;min-height:88px;line-height:1.5}
+  .hint{font-size:12px;color:var(--tx2);margin-top:7px;line-height:1.5}
+  .hint a{color:var(--a1)}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 0;
+    border-bottom:1px solid var(--line)}
+  .row:last-child{border-bottom:0}
+  .row .lb{font-size:14.5px}
+  .row .lb small{display:block;color:var(--tx2);font-size:12px;margin-top:2px}
+  .sw{width:48px;height:28px;border-radius:15px;background:var(--bg3);position:relative;flex:none;
+    border:1px solid var(--line);transition:background .18s}
+  .sw::after{content:"";position:absolute;top:2px;left:2px;width:21px;height:21px;border-radius:50%;
+    background:var(--tx3);transition:transform .18s,background .18s}
+  .sw.on{background:linear-gradient(120deg,var(--a1),var(--a2));border-color:transparent}
+  .sw.on::after{transform:translateX(20px);background:#fff}
+  .btn{display:block;width:100%;text-align:center;padding:13px;border-radius:13px;color:#fff;
+    background:linear-gradient(120deg,var(--a1),var(--a2));font-weight:600;font-size:15px;margin-top:9px}
+  .btn.ghost{background:var(--bg2);border:1px solid var(--line);color:var(--tx);font-weight:500}
+  .btn.danger{background:none;border:1px solid #4a2b2b;color:var(--danger)}
+  .swatches{display:flex;gap:11px;margin-top:3px}
+  .swatch{width:34px;height:34px;border-radius:50%;border:2px solid transparent;flex:none;
+    box-shadow:0 0 0 1px var(--line)}
+  .swatch.on{border-color:var(--tx)}
+
+  /* chat history list */
+  .clist{overflow-y:auto;flex:1;padding:4px 2px 8px;min-height:0}
+  .side .clist{max-height:38vh}
+  .citem{display:flex;align-items:center;gap:8px;padding:10px 11px;border-radius:11px;cursor:pointer}
+  .citem:hover{background:var(--bg2)}
+  .citem.on{background:color-mix(in srgb,var(--a1) 14%,transparent)}
+  .citem .nm{flex:1;min-width:0;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--tx2)}
+  .citem.on .nm{color:var(--tx)}
+  .citem .dl{color:var(--tx3);font-size:13px;padding:0 3px}
+  .secttl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--tx3);
+    font-weight:700;padding:12px 12px 6px}
+  .toast{position:fixed;left:50%;bottom:calc(var(--safe-b) + 92px);transform:translateX(-50%);
+    background:var(--bg3);border:1px solid var(--line);color:var(--tx);padding:10px 17px;
+    border-radius:999px;font-size:13px;z-index:60;opacity:0;pointer-events:none;transition:opacity .2s}
+  .toast.on{opacity:1}
+
+  .taught{display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border-radius:11px;
+    background:var(--bg2); border:1px solid var(--line); margin-bottom:7px}
+  .taught .tt{flex:1; min-width:0; font-size:13.5px; line-height:1.5; overflow-wrap:anywhere}
+  .taught button{color:var(--tx3); font-size:16px; line-height:1; padding:0 4px; flex:none}
+  .taught button:hover{color:var(--danger)}
+
+  /* tools list */
+  .tool{display:flex;align-items:center;gap:12px;padding:13px;border-radius:13px;width:100%;
+    text-align:left;border:1px solid var(--line);background:var(--bg2);margin-bottom:9px}
+  .tool:hover{border-color:color-mix(in srgb,var(--a1) 45%,var(--line))}
+  .tool .ic{width:38px;height:38px;border-radius:11px;flex:none;display:grid;place-items:center;
+    background:color-mix(in srgb,var(--a1) 15%,transparent);color:var(--a1)}
+  .tool .ic svg{width:18px;height:18px}
+  .tool .tx{flex:1;min-width:0}
+  .tool .tx b{display:block;font-size:14.5px;font-weight:600}
+  .tool .tx small{color:var(--tx2);font-size:12px}
+
+  /* ============ hands-free ============ */
+  #hf{position:fixed;inset:0;z-index:70;background:var(--bg);display:none;flex-direction:column;
+    align-items:center;justify-content:center;gap:22px;text-align:center;
+    padding:28px 24px calc(var(--safe-b) + 28px)}
+  #hf.on{display:flex}
+  #hf::before{content:"";position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(60% 45% at 50% 40%, color-mix(in srgb,var(--a1) 20%,transparent),transparent 70%)}
+  #hfOrb{width:150px;height:150px;flex:none;position:relative;z-index:1}
+  #hfOrb svg{width:100%;height:100%;
+    filter:drop-shadow(0 0 26px color-mix(in srgb,var(--a1) 75%,transparent))}
+  #hfOrb.wait svg{animation:breathe 3.4s ease-in-out infinite}
+  #hfOrb.hear svg{animation:breathe 1.1s ease-in-out infinite}
+  #hfOrb.busy svg{animation:spin 2.4s linear infinite}
+  #hfOrb.talk svg{animation:breathe .8s ease-in-out infinite}
+  @keyframes breathe{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(1.07);opacity:1}}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  #hfState{font-size:22px;font-weight:700;letter-spacing:-.02em;position:relative;z-index:1}
+  #hfHeard{color:var(--tx2);font-size:15px;min-height:44px;max-width:460px;line-height:1.45;z-index:1}
+  #hfSaid{color:var(--tx);font-size:16px;max-width:560px;line-height:1.55;min-height:24px;z-index:1}
+  #hf .exit{position:absolute;top:calc(var(--safe-t) + 14px);right:16px;z-index:2}
+  #hfWarn{position:absolute;bottom:calc(var(--safe-b) + 14px);left:16px;right:16px;
+    color:var(--tx3);font-size:11.5px;line-height:1.45}
+
+  /* ============ lock + lightbox ============ */
+  #lock{position:fixed;inset:0;z-index:80;background:var(--bg);display:none;flex-direction:column;
+    align-items:center;justify-content:center;padding:26px}
+  #lock.on{display:flex}
+  #lock .mark{width:82px;height:82px;margin-bottom:18px;
+    filter:drop-shadow(0 0 20px color-mix(in srgb,var(--a1) 70%,transparent))}
+  #lock h2{margin:0 0 6px;font-size:20px;letter-spacing:-.02em}
+  #lock p{margin:0 0 22px;color:var(--tx2);font-size:14px;text-align:center;max-width:320px}
+  #lock input{width:min(250px,72vw);text-align:center;letter-spacing:.4em;font-size:22px;
+    background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:14px;outline:none}
+  #lock input:focus{border-color:var(--a1)}
+  #lock .btn{width:min(250px,72vw)}
+  #lock .msg2{color:var(--danger);font-size:13px;height:18px;margin-top:10px}
+  #shade{position:fixed;inset:0;z-index:75;background:#000e;display:none;align-items:center;
+    justify-content:center;padding:16px}
+  #shade.on{display:flex}
+  #shade img{max-width:100%;max-height:100%;border-radius:12px}
+
+  /* ============ phone ============ */
+  @media(max-width:899px){
+    .side{position:fixed;top:0;bottom:0;left:0;z-index:31;width:min(290px,84vw);
+      border-radius:0 20px 20px 0;transform:translateX(-102%);
+      transition:transform .26s cubic-bezier(.3,.8,.4,1)}
+    .side.on{transform:none}
+    #btnMenu{display:grid}
+    main{padding:16px 12px 4px}
+    footer{padding:8px 12px calc(var(--safe-b) + 10px)}
+    .msg{gap:9px;margin-bottom:16px}
+    .empty h2{font-size:22px}
+    .hero{width:140px;height:140px;margin-bottom:14px}
+    .chips{grid-template-columns:1fr 1fr;gap:8px}
+    .chip{padding:11px;font-size:12.5px;flex-direction:column;align-items:flex-start;gap:7px}
+    .topbar .brandtx{display:none}
+  }
+  @media(max-width:380px){ .chips{grid-template-columns:1fr} }
+
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="botg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#dbe7ff"/>
+      <stop offset=".45" stop-color="var(--a1)"/>
+      <stop offset="1" stop-color="var(--a2)"/>
+    </linearGradient>
+    <radialGradient id="eyeg" cx=".5" cy=".5" r=".5">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset=".55" stop-color="var(--eye)"/>
+      <stop offset="1" stop-color="var(--eye)"/>
+    </radialGradient>
+    <filter id="eyeglow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="1.6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+    <!-- the mascot -->
+    <symbol id="bot" viewBox="0 0 64 64">
+      <circle cx="32" cy="5.5" r="3.4" fill="url(#botg)"/>
+      <rect x="30.9" y="8" width="2.2" height="6" rx="1.1" fill="url(#botg)"/>
+      <rect x="4.5" y="24" width="8" height="17" rx="4" fill="url(#botg)" opacity=".92"/>
+      <rect x="51.5" y="24" width="8" height="17" rx="4" fill="url(#botg)" opacity=".92"/>
+      <path d="M32 13.5c11.6 0 20 8.2 20 19.2 0 6.2-2.7 11.4-7.1 14.8l1.6 7.4-8.2-4.1c-1.9.5-4.1.8-6.3.8-11.6 0-20-8.2-20-18.9s8.4-19.2 20-19.2z" fill="url(#botg)"/>
+      <rect x="17.5" y="21.5" width="29" height="23" rx="11.5" fill="#050a16" opacity=".92"/>
+      <g filter="url(#eyeglow)">
+        <ellipse cx="25.6" cy="32.8" rx="3.5" ry="5.4" fill="url(#eyeg)"/>
+        <ellipse cx="38.4" cy="32.8" rx="3.5" ry="5.4" fill="url(#eyeg)"/>
+      </g>
+    </symbol>
+
+    <!-- ui icons -->
+    <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.8-.8L3 21l1.9-4.6A8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4z"/></symbol>
+    <symbol id="i-compass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2.1 5-5 2.1 2.1-5z"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 1.9"/></symbol>
+    <symbol id="i-tools" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0 5 5L15 16l-3-3zM7 14l3 3-4.5 4.5a2.1 2.1 0 0 1-3-3z"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.7H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12a4.2 4.2 0 1 0 0-8.4 4.2 4.2 0 0 0 0 8.4zm0 2c-4 0-7.5 2.1-7.5 4.8V21h15v-2.2c0-2.7-3.5-4.8-7.5-4.8z"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2.2"/><path d="M5 15V5.5A1.5 1.5 0 0 1 6.5 4H15"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 21V10l4.5-7 .6.3A2.6 2.6 0 0 1 13.4 6L13 10h5.4a2 2 0 0 1 2 2.4l-1.4 6.5a2.5 2.5 0 0 1-2.4 2H7z"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3v11l-4.5 7-.6-.3A2.6 2.6 0 0 1 10.6 18l.4-4H5.6a2 2 0 0 1-2-2.4l1.4-6.5A2.5 2.5 0 0 1 7.4 3H17z"/></symbol>
+    <symbol id="i-speak" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6.5 9H3v6h3.5L11 19z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24" fill="currentColor"><path d="m12 2 2.2 6.4L20.5 11l-6.3 2.3L12 20l-2.2-6.7L3.5 11l6.3-2.6z"/></symbol>
+    <symbol id="i-cam" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h2.7l1.3-2h6.9l1.3 2h2.8A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"/><circle cx="12" cy="13" r="3.4"/></symbol>
+    <symbol id="i-art" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.4"/><circle cx="8.5" cy="9.5" r="1.8"/><path d="m4 17 5-5 4 4 3-2.5 4 3.5"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24" fill="currentColor"><path d="M3.2 20.5 21.5 12 3.2 3.5 3 10.2l12 1.8-12 1.8z"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.2 4.2l1.4 1.4m12.8 12.8 1.4 1.4M2 12h2m16 0h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/></symbol>
+    <symbol id="i-code" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m8 6-6 6 6 6M16 6l6 6-6 6"/></symbol>
+    <symbol id="i-doc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></symbol>
+    <symbol id="i-bulb" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17h6M10 21h4"/><path d="M12 3a6 6 0 0 1 3.5 10.9c-.5.4-.8 1-.8 1.6H9.3c0-.6-.3-1.2-.8-1.6A6 6 0 0 1 12 3z"/></symbol>
+    <symbol id="i-pen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L20 8l-4-4L4 16z"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M5 20V10M12 20V4M19 20v-6"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2.4"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></symbol>
+  </defs>
+</svg>
+
+<div class="app">
+  <aside class="side" id="drawer">
+    <div class="brand">
+      <svg class="mark"><use href="#bot"/></svg>
+      <b>PEDRO</b>
+    </div>
+
+    <button class="newchat" id="btnNew"><svg width="17" height="17"><use href="#i-plus"/></svg> New Chat</button>
+
+    <div class="nav">
+      <button data-nav="chat" class="on"><svg><use href="#i-chat"/></svg> Chat</button>
+      <button data-nav="explore"><svg><use href="#i-compass"/></svg> Explore</button>
+      <button data-nav="history"><svg><use href="#i-clock"/></svg> History</button>
+      <button data-nav="teach"><svg><use href="#i-bulb"/></svg> Teach</button>
+      <button data-nav="tools"><svg><use href="#i-tools"/></svg> Tools</button>
+      <button data-nav="settings"><svg><use href="#i-gear"/></svg> Settings</button>
+    </div>
+
+    <div class="secttl" id="histTtl">Recent</div>
+    <div class="clist" id="chatList"></div>
+
+    <div class="sidefoot">
+      <div class="card">
+        <div class="ct"><svg><use href="#i-spark"/></svg> <span id="provTtl">Gemini</span></div>
+        <p id="provNote">Free tier &middot; runs on your device</p>
+      </div>
+      <div class="userrow">
+        <div class="av"><svg><use href="#i-user"/></svg></div>
+        <div style="flex:1;min-width:0">
+          <div class="nm" id="youName">You</div>
+          <div class="sb">Private &middot; on this phone</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="content">
+    <header class="topbar">
+      <button class="icobtn" id="btnMenu" aria-label="Menu">&#9776;</button>
+      <svg class="mark brandtx"><use href="#bot"/></svg>
+      <div class="tt">
+        <h1 id="chatTitle">New chat</h1>
+        <div class="sub" id="modelSub">Gemini</div>
+      </div>
+      <button class="icobtn" id="btnTheme" aria-label="Light or dark"><svg><use href="#i-sun"/></svg></button>
+      <button class="icobtn" id="btnHF" aria-label="Hands-free mode"><svg><use href="#i-speak"/></svg></button>
+      <button class="icobtn" id="btnSettings" aria-label="Settings"><svg><use href="#i-gear"/></svg></button>
+    </header>
+
+    <main id="scroll"></main>
+
+    <footer>
+      <div class="cwrap">
+        <div id="attach"></div>
+        <input type="file" id="fileIn" accept="image/*" multiple hidden>
+        <div class="composer">
+          <textarea id="input" rows="1" placeholder="Message PEDRO&hellip;" enterkeyhint="send"></textarea>
+          <div class="ctools">
+            <button id="btnAttach" aria-label="Add a photo"><svg><use href="#i-cam"/></svg></button>
+            <button id="btnImg" aria-label="Make a picture"><svg><use href="#i-art"/></svg></button>
+            <button id="btnMic" class="mic" aria-label="Voice input"><svg><use href="#i-mic"/></svg></button>
+          </div>
+          <button class="send" id="btnSend" aria-label="Send" disabled><svg><use href="#i-send"/></svg></button>
+        </div>
+        <div class="disc">PEDRO can make mistakes. Check anything important.</div>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<div class="scrim" id="scrim"></div>
+
+
+
+<section class="panel" id="settings">
+  <div class="phead"><h3>Settings</h3><button class="icobtn" data-close><svg><use href="#i-x"/></svg></button></div>
+  <div class="pbody">
+    <div class="field">
+      <label>Accent colour</label>
+      <div class="swatches" id="swatches">
+        <button class="swatch" data-accent="blue"   style="background:linear-gradient(140deg,#3b82f6,#8b5cf6)"></button>
+        <button class="swatch" data-accent="purple" style="background:linear-gradient(140deg,#8b5cf6,#d946ef)"></button>
+        <button class="swatch" data-accent="cyan"   style="background:linear-gradient(140deg,#06b6d4,#3b82f6)"></button>
+        <button class="swatch" data-accent="green"  style="background:linear-gradient(140deg,#10b981,#06b6d4)"></button>
+        <button class="swatch" data-accent="orange" style="background:linear-gradient(140deg,#f59e0b,#ef4444)"></button>
+      </div>
+    </div>
+    <div class="field">
+      <label for="setProvider">Powered by</label>
+      <select id="setProvider">
+        <option value="device" id="optDevice" hidden>On this iPhone &mdash; free, works with no internet</option>
+        <option value="local">On this PC &mdash; free, private, works offline</option>
+        <option value="gemini">Google Gemini &mdash; free, works anywhere</option>
+        <option value="groq">Groq &mdash; free, very fast</option>
+        <option value="claude">Claude &mdash; paid, smartest</option>
+      </select>
+      <div class="hint" id="provHint"></div>
+    </div>
+
+    <div id="gemBlock">
+      <div class="field">
+        <label for="setGemKey">Google AI Studio key</label>
+        <input type="password" id="setGemKey" placeholder="AIza..." autocomplete="off" spellcheck="false">
+        <div class="hint">Free, no card needed. Get one at
+          <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>
+          &mdash; click <em>Create API key</em> and paste it here.</div>
+      </div>
+      <div class="field">
+        <label for="setGemModel">Model</label>
+        <select id="setGemModel">
+          <option value="gemini-2.5-flash">Gemini 2.5 Flash &mdash; fast, free</option>
+          <option value="gemini-2.5-pro">Gemini 2.5 Pro &mdash; smarter, smaller free limit</option>
+          <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="setImgModel">Picture model</label>
+        <select id="setImgModel">
+          <option value="gemini-2.5-flash-image">Gemini 2.5 Flash Image</option>
+          <option value="gemini-2.0-flash-preview-image-generation">Gemini 2.0 Flash (image preview)</option>
+        </select>
+        <button class="btn ghost" id="btnGemModels" style="margin-top:8px">Load models from my account</button>
+        <button class="btn ghost" id="btnGemTest" style="margin-top:8px">Test connection</button>
+        <div class="hint" id="gemModelsHint">Google adds new models often &mdash; tap above to pull the
+          current list for your key.</div>
+      </div>
+    </div>
+
+    <div id="localBlock">
+      <div class="field">
+        <label for="setLocalModel">Model on this PC</label>
+        <select id="setLocalModel"><option value="qwen2.5:7b">qwen2.5:7b</option></select>
+        <button class="btn ghost" id="btnLocalCheck" style="margin-top:8px">Check what's installed</button>
+        <div class="hint" id="localHint">Runs through Ollama on this computer. Nothing is sent
+          anywhere, it costs nothing, and it works with the internet off &mdash; but this PC has
+          to be awake.</div>
+      </div>
+      <div class="field">
+        <label for="setLocalUrl">Ollama address</label>
+        <input type="text" id="setLocalUrl" placeholder="http://localhost:11434" spellcheck="false">
+        <div class="hint">Leave this unless you've moved Ollama to another machine.</div>
+      </div>
+    </div>
+
+    <div id="groqBlock">
+      <div class="field">
+        <label for="setGroqKey">Groq key</label>
+        <input type="password" id="setGroqKey" placeholder="gsk_..." autocomplete="off" spellcheck="false">
+        <div class="hint">Free, no card. Get one at
+          <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a>.
+          Very fast, and a good backup for when Gemini is busy.</div>
+      </div>
+      <div class="field">
+        <label for="setGroqModel">Model</label>
+        <select id="setGroqModel">
+          <option value="llama-3.3-70b-versatile">Llama 3.3 70B</option>
+          <option value="llama-3.1-8b-instant">Llama 3.1 8B (fastest)</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="claudeBlock">
+      <div class="field">
+        <label for="setKey">Anthropic API key</label>
+        <input type="password" id="setKey" placeholder="sk-ant-..." autocomplete="off" spellcheck="false">
+        <div class="hint">Pay-as-you-go, needs credit. Get one at
+          <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.</div>
+      </div>
+      <div class="field">
+        <label for="setModel">Model</label>
+        <select id="setModel">
+          <option value="claude-opus-5">Opus 5 &mdash; smartest</option>
+          <option value="claude-sonnet-5">Sonnet 5 &mdash; fast &amp; capable</option>
+          <option value="claude-haiku-4-5">Haiku 4.5 &mdash; cheapest</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="setEffort">Thinking depth</label>
+        <select id="setEffort">
+          <option value="low">Low &mdash; snappy replies</option>
+          <option value="medium">Medium &mdash; balanced</option>
+          <option value="high">High &mdash; think hard</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label for="setAiName">What to call it (wake word)</label>
+      <input type="text" id="setAiName" placeholder="Pedro">
+      <div class="hint">Say this name in hands-free mode to wake it up.</div>
+    </div>
+    <div class="field">
+      <label for="setName">Your name</label>
+      <input type="text" id="setName" placeholder="What should it call you?">
+    </div>
+    <div class="field">
+      <label for="setAbout">What it should remember about you</label>
+      <textarea id="setAbout" placeholder="e.g. I build Roblox games in Luau. I'm learning guitar. Keep answers short unless I ask for detail."></textarea>
+      <div class="hint">Added to every conversation, so it always knows who it&rsquo;s talking to.</div>
+    </div>
+    <div class="field">
+      <label>Microphone</label>
+      <button class="btn ghost" id="btnMicTest">Test microphone</button>
+      <div class="hint" id="micHint">Checks each step and tells you exactly which one fails.</div>
+    </div>
+    <div class="row">
+      <div class="lb">Speak replies aloud<small>Reads answers using your phone&rsquo;s voice</small></div>
+      <div class="sw" id="swTts"></div>
+    </div>
+    <div class="row">
+      <div class="lb">Show its thinking<small>Displays a summary of how it reasoned</small></div>
+      <div class="sw" id="swThink"></div>
+    </div>
+    <div class="row">
+      <div class="lb">Send on Enter<small>Off: Enter makes a new line</small></div>
+      <div class="sw" id="swEnter"></div>
+    </div>
+    <div class="row">
+      <div class="lb">Switch automatically if one is busy<small>Falls back to another provider you've set up</small></div>
+      <div class="sw" id="swFail"></div>
+    </div>
+    <div class="row">
+      <div class="lb">Require sign-in<small id="lockSub">Email and password, and your API keys get encrypted</small></div>
+      <div class="sw" id="swLock"></div>
+    </div>
+    <button class="btn ghost" id="btnExport" style="margin-top:16px">Export all chats (.json)</button>
+    <button class="btn danger" id="btnWipe">Delete everything on this device</button>
+    <div class="hint" style="margin-top:14px">Build <b id="buildId"></b> &middot; <span id="originId"></span><br>
+      Add it to your home screen for an app-like experience.</div>
+  </div>
+</section>
+
+<section class="panel" id="tools">
+  <div class="phead"><h3>Tools</h3><button class="icobtn" data-close><svg><use href="#i-x"/></svg></button></div>
+  <div class="pbody">
+    <button class="tool" data-tool="code">
+      <span class="ic"><svg><use href="#i-code"/></svg></span>
+      <span class="tx"><b>Code Assistant</b><small>Write, debug and explain code</small></span>
+    </button>
+    <button class="tool" data-tool="sum">
+      <span class="ic"><svg><use href="#i-doc"/></svg></span>
+      <span class="tx"><b>Summarizer</b><small>Paste anything long, get the short version</small></span>
+    </button>
+    <button class="tool" data-tool="img">
+      <span class="ic"><svg><use href="#i-art"/></svg></span>
+      <span class="tx"><b>Image Generator</b><small>Make a picture from a description</small></span>
+    </button>
+    <button class="tool" data-tool="photo">
+      <span class="ic"><svg><use href="#i-cam"/></svg></span>
+      <span class="tx"><b>Read a Photo</b><small>Ask about anything in a picture</small></span>
+    </button>
+    <button class="tool" data-tool="voice">
+      <span class="ic"><svg><use href="#i-speak"/></svg></span>
+      <span class="tx"><b>Hands-free</b><small>Say the wake word, talk out loud</small></span>
+    </button>
+  </div>
+</section>
+
+<div id="banner"><div id="bannerTx"></div><button class="bx" id="bannerX">&times;</button></div>
+
+<section class="panel" id="teach">
+  <div class="phead">
+    <h3>Teach <span id="teachCount" style="font-weight:400;color:var(--tx2);font-size:12.5px"></span></h3>
+    <button class="icobtn" data-close><svg><use href="#i-x"/></svg></button>
+  </div>
+  <div class="pbody">
+    <div class="field">
+      <label for="newFact">Tell it something that's always true</label>
+      <input type="text" id="newFact" placeholder="I build Roblox games in Luau">
+      <button class="btn ghost" id="btnAddFact" style="margin-top:8px">Remember this</button>
+    </div>
+
+    <div class="field">
+      <label for="newQ">Show it how to answer something</label>
+      <input type="text" id="newQ" placeholder="When I ask… (e.g. how do I make a part glow?)">
+      <textarea id="newA" placeholder="…answer like this." style="margin-top:8px"></textarea>
+      <button class="btn" id="btnAddLesson" style="margin-top:8px">Teach it</button>
+      <div class="hint">Quicker way: ask Pedro something, then tap <b>Teach</b> under its answer
+        and edit it into what you actually wanted.</div>
+    </div>
+
+    <div id="teachList"></div>
+
+    <div class="field" style="margin-top:18px">
+      <label>Move this to your other device</label>
+      <button class="btn ghost" id="btnTeachExport">Save what I've taught</button>
+      <button class="btn ghost" id="btnTeachImport" style="margin-top:8px">Load it on this device</button>
+      <input type="file" id="teachFile" accept="application/json,.json" hidden>
+      <button class="btn ghost" id="btnTeachJsonl" style="margin-top:8px">Export for real training (.jsonl)</button>
+      <div class="hint">Teaching is stored on the device you did it on. Save it here, then load it
+        on your phone to keep both in step.</div>
+    </div>
+  </div>
+</section>
+
+<div class="toast" id="toast"></div>
+<div id="shade"><img alt=""></div>
+
+<div id="hf">
+  <button class="icobtn exit" id="hfExit" aria-label="Close"><svg><use href="#i-x"/></svg></button>
+  <div id="hfOrb" class="wait"><svg><use href="#bot"/></svg></div>
+  <div id="hfState">Say &ldquo;Pedro&rdquo;</div>
+  <div id="hfHeard"></div>
+  <div id="hfSaid"></div>
+  <div id="hfWarn"></div>
+</div>
+
+<div id="lock">
+  <svg class="mark"><use href="#bot"/></svg>
+  <h2 id="lockTitle">Sign in</h2>
+  <p id="lockNote">Pedro is locked on this device.</p>
+  <input type="email" id="lockEmail" autocomplete="username" placeholder="you@example.com"
+         spellcheck="false" style="letter-spacing:normal;font-size:16px;margin-bottom:10px">
+  <input type="password" id="lockPin" autocomplete="current-password"
+         placeholder="password" style="letter-spacing:normal;font-size:16px">
+  <div class="msg2" id="lockMsg"></div>
+  <button class="btn" id="lockGo">Unlock</button>
+  <button class="btn ghost" id="lockCancel" style="display:none">Cancel</button>
+</div>
+
+<script>
+"use strict";
+
+/* ============================ state ============================ */
+var KEY = "pocketai.v1";
+var DEF = {
+  provider:"gemini", aiName:"Pedro", theme:"dark", accent:"blue",                 /* "gemini" (free) or "claude" (paid) */
+  apiKey:"", model:"claude-opus-5", effort:"low",
+  geminiKey:"", geminiModel:"gemini-2.5-flash", imageModel:"gemini-2.5-flash-image",
+  groqKey:"", groqModel:"llama-3.3-70b-versatile",
+  localUrl:"http://localhost:11434", localModel:"qwen2.5:7b",
+  deviceSeen:false,               /* the phone's own model has answered at least once */
+  facts:[], lessons:[],            /* what you've taught it */
+  autoFailover:true,   /* if the chosen provider is busy, use the other one */
+  modelsLoaded:0,   /* set once we've asked Google what this key can really use */
+  name:"", about:"",
+  tts:false, showThink:false, enterSends:true,
+  lock:null,       /* when set: {salt, iv, ct} - your API keys, encrypted with your password */
+  authEmail:"",    /* not a secret - just so you don't retype it every time */
+};
+var store = load();
+
+function load(){
+  try{
+    var raw = localStorage.getItem(KEY);
+    if(!raw) return { chats:[], activeId:null, settings:Object.assign({},DEF) };
+    var s = JSON.parse(raw);
+    s.chats = s.chats || [];
+    s.settings = Object.assign({}, DEF, s.settings || {});
+    return s;
+  }catch(e){
+    return { chats:[], activeId:null, settings:Object.assign({},DEF) };
+  }
+}
+function save(){
+  try{ localStorage.setItem(KEY, JSON.stringify(store)); return; }
+  catch(e){}
+  /* out of room - drop the oldest pictures (keeping the words) and try again */
+  var freed = 0;
+  outer:
+  for(var i = store.chats.length - 1; i >= 0; i--){
+    var ms = store.chats[i].messages;
+    for(var j = 0; j < ms.length; j++){
+      if(ms[j].images && ms[j].images.length){
+        delete ms[j].images; freed++;
+        try{ localStorage.setItem(KEY, JSON.stringify(store));
+             if(freed) toast("Storage full - dropped " + freed + " old picture(s)");
+             return; }
+        catch(e2){ continue; }
+      }
+    }
+    if(freed > 40) break outer;
+  }
+  try{ localStorage.setItem(KEY, JSON.stringify(store)); }
+  catch(e3){ toast("Storage full - delete a chat"); }
+}
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+function activeChat(){
+  var c = store.chats.filter(function(x){ return x.id === store.activeId; })[0];
+  return c || null;
+}
+function newChat(){
+  var c = { id:uid(), title:"New chat", messages:[], created:Date.now() };
+  store.chats.unshift(c);
+  store.activeId = c.id;
+  save();
+  return c;
+}
+
+/* ============================ lock / crypto ============================
+   With a PIN set, the API key is stored AES-GCM encrypted, with the key
+   derived from your PIN (PBKDF2, 250k iterations). Without the PIN the
+   stored blob is useless - there is no copy of the key anywhere else. */
+var sessionKeys = null;  /* {claude, gemini} decrypted, memory only */
+var sessionPin = null;   /* needed to re-encrypt if you change a key */
+
+function isLocked(){ return !!(store.settings.lock); }
+function isGemini(){ return store.settings.provider === "gemini"; }
+function isGroq(){ return store.settings.provider === "groq"; }
+function isLocal(){ return store.settings.provider === "local"; }
+/* "device" = the model inside the iPhone. isDevice() lives in the native module. */
+/* Groq and Ollama both speak the OpenAI chat format */
+function isOpenAIStyle(){ return isGroq() || isLocal(); }
+
+/* all keys, wherever they currently live */
+function allKeys(){
+  if(isLocked()) return sessionKeys || { claude:"", gemini:"", groq:"" };
+  return { claude:store.settings.apiKey, gemini:store.settings.geminiKey, groq:store.settings.groqKey };
+}
+/* the key for the provider that's actually selected */
+function apiKeyNow(){
+  var k = allKeys();
+  if(isDevice()) return "device";       /* runs inside the phone - no key at all */
+  if(isLocal())  return "local";        /* runs on this PC - no key to hold */
+  if(isGemini()) return k.gemini || "";
+  if(isGroq())   return k.groq || "";
+  return k.claude || "";
+}
+/* every provider that is actually set up, current one first.
+   "local" counts only once we've seen Ollama answer at least once. */
+function usableProviders(){
+  var k = allKeys(), out = [], cur = store.settings.provider;
+  var all = [
+    ["device", store.settings.deviceSeen && inApp()],
+    ["local",  store.settings.localSeen],
+    ["gemini", !!k.gemini],
+    ["groq",   !!k.groq],
+    ["claude", !!k.claude]
+  ];
+  all.forEach(function(p){ if(p[1] && p[0] === cur) out.push(p[0]); });
+  all.forEach(function(p){ if(p[1] && p[0] !== cur) out.push(p[0]); });
+  return out;
+}
+function nextProvider(tried){
+  var list = usableProviders();
+  for(var i=0;i<list.length;i++) if(tried.indexOf(list[i]) < 0) return list[i];
+  return null;
+}
+function providerLabel(p){
+  return ({ device:"your iPhone's own model", local:"the local model",
+            gemini:"Gemini", groq:"Groq", claude:"Claude" })[p] || p;
+}
+function activeModel(){
+  if(isDevice()) return "on this iPhone";
+  if(isGemini()) return store.settings.geminiModel;
+  if(isGroq())   return store.settings.groqModel;
+  if(isLocal())  return store.settings.localModel;
+  return store.settings.model;
+}
+
+var enc = new TextEncoder(), dec = new TextDecoder();
+function b64(buf){
+  var b = new Uint8Array(buf), s = "";
+  for(var i=0;i<b.length;i++) s += String.fromCharCode(b[i]);
+  return btoa(s);
+}
+function unb64(str){
+  var s = atob(str), b = new Uint8Array(s.length);
+  for(var i=0;i<s.length;i++) b[i] = s.charCodeAt(i);
+  return b;
+}
+function deriveKey(pin, salt){
+  return crypto.subtle.importKey("raw", enc.encode(pin), "PBKDF2", false, ["deriveKey"])
+    .then(function(base){
+      return crypto.subtle.deriveKey(
+        { name:"PBKDF2", salt:salt, iterations:250000, hash:"SHA-256" },
+        base, { name:"AES-GCM", length:256 }, false, ["encrypt","decrypt"]);
+    });
+}
+function encryptKey(pin, plaintext){
+  var salt = crypto.getRandomValues(new Uint8Array(16));
+  var iv = crypto.getRandomValues(new Uint8Array(12));
+  return deriveKey(pin, salt).then(function(k){
+    return crypto.subtle.encrypt({ name:"AES-GCM", iv:iv }, k, enc.encode(plaintext));
+  }).then(function(ct){
+    return { salt:b64(salt), iv:b64(iv), ct:b64(ct) };
+  });
+}
+function decryptKey(pin, blob){
+  return deriveKey(pin, unb64(blob.salt)).then(function(k){
+    return crypto.subtle.decrypt({ name:"AES-GCM", iv:unb64(blob.iv) }, k, unb64(blob.ct));
+  }).then(function(pt){ return dec.decode(pt); });   /* rejects on a wrong PIN */
+}
+
+/* key setter - handles both plain and locked storage.
+   which is "claude" or "gemini" */
+function setKey(which, v){
+  if(!isLocked()){
+    if(which === "gemini") store.settings.geminiKey = v;
+    else store.settings.apiKey = v;
+    save(); return Promise.resolve();
+  }
+  if(!sessionPin) return Promise.reject(new Error("locked"));
+  var next = allKeys();
+  next[which] = v;
+  return encryptKey(sessionPin, JSON.stringify(next)).then(function(blob){
+    store.settings.lock = blob; sessionKeys = next; save();
+  });
+}
+/* the encrypted payload is JSON of both keys; tolerate an older single-key blob */
+function parseKeyPayload(txt){
+  try{
+    var o = JSON.parse(txt);
+    if(o && typeof o === "object")
+      return { claude:o.claude || "", gemini:o.gemini || "", groq:o.groq || "" };
+  }catch(e){}
+  return { claude:txt, gemini:"", groq:"" };
+}
+
+/* ============================ dom ============================ */
+var $ = function(id){ return document.getElementById(id); };
+var scroll=$("scroll"), input=$("input"), btnSend=$("btnSend"), btnMic=$("btnMic");
+var chatTitle=$("chatTitle"), modelSub=$("modelSub"), chatList=$("chatList");
+var scrim=$("scrim"), drawer=$("drawer"), settings=$("settings"), toastEl=$("toast");
+
+var MODEL_NAMES = {
+  "claude-opus-5":"Opus 5",
+  "claude-sonnet-5":"Sonnet 5",
+  "claude-haiku-4-5":"Haiku 4.5"
+};
+
+var streaming = false;
+var voiceMode = false;   /* true while answering out loud - keeps replies short */
+var abortCtl = null;
+
+/* ============================ markdown-lite ============================ */
+function esc(s){
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;")
+                  .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+function inline(s){
+  return s
+    .replace(/`([^`\n]+)`/g, function(m,a){ return "<code>"+a+"</code>"; })
+    .replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/(^|[\s(])\*([^*\n]+)\*/g, "$1<em>$2</em>")
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+      '<a href="$2" target="_blank" rel="noopener">$1</a>');
+}
+function md(src){
+  var text = esc(src || "");
+  var blocks = text.split(/```/);
+  var out = "";
+  for(var i=0;i<blocks.length;i++){
+    if(i % 2 === 1){
+      var body = blocks[i].replace(/^[a-zA-Z0-9+#-]*\n/, "");
+      out += "<pre><code>" + body.replace(/\n$/,"") + "</code></pre>";
+      continue;
+    }
+    var lines = blocks[i].split("\n");
+    var buf = [], list = null;
+    function flushList(){ if(list){ out += "<"+list+">"+buf.join("")+"</"+list+">"; buf=[]; list=null; } }
+    for(var j=0;j<lines.length;j++){
+      var ln = lines[j];
+      var t = ln.trim();
+      if(!t){ flushList(); continue; }
+      var h = t.match(/^(#{1,4})\s+(.*)$/);
+      if(h){ flushList(); out += "<h3>" + inline(h[2]) + "</h3>"; continue; }
+      /* note: esc() already turned ">" into "&gt;" by this point */
+      if(/^&gt;\s?/.test(t)){ flushList(); out += "<blockquote>"+inline(t.replace(/^&gt;\s?/,""))+"</blockquote>"; continue; }
+      var ul = t.match(/^[-*+]\s+(.*)$/);
+      var ol = t.match(/^(\d+)[.)]\s+(.*)$/);
+      if(ul){ if(list !== "ul"){ flushList(); list="ul"; } buf.push("<li>"+inline(ul[1])+"</li>"); continue; }
+      if(ol){ if(list !== "ol"){ flushList(); list="ol"; } buf.push("<li>"+inline(ol[2])+"</li>"); continue; }
+      flushList();
+      out += "<p>" + inline(t) + "</p>";
+    }
+    flushList();
+  }
+  return out;
+}
+function plain(s){
+  return String(s||"").replace(/```[\s\S]*?```/g," code block ")
+    .replace(/[*_`#>]/g,"").replace(/\[([^\]]+)\]\([^)]+\)/g,"$1").trim();
+}
+
+/* ============================ rendering ============================ */
+var STARTERS = [
+  { i:"i-bulb",  t:"Explain something", p:"Explain " },
+  { i:"i-pen",   t:"Write something",   p:"Write me " },
+  { i:"i-spark", t:"Give me ideas",     p:"Give me ideas for " },
+  { i:"i-chart", t:"Analyze data",      p:"Help me analyse " }
+];
+
+/* HH:MM for message stamps */
+function clock(t){
+  try{ return new Date(t).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}); }
+  catch(e){ return ""; }
+}
+function icon(id, cls){ return '<svg class="' + (cls||"") + '"><use href="#' + id + '"/></svg>'; }
+
+function renderAll(){
+  var c = activeChat();
+  chatTitle.textContent = c ? c.title : "New chat";
+  modelSub.textContent = MODEL_NAMES[activeModel()] || activeModel();
+  scroll.innerHTML = "";
+  if(!c || !c.messages.length){ renderEmpty(); return; }
+  for(var i=0;i<c.messages.length;i++) addBubble(c.messages[i], i);
+  jump(false);
+}
+
+function renderEmpty(){
+  var nm = store.settings.name ? (", " + esc(store.settings.name)) : "";
+  var name = esc(aiName());
+  var chips = STARTERS.map(function(s){
+    return '<button class="chip" data-p="' + esc(s.p) + '">' +
+             '<span class="ic">' + icon(s.i) + '</span>' + esc(s.t) + '</button>';
+  }).join("");
+  var wrap = document.createElement("div");
+  wrap.className = "empty";
+  wrap.innerHTML =
+    '<h2>Hello' + nm + '! I&rsquo;m <b>' + name + '</b></h2>' +
+    '<p class="lede">' + (apiKeyNow()
+      ? "How can I help you today?"
+      : "First, add your free API key in Settings") + '</p>' +
+    '<div class="hero"><svg><use href="#bot"/></svg></div>' +
+    '<div class="chips">' + chips + '</div>';
+  scroll.appendChild(wrap);
+  var cs = wrap.querySelectorAll(".chip");
+  for(var i=0;i<cs.length;i++){
+    cs[i].addEventListener("click", function(){
+      input.value = this.dataset.p; autosize(); input.focus(); syncSend();
+    });
+  }
+}
+
+function actsHtml(m){
+  return '<div class="acts">' +
+    '<button data-act="copy" title="Copy">' + icon("i-copy") + '</button>' +
+    '<button data-act="up" class="' + (m.rate === 1 ? "on" : "") + '" title="Good answer">' + icon("i-up") + '</button>' +
+    '<button data-act="down" class="' + (m.rate === -1 ? "on" : "") + '" title="Bad answer">' + icon("i-down") + '</button>' +
+    '<button data-act="say" title="Read aloud">' + icon("i-speak") + '</button>' +
+    '<button data-act="teach" title="Teach it a better answer">' + icon("i-bulb") + '</button>' +
+    '<button class="more" data-act="more">' + icon("i-spark") + ' Explain more</button>' +
+  '</div>';
+}
+function wireActs(el, m){
+  el.addEventListener("click", function(ev){
+    var b = ev.target.closest ? ev.target.closest("button[data-act]") : null;
+    if(!b) return;
+    var a = b.dataset.act;
+    if(a === "copy"){
+      navigator.clipboard.writeText(m.content).then(function(){ toast("Copied"); },
+        function(){ toast("Couldn't copy"); });
+    } else if(a === "say"){
+      speak(m.content);
+    } else if(a === "up" || a === "down"){
+      var v = a === "up" ? 1 : -1;
+      m.rate = (m.rate === v) ? 0 : v;
+      save();
+      var acts = b.parentNode;
+      acts.querySelector('[data-act="up"]').classList.toggle("on", m.rate === 1);
+      acts.querySelector('[data-act="down"]').classList.toggle("on", m.rate === -1);
+    } else if(a === "teach"){
+      teachFrom(m);
+    } else if(a === "more"){
+      input.value = "Explain that in more detail.";
+      autosize(); syncSend(); send();
+    }
+  });
+}
+
+function addBubble(m, idx){
+  var el = document.createElement("div");
+  el.className = "msg " + (m.role === "user" ? "user" : "ai");
+  el.dataset.idx = idx;
+
+  if(m.role === "user"){
+    el.innerHTML =
+      '<div class="av me">' + icon("i-user") + '</div>' +
+      '<div class="wrap"><div class="bubble">' + shots(m) + md(m.content) + '</div>' +
+      (m.t ? '<div class="time">' + esc(clock(m.t)) + '</div>' : '') + '</div>';
+  } else {
+    el.innerHTML =
+      '<div class="av bot">' + icon("bot") + '</div>' +
+      '<div class="wrap">' +
+        '<div class="who">' + esc(aiName().toUpperCase()) +
+          (m.t ? '<span class="time">' + esc(clock(m.t)) + '</span>' : '') + '</div>' +
+        (m.thinking ? '<div class="think' + (store.settings.showThink ? " on" : "") + '">' +
+           esc(m.thinking) + '</div>' : '') +
+        '<div class="bubble">' + shots(m) + md(m.content) + '</div>' +
+        actsHtml(m) +
+      '</div>';
+    wireActs(el, m);
+  }
+  scroll.appendChild(el);
+  decorateCode(el);
+  return el;
+}
+document.addEventListener("click", function(ev){
+  var t = ev.target;
+  if(t && t.tagName === "IMG" && t.closest && t.closest(".shots")){
+    var sh = $("shade");
+    sh.querySelector("img").src = t.src;
+    sh.classList.add("on");
+  } else if(t && t.id === "shade"){
+    t.classList.remove("on");
+  } else if(t && t.parentNode && t.parentNode.id === "shade"){
+    t.parentNode.classList.remove("on");
+  }
+});
+
+/* photos attached to (or generated for) a message */
+function shots(m){
+  if(!m.images || !m.images.length) return "";
+  var h = '<div class="shots' + (m.images.length === 1 ? " one" : "") + '">';
+  for(var i=0;i<m.images.length;i++)
+    h += '<img alt="" src="data:' + esc(m.images[i].mime || "image/jpeg") +
+         ';base64,' + esc(m.images[i].data) + '">';
+  return h + "</div>";
+}
+
+function nearBottom(){
+  return scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 120;
+}
+function jump(smooth){
+  scroll.scrollTo({ top: scroll.scrollHeight, behavior: smooth ? "smooth" : "auto" });
+}
+function showError(msg){
+  var e = document.createElement("div");
+  e.className = "err";
+  e.textContent = msg;
+  scroll.appendChild(e);
+  jump(true);
+}
+var toastTimer = null;
+function toast(msg){
+  toastEl.textContent = msg;
+  toastEl.classList.add("on");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ toastEl.classList.remove("on"); }, 2000);
+}
+
+function renderChatList(){
+  chatList.innerHTML = "";
+  if(!store.chats.length){
+    chatList.innerHTML = '<div style="padding:16px;color:var(--tx2);font-size:13.5px">No chats yet.</div>';
+    return;
+  }
+  store.chats.forEach(function(c){
+    var d = document.createElement("div");
+    d.className = "citem" + (c.id === store.activeId ? " on" : "");
+    d.innerHTML = '<span class="nm"></span><button class="dl" aria-label="Delete">&#10005;</button>';
+    d.querySelector(".nm").textContent = c.title;
+    d.querySelector(".nm").addEventListener("click", function(){
+      store.activeId = c.id; save(); renderAll(); closePanels();
+    });
+    d.querySelector(".dl").addEventListener("click", function(ev){
+      ev.stopPropagation();
+      store.chats = store.chats.filter(function(x){ return x.id !== c.id; });
+      if(store.activeId === c.id) store.activeId = store.chats.length ? store.chats[0].id : null;
+      save(); renderChatList(); renderAll();
+    });
+    chatList.appendChild(d);
+  });
+}
+
+/* ============================ panels ============================ */
+function openPanel(p){ scrim.classList.add("on"); p.classList.add("on"); }
+function closePanels(){
+  scrim.classList.remove("on");
+  drawer.classList.remove("on");
+  settings.classList.remove("on");
+  $("tools").classList.remove("on");
+  $("teach").classList.remove("on");
+}
+scrim.addEventListener("click", closePanels);
+var closers = document.querySelectorAll("[data-close]");
+for(var ci=0; ci<closers.length; ci++) closers[ci].addEventListener("click", closePanels);
+
+$("btnMenu").addEventListener("click", function(){ renderChatList(); openPanel(drawer); });
+
+/* ---- look and feel ---- */
+function applyTheme(){
+  var r = document.documentElement;
+  r.setAttribute("data-theme", store.settings.theme || "dark");
+  r.setAttribute("data-accent", store.settings.accent || "blue");
+  var meta = document.querySelector('meta[name="theme-color"]');
+  if(meta) meta.setAttribute("content", store.settings.theme === "light" ? "#eef1f8" : "#04060f");
+  var sw = document.querySelectorAll("#swatches .swatch");
+  for(var i=0;i<sw.length;i++)
+    sw[i].classList.toggle("on", sw[i].dataset.accent === (store.settings.accent || "blue"));
+}
+$("btnTheme").addEventListener("click", function(){
+  store.settings.theme = (store.settings.theme === "light") ? "dark" : "light";
+  save(); applyTheme();
+});
+$("swatches").addEventListener("click", function(ev){
+  var b = ev.target.closest ? ev.target.closest(".swatch") : null;
+  if(!b) return;
+  store.settings.accent = b.dataset.accent; save(); applyTheme();
+});
+
+/* ---- sidebar navigation ---- */
+document.querySelector(".nav").addEventListener("click", function(ev){
+  var b = ev.target.closest ? ev.target.closest("button[data-nav]") : null;
+  if(!b) return;
+  var to = b.dataset.nav;
+  if(to === "settings"){ fillSettings(); openPanel(settings); return; }
+  if(to === "tools"){ openPanel($("tools")); return; }
+  if(to === "teach"){ renderTeach(); openPanel($("teach")); return; }
+
+  var all = document.querySelectorAll(".nav button");
+  for(var i=0;i<all.length;i++) all[i].classList.toggle("on", all[i] === b);
+
+  if(to === "chat"){ closePanels(); }
+  else if(to === "explore"){ newChat(); renderAll(); renderChatList(); closePanels(); }
+  else if(to === "history"){
+    renderChatList();
+    var list = $("chatList");
+    if(list) list.scrollIntoView({ behavior:"smooth", block:"nearest" });
+    if(window.matchMedia("(min-width:900px)").matches) toast("Your chats are in the sidebar");
+  }
+});
+
+/* ---- tools ---- */
+$("tools").addEventListener("click", function(ev){
+  var b = ev.target.closest ? ev.target.closest("button[data-tool]") : null;
+  if(!b) return;
+  var k = b.dataset.tool;
+  closePanels();
+  if(k === "code"){
+    input.value = "Write me code that "; autosize(); input.focus(); syncSend();
+  } else if(k === "sum"){
+    input.value = "Summarise this:\n\n"; autosize(); input.focus(); syncSend();
+  } else if(k === "img"){
+    if(!isGemini()){ toast("Picture-making needs Gemini"); return; }
+    imgMode = true; $("btnImg").classList.add("act");
+    input.placeholder = "Describe the picture to make…";
+    input.focus(); toast("Next message makes a picture");
+  } else if(k === "photo"){
+    $("fileIn").click();
+  } else if(k === "voice"){
+    hfOpen();
+  }
+});
+$("btnSettings").addEventListener("click", function(){ fillSettings(); openPanel(settings); });
+$("btnNew").addEventListener("click", function(){ newChat(); renderAll(); renderChatList(); closePanels(); });
+
+/* ============================ settings ============================ */
+function sw(el, val){ el.classList.toggle("on", !!val); }
+function fillSettings(){
+  var s = store.settings, k = allKeys();
+  $("setProvider").value = s.provider;
+  $("setKey").value = k.claude;
+  $("setGemKey").value = k.gemini;
+  $("setModel").value = s.model;
+  $("setGemModel").value = s.geminiModel;
+  $("setGroqKey").value = k.groq || "";
+  $("setGroqModel").value = s.groqModel;
+  $("setLocalUrl").value = s.localUrl;
+  if(!$("setLocalModel").querySelector('[value="' + s.localModel + '"]')){
+    var o = document.createElement("option");
+    o.value = s.localModel; o.textContent = s.localModel;
+    $("setLocalModel").appendChild(o);
+  }
+  $("setLocalModel").value = s.localModel;
+  sw($("swFail"), s.autoFailover !== false);
+  $("setImgModel").value = s.imageModel;
+  $("setEffort").value = s.effort;
+  $("setAiName").value = s.aiName || "Pedro";
+  $("setName").value = s.name;
+  $("setAbout").value = s.about;
+  sw($("swTts"), s.tts); sw($("swThink"), s.showThink); sw($("swEnter"), s.enterSends);
+  sw($("swLock"), isLocked()); syncLockSub();
+  syncProviderUI();
+}
+function syncProviderUI(){
+  $("gemBlock").style.display    = isGemini() ? "" : "none";
+  $("claudeBlock").style.display = (store.settings.provider === "claude") ? "" : "none";
+  $("localBlock").style.display  = isLocal() ? "" : "none";
+  $("groqBlock").style.display   = isGroq() ? "" : "none";
+  var ph = $("provHint");
+  if(ph) ph.textContent = isLocal()
+    ? "Free and private, but only while this PC is awake."
+    : "Works from anywhere, including your phone.";
+  modelSub.textContent = MODEL_NAMES[activeModel()] || activeModel();
+  var t = $("provTtl"), n = $("provNote");
+  var pname = { device:"This iPhone", local:"On this PC", gemini:"Gemini",
+                groq:"Groq", claude:"Claude" };
+  var pnote = { device:"Free · no internet needed", local:"Free · private · offline",
+                gemini:"Free tier", groq:"Free tier", claude:"Pay as you go" };
+  var od = $("optDevice");
+  if(od) od.hidden = !(inApp() && deviceModel.available);
+  var p = store.settings.provider;
+  if(t) t.textContent = pname[p] || p;
+  if(n) n.textContent = (pnote[p] || "") + " · " + (MODEL_NAMES[activeModel()] || activeModel());
+  var you = $("youName");
+  if(you) you.textContent = store.settings.name || "You";
+  var tc = (store.settings.facts || []).length + (store.settings.lessons || []).length;
+  var sb = document.querySelector(".userrow .sb");
+  if(sb) sb.textContent = tc ? (tc + " things taught") : "Private · on this device";
+}
+$("setProvider").addEventListener("change", function(){
+  store.settings.provider = this.value; save();
+  syncProviderUI(); renderAll();
+});
+var gemKeyTimer = null;
+function saveGemKey(v, thenLoad){
+  return setKey("gemini", v).then(function(){
+    renderAll();
+    /* a fresh key means the stored model ids may be meaningless - go find real ones */
+    if(thenLoad && v.length > 20) return loadGeminiModels(true).catch(function(){});
+  }).catch(function(){ toast("Unlock first to change your key"); });
+}
+/* save on every keystroke (debounced) so tapping a button never races the save */
+$("setGemKey").addEventListener("input", function(){
+  var v = this.value.trim();
+  clearTimeout(gemKeyTimer);
+  gemKeyTimer = setTimeout(function(){ saveGemKey(v, false); }, 300);
+});
+$("setGemKey").addEventListener("change", function(){
+  clearTimeout(gemKeyTimer);
+  saveGemKey(this.value.trim(), true);
+});
+
+/* Google renames models constantly, so never trust a hardcoded id -
+   discover what this key can actually use, and self-heal when one disappears. */
+var modelsLoading = null;
+
+/* sort a /v1beta/models response into chat vs picture models, newest-looking first */
+function pickModels(d){
+  var usable = (d.models || []).filter(function(m){
+    return (m.supportedGenerationMethods || []).indexOf("generateContent") >= 0 &&
+           !/embedding|aqa/i.test(m.name);
+  });
+  var ids = usable.map(function(m){ return m.name.replace(/^models\//, ""); });
+  var image = ids.filter(function(id){ return /image|imagen/i.test(id); });
+  var chat  = ids.filter(function(id){ return image.indexOf(id) < 0; });
+  return { chat: chat, image: image };
+}
+/* prefer a stable "flash" build for chat - fast and the cheapest on the free tier */
+function bestModel(list){
+  if(!list.length) return "";
+  var stable = list.filter(function(id){ return !/preview|exp|experimental|thinking|tuning/i.test(id); });
+  var pool = stable.length ? stable : list;
+  var flash = pool.filter(function(id){ return /flash/i.test(id); });
+  var byVersion = (flash.length ? flash : pool).slice().sort(function(a, b){
+    var va = parseFloat((a.match(/(\d+\.?\d*)/) || [0, 0])[1]);
+    var vb = parseFloat((b.match(/(\d+\.?\d*)/) || [0, 0])[1]);
+    return vb - va;                       /* highest version number wins */
+  });
+  return byVersion[0];
+}
+
+function loadGeminiModels(silent){
+  var key = allKeys().gemini || ($("setGemKey") ? $("setGemKey").value.trim() : "");
+  if(!key) return Promise.reject(new Error("no key"));
+  if(modelsLoading) return modelsLoading;
+
+  var btn = $("btnGemModels"), hint = $("gemModelsHint");
+  if(!silent && btn){ btn.textContent = "Loading…"; btn.disabled = true; }
+  if(hint) hint.textContent = "Checking which models your key can use…";
+
+  modelsLoading = fetch("https://generativelanguage.googleapis.com/v1beta/models?key=" +
+      encodeURIComponent(key) + "&pageSize=200")
+    .then(function(r){
+      return r.json().then(function(d){
+        if(d.error) throw new Error(d.error.message || ("HTTP " + r.status));
+        if(!r.ok) throw new Error("HTTP " + r.status);
+        return d;
+      });
+    })
+    .then(function(d){
+      var split = pickModels(d);
+      var txtIds = split.chat, imgIds = split.image;
+      if(!txtIds.length && !imgIds.length) throw new Error("this key has no usable models");
+
+      function best(list){ return bestModel(list); }
+      function fill(sel, options, cur){
+        if(!sel || !options.length) return cur;
+        sel.innerHTML = "";
+        options.forEach(function(id){
+          var o = document.createElement("option");
+          o.value = id; o.textContent = id;
+          sel.appendChild(o);
+        });
+        var keep = options.indexOf(cur) >= 0 ? cur : best(options);
+        sel.value = keep;
+        return keep;
+      }
+      store.settings.geminiModel = fill($("setGemModel"), txtIds, store.settings.geminiModel);
+      store.settings.imageModel  = fill($("setImgModel"), imgIds, store.settings.imageModel);
+      store.settings.modelsLoaded = Date.now();
+      save(); syncProviderUI();
+
+      if(hint) hint.textContent = txtIds.length + " chat models, " + imgIds.length +
+        " picture model(s) on your key. Using " + store.settings.geminiModel + ".";
+      if(!silent) toast("Model list updated");
+      return { chat: txtIds, image: imgIds };
+    })
+    .catch(function(e){
+      var msg = String(e && e.message || e);
+      if(/Failed to fetch|NetworkError|load failed/i.test(msg)){
+        msg = location.protocol === "file:"
+          ? "Blocked because the app is opened as a local file. Put it online (Netlify Drop) and open that URL."
+          : "Couldn't reach Google. Check your connection.";
+      } else if(/API key not valid|API_KEY_INVALID|unregistered callers|PERMISSION_DENIED/i.test(msg)){
+        msg = "That key was rejected by Google. Copy it again from aistudio.google.com/apikey.";
+      }
+      if(hint) hint.textContent = msg;
+      throw new Error(msg);
+    })
+    .then(function(v){
+      modelsLoading = null;
+      if(!silent && btn){ btn.textContent = "Load models from my account"; btn.disabled = false; }
+      return v;
+    }, function(e){
+      modelsLoading = null;
+      if(!silent && btn){ btn.textContent = "Load models from my account"; btn.disabled = false; }
+      throw e;
+    });
+
+  return modelsLoading;
+}
+
+$("btnGemModels").addEventListener("click", function(){
+  loadGeminiModels(false).catch(function(){});
+});
+
+/* End-to-end check: list the models, then actually send one message.
+   Whatever fails, it prints the real reason rather than a tidy summary. */
+$("btnGemTest").addEventListener("click", function(){
+  var out = $("gemModelsHint"), btn = this;
+  btn.disabled = true; btn.textContent = "Testing…";
+  out.textContent = "1/2 asking Google which models your key can use…";
+
+  loadGeminiModels(true).then(function(sets){
+    var chat = (sets && sets.chat) || [];
+    if(!chat.length) throw new Error("your key returned no chat models at all");
+    out.textContent = "Found " + chat.length + " chat models (" +
+      chat.slice(0,5).join(", ") + (chat.length > 5 ? "…" : "") +
+      "). 2/2 sending a test message on " + store.settings.geminiModel + "…";
+
+    var req = geminiRequest([{ role:"user", content:"Reply with the single word OK." }]);
+    req.url = req.url.split(":streamGenerateContent?alt=sse&").join(":generateContent?");
+    return fetch(req.url, { method:"POST", headers:req.headers, body:JSON.stringify(req.body) })
+      .then(function(r){
+        return r.text().then(function(t){
+          if(!r.ok){
+            var msg = t;
+            try{ msg = JSON.parse(t).error.message; }catch(e){}
+            throw new Error("HTTP " + r.status + " - " + String(msg).slice(0, 180));
+          }
+          out.textContent = "Working. " + store.settings.geminiModel +
+            " replied over " + chat.length + " available models. You're good to go.";
+          banner("warn", "");
+          $("banner").classList.remove("on");
+          toast("Connection OK");
+        });
+      });
+  }).catch(function(e){
+    out.textContent = "Test failed: " + String(e && e.message || e);
+  }).then(function(){
+    btn.disabled = false; btn.textContent = "Test connection";
+  });
+});
+
+/* one settings field -> one stored value */
+function bindInput(id, key, after){
+  $(id).addEventListener("change", function(){
+    store.settings[key] = this.value.trim ? this.value.trim() : this.value;
+    save(); if(after) after();
+  });
+}
+
+/* --- the rest of the settings fields --- */
+var claudeKeyTimer = null;
+$("setKey").addEventListener("input", function(){
+  var v = this.value.trim();
+  clearTimeout(claudeKeyTimer);
+  claudeKeyTimer = setTimeout(function(){ setKey("claude", v).catch(function(){}); }, 300);
+});
+$("setKey").addEventListener("change", function(){
+  clearTimeout(claudeKeyTimer);
+  setKey("claude", this.value.trim())
+    .then(function(){ renderAll(); })
+    .catch(function(){ toast("Unlock first to change your key"); });
+});
+
+bindInput("setModel","model", syncProviderUI);
+bindInput("setGemModel","geminiModel", syncProviderUI);
+bindInput("setGroqModel","groqModel", syncProviderUI);
+bindInput("setLocalModel","localModel", syncProviderUI);
+bindInput("setLocalUrl","localUrl");
+$("setGroqKey").addEventListener("input", function(){
+  var v = this.value.trim();
+  clearTimeout(gemKeyTimer);
+  gemKeyTimer = setTimeout(function(){ setKey("groq", v).catch(function(){}); }, 300);
+});
+$("setGroqKey").addEventListener("change", function(){
+  setKey("groq", this.value.trim()).then(renderAll).catch(function(){});
+});
+
+/* ask Ollama what it has installed */
+$("btnLocalCheck").addEventListener("click", function(){
+  var btn = this, hint = $("localHint");
+  var base = (store.settings.localUrl || "http://localhost:11434").replace(/\/+$/, "");
+  btn.disabled = true; btn.textContent = "Checking…";
+  fetch(base + "/api/tags")
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var list = (d.models || []).map(function(m){ return m.name; });
+      if(!list.length) throw new Error("Ollama is running but has no models yet. Run: ollama pull qwen2.5:7b");
+      var sel = $("setLocalModel"), cur = store.settings.localModel;
+      sel.innerHTML = "";
+      list.forEach(function(id){
+        var o = document.createElement("option");
+        o.value = id; o.textContent = id;
+        sel.appendChild(o);
+      });
+      sel.value = list.indexOf(cur) >= 0 ? cur : list[0];
+      store.settings.localModel = sel.value;
+      store.settings.localSeen = true;
+      save(); syncProviderUI();
+      hint.textContent = "Ollama is running with " + list.length + " model(s). Using " + sel.value + ".";
+      toast("Local model ready");
+    })
+    .catch(function(e){
+      var m = String(e && e.message || e);
+      if(/Failed to fetch|NetworkError|load failed/i.test(m))
+        m = "Can't reach Ollama at " + base + ". Make sure it's installed and running.";
+      hint.textContent = m;
+    })
+    .then(function(){ btn.disabled = false; btn.textContent = "Check what's installed"; });
+});
+bindInput("setImgModel","imageModel");
+bindInput("setEffort","effort");
+bindInput("setAiName","aiName", renderAll);
+bindInput("setName","name", renderAll);
+bindInput("setAbout","about");
+
+function bindSwitch(id, key, after){
+  $(id).addEventListener("click", function(){
+    store.settings[key] = !store.settings[key];
+    sw(this, store.settings[key]); save(); if(after) after();
+  });
+}
+bindSwitch("swTts","tts", syncSpeakBtn);
+bindSwitch("swThink","showThink", renderAll);
+bindSwitch("swEnter","enterSends");
+bindSwitch("swFail","autoFailover");
+
+/* ---- PIN lock flow ---- */
+var lockEl=$("lock"), lockPin=$("lockPin"), lockMsg=$("lockMsg"),
+    lockGo=$("lockGo"), lockCancel=$("lockCancel"),
+    lockTitle=$("lockTitle"), lockNote=$("lockNote");
+var lockMode = "unlock", pendingPin = null;
+
+function showLock(mode){
+  lockMode = mode; pendingPin = null;
+  lockPin.value = ""; lockMsg.textContent = "";
+  var em = $("lockEmail");
+  if(em) em.value = store.settings.authEmail || "";
+  if(mode === "unlock"){
+    lockTitle.textContent = "Sign in";
+    lockNote.textContent = "Pedro is locked on this device.";
+    lockGo.textContent = "Sign in"; lockCancel.style.display = "none";
+  } else if(mode === "set"){
+    lockTitle.textContent = "Create your sign-in";
+    lockNote.textContent = "Pick an email and password. There's no server and no reset - " +
+      "forget them and you'll just re-enter your API keys.";
+    lockGo.textContent = "Continue"; lockCancel.style.display = "block";
+  } else if(mode === "confirm"){
+    lockTitle.textContent = "Confirm your password";
+    lockNote.textContent = "Type the same password once more.";
+    lockGo.textContent = "Turn on sign-in"; lockCancel.style.display = "block";
+  } else {
+    lockTitle.textContent = "Sign in to turn it off";
+    lockNote.textContent = "Confirm it's you before removing the sign-in.";
+    lockGo.textContent = "Turn off sign-in"; lockCancel.style.display = "block";
+  }
+  lockEl.classList.add("on");
+  setTimeout(function(){ lockPin.focus(); }, 120);
+}
+function hideLock(){ lockEl.classList.remove("on"); lockPin.value = ""; lockMsg.textContent = ""; }
+
+/* one secret built from both fields - changing either changes the key */
+function passphrase(){
+  var em = ($("lockEmail").value || "").trim().toLowerCase();
+  return em + "\u0000" + lockPin.value;
+}
+
+function lockSubmit(){
+  var pin = passphrase();
+  var email = ($("lockEmail").value || "").trim();
+  var pw = lockPin.value;
+  lockMsg.textContent = "";
+
+  if(lockMode === "set" || lockMode === "confirm"){
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){
+      lockMsg.textContent = "Enter a real email address"; return;
+    }
+  }
+
+  if(lockMode === "set"){
+    if(pw.length < 6){ lockMsg.textContent = "Password needs at least 6 characters"; return; }
+    pendingPin = pin; lockMode = "confirm";
+    lockTitle.textContent = "Confirm your password";
+    lockNote.textContent = "Type the same password once more.";
+    lockGo.textContent = "Turn on sign-in";
+    lockPin.value = ""; lockPin.focus();
+    return;
+  }
+
+  if(lockMode === "confirm"){
+    if(pin !== pendingPin){
+      lockMsg.textContent = "Those passwords didn't match"; showLock("set"); return;
+    }
+    store.settings.authEmail = email;
+    var payload = JSON.stringify(allKeys());
+    lockGo.disabled = true;
+    encryptKey(pin, payload).then(function(blob){
+      store.settings.lock = blob;
+      store.settings.apiKey = ""; store.settings.geminiKey = "";  /* plaintext key removed from storage */
+      sessionKeys = parseKeyPayload(payload); sessionPin = pin;
+      save(); lockGo.disabled = false;
+      hideLock(); sw($("swLock"), true); syncLockSub();
+      toast("Sign-in on - your keys are encrypted");
+    }).catch(function(){
+      lockGo.disabled = false; lockMsg.textContent = "Couldn't set the lock";
+    });
+    return;
+  }
+
+  if(lockMode === "remove"){
+    lockGo.disabled = true;
+    decryptKey(pin, store.settings.lock).then(function(k){
+      var kk = parseKeyPayload(k);
+      store.settings.apiKey = kk.claude; store.settings.geminiKey = kk.gemini;
+      store.settings.lock = null; sessionKeys = null; sessionPin = null;
+      save(); lockGo.disabled = false;
+      hideLock(); sw($("swLock"), false); syncLockSub();
+      toast("Sign-in removed");
+    }).catch(function(){
+      lockGo.disabled = false; lockMsg.textContent = "Email or password is wrong";
+      lockPin.value = ""; lockPin.focus();
+    });
+    return;
+  }
+
+  /* sign in */
+  if(!pw){ lockMsg.textContent = "Enter your password"; return; }
+  lockGo.disabled = true;
+  decryptKey(pin, store.settings.lock).then(function(k){
+    sessionKeys = parseKeyPayload(k); sessionPin = pin;
+    lockGo.disabled = false; hideLock();
+    renderAll();
+  }).catch(function(){
+    lockGo.disabled = false;
+    lockMsg.textContent = "Email or password is wrong";
+    lockPin.value = ""; lockPin.focus();
+  });
+}
+lockGo.addEventListener("click", lockSubmit);
+lockPin.addEventListener("keydown", function(e){ if(e.key === "Enter") lockSubmit(); });
+$("lockEmail").addEventListener("keydown", function(e){ if(e.key === "Enter") lockPin.focus(); });
+lockCancel.addEventListener("click", function(){
+  hideLock(); sw($("swLock"), isLocked());
+});
+
+function syncLockSub(){
+  $("lockSub").textContent = isLocked()
+    ? "On - " + (store.settings.authEmail || "your account") + ", keys encrypted"
+    : "Email and password, and your API keys get encrypted";
+}
+$("swLock").addEventListener("click", function(){
+  if(isLocked()){ showLock("remove"); return; }
+  if(!allKeys().claude && !allKeys().gemini && !allKeys().groq){
+    toast("Add an API key first"); return;
+  }
+  if(!window.crypto || !crypto.subtle){
+    toast("Needs https - deploy it, then turn this on"); return;
+  }
+  showLock("set");
+});
+
+
+function syncSpeakBtn(){
+  var el = $("swTts"); if(el) sw(el, store.settings.tts);
+}
+
+$("btnExport").addEventListener("click", function(){
+  var blob = new Blob([JSON.stringify({ chats:store.chats }, null, 2)], { type:"application/json" });
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "pocket-ai-chats.json";
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+});
+$("btnWipe").addEventListener("click", function(){
+  if(!confirm("Delete every chat, your key and your notes from this device?")) return;
+  localStorage.removeItem(KEY);
+  store = load(); closePanels(); renderAll(); renderChatList();
+  toast("Wiped");
+});
+
+/* ============================ composer ============================ */
+function autosize(){
+  input.style.height = "auto";
+  input.style.height = Math.min(input.scrollHeight, 150) + "px";
+}
+function syncSend(){
+  btnSend.disabled = !streaming && !input.value.trim() && !pending.length;
+}
+input.addEventListener("input", function(){ autosize(); syncSend(); });
+input.addEventListener("keydown", function(e){
+  if(e.key === "Enter" && !e.shiftKey && store.settings.enterSends && !matchMedia("(pointer:coarse)").matches){
+    e.preventDefault(); send();
+  }
+});
+btnSend.addEventListener("click", function(){
+  if(streaming){ if(abortCtl) abortCtl.abort(); return; }
+  send();
+});
+
+/* ============================ voice in ============================ */
+var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+var rec = null, listening = false;
+var isiOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+            (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+/* Why the mic isn't working, in words that suggest a fix. */
+function micProblem(){
+  if(nativeMicSupported()) return null;     /* the app has its own recogniser */
+  if(!window.isSecureContext && location.hostname !== "localhost")
+    return "The microphone only works on a secure (https) address. Open the hosted version instead.";
+  if(!SR)
+    return isiOS
+      ? "Safari on iPhone doesn't give web apps the microphone. Use the microphone key on your keyboard instead - it types straight into the box."
+      : "This browser has no speech recognition. Chrome or Edge do.";
+  return null;
+}
+
+function micError(code){
+  switch(code){
+    case "not-allowed":
+    case "service-not-allowed":
+      if(location.protocol === "http:" && !isiOS)
+        return "Chrome won't do speech recognition on an http address, even localhost. " +
+               "Use the hosted https version and it works.";
+      return isiOS
+        ? "Safari won't give web apps speech-to-text, even with microphone access allowed. " +
+          "Use the microphone key on your keyboard instead - it types straight into the box."
+        : "Microphone blocked. Tap the padlock in the address bar, allow the microphone, then reload.";
+    case "audio-capture":
+      return "No microphone found. Check it's plugged in and not in use by another app.";
+    case "no-speech":
+      return "Didn't hear anything - try again and speak up.";
+    case "network":
+      return "Speech recognition needs a connection on this browser.";
+    case "aborted":
+      return "";                       /* you stopped it on purpose - stay quiet */
+    default:
+      return "Voice input failed (" + code + ").";
+  }
+}
+
+function stopListening(){
+  listening = false;
+  btnMic.classList.remove("rec");
+  try{ if(rec) rec.stop(); }catch(e){}
+  rec = null;
+}
+
+if(micProblem() && !SR) btnMic.style.display = "none";
+
+btnMic.addEventListener("click", function(){
+  /* inside the iOS app we get the real speech recogniser, which also works offline */
+  if(nativeMicSupported()){
+    if(nativeListening){ nativeMicStop(); btnMic.classList.remove("rec"); return; }
+    var base = input.value ? input.value.replace(/\s+$/,"") + " " : "";
+    btnMic.classList.add("rec");
+    nativeMicStart(function(text){
+      input.value = base + text; autosize(); syncSend();
+    }, function(err){
+      btnMic.classList.remove("rec");
+      if(err) toast("Voice input stopped: " + err.message);
+      input.focus();
+    }).catch(function(e){
+      btnMic.classList.remove("rec");
+      banner("warn", "Microphone: " + esc(String(e && e.message || e)));
+    });
+    return;
+  }
+
+  var why = micProblem();
+  if(why){ banner("warn", esc(why)); toast("Mic unavailable"); return; }
+  if(listening){ stopListening(); return; }   /* safe even if onend never fired */
+
+  try{
+    rec = new SR();
+    rec.lang = navigator.language || "en-US";
+    rec.interimResults = true;
+    rec.continuous = false;
+    var base = input.value ? input.value.replace(/\s+$/,"") + " " : "";
+    var heard = false;
+
+    rec.onstart = function(){
+      listening = true; btnMic.classList.add("rec");
+      toast("Listening… tap again to stop");
+    };
+    rec.onresult = function(ev){
+      var txt = "";
+      for(var i=0;i<ev.results.length;i++) txt += ev.results[i][0].transcript;
+      if(txt.trim()) heard = true;
+      input.value = base + txt; autosize(); syncSend();
+    };
+    rec.onerror = function(ev){
+      var msg = micError(ev.error);
+      stopListening();
+      if(msg){
+        toast(msg.length > 60 ? "Mic problem - see the banner" : msg);
+        if(msg.length > 60) banner("warn", esc(msg));
+      }
+    };
+    rec.onend = function(){
+      var was = listening;
+      stopListening();
+      if(was && !heard) toast("Didn't catch that");
+      input.focus();
+    };
+    rec.start();
+  }catch(e){
+    stopListening();
+    banner("warn", "Couldn't start the microphone: " + esc(String(e && e.message || e)));
+  }
+});
+
+/* ============================ voice out ============================ */
+function speak(text, onEnd){
+  if(!window.speechSynthesis){ if(onEnd) onEnd(); return; }
+  speechSynthesis.cancel();
+  var say = plain(text).slice(0,4000);
+  var u = new SpeechSynthesisUtterance(say);
+  u.lang = navigator.language || "en-US";
+  u.rate = 1.02;
+  var done = false;
+  function fin(){ if(done) return; done = true; if(onEnd) onEnd(); }
+  u.onend = fin; u.onerror = fin;
+  /* some mobile browsers never fire onend - fall back on a length estimate */
+  setTimeout(fin, Math.min(90000, 2500 + say.length * 80));
+  speechSynthesis.speak(u);
+}
+
+/* ============================ api ============================ */
+var lastUserText = "";   /* what they just asked - used to pick relevant lessons */
+function systemPrompt(){
+  var s = store.settings;
+  var now = new Date();
+  var p = "You are " + (s.aiName || "Pedro") + ", " + (s.name ? s.name + "'s" : "the user's") +
+    " personal assistant, running on their phone. You help with anything they ask: " +
+    "questions, ideas, writing, planning, code, decisions, or just talking things through.\n\n" +
+    "Today is " + now.toDateString() + " (" +
+    Intl.DateTimeFormat().resolvedOptions().timeZone + ").\n\n";
+  if(s.name) p += "Their name is " + s.name + ".\n";
+  if(s.about) p += "What they've told you about themselves:\n" + s.about + "\n";
+  p += "\nYou are read on a phone screen, so keep responses focused, brief, and concise. " +
+    "Lead with the answer, then any detail that's actually needed. " +
+    "Skip preamble, disclaimers and restating the question. " +
+    "Use short paragraphs; use a list only when the content is genuinely a list. " +
+    "Answers may be read aloud by a text-to-speech voice, so write in plain sentences " +
+    "and avoid heavy formatting unless asked for code. " +
+    "Talk like a sharp friend who knows them: warm, direct, no filler. " +
+    "If you don't know something, say so.\n\n" +
+    "When they ask for code, brevity does not apply: give complete, runnable code in a " +
+    "fenced block with the language tag, and say in one line what to do with it. " +
+    "Don't leave TODOs or placeholder functions - write the actual thing. " +
+    "Keep the explanation around it short; the code is the answer.\n" +
+    "When they send a photo, look at it properly and answer about what's actually in it.";
+  p += taughtBlock(lastUserText);
+  if(voiceMode){
+    p += "\n\nRIGHT NOW you are being spoken out loud and the person is not reading a screen. " +
+      "Answer in one to three short sentences of plain speech. No markdown, no lists, " +
+      "no code, no headings, no emoji - just words someone can follow by ear. " +
+      "If the answer really needs detail, give the short version and offer the rest.";
+  }
+  return p;
+}
+
+/* ---- request shape differs per provider ---- */
+/* one history entry -> provider content */
+function claudeContent(m){
+  if(!m.images || !m.images.length) return m.content;
+  var out = m.images.map(function(im){
+    return { type:"image", source:{ type:"base64", media_type:im.mime, data:im.data } };
+  });
+  if(m.content) out.push({ type:"text", text:m.content });
+  return out;
+}
+function geminiParts(m){
+  var out = (m.images || []).map(function(im){
+    return { inline_data:{ mime_type:im.mime, data:im.data } };
+  });
+  if(m.content) out.push({ text:m.content });
+  if(!out.length) out.push({ text:"" });
+  return out;
+}
+
+function claudeRequest(msgs){
+  var s = store.settings;
+  var body = {
+    model: s.model,
+    max_tokens: 8000,
+    stream: true,
+    system: systemPrompt(),
+    messages: msgs.map(function(m){ return { role:m.role, content:claudeContent(m) }; })
+  };
+  if(s.model !== "claude-haiku-4-5"){
+    body.thinking = { type:"adaptive", display:"summarized" };
+    body.output_config = { effort: s.effort };
+  }
+  return {
+    url: "https://api.anthropic.com/v1/messages",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": apiKeyNow(),
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true"
+    },
+    body: body
+  };
+}
+
+function geminiRequest(msgs){
+  var s = store.settings;
+  return {
+    url: "https://generativelanguage.googleapis.com/v1beta/models/" +
+         encodeURIComponent(s.geminiModel) + ":streamGenerateContent?alt=sse&key=" +
+         encodeURIComponent(apiKeyNow()),
+    headers: { "content-type": "application/json" },
+    body: {
+      systemInstruction: { parts: [{ text: systemPrompt() }] },
+      contents: msgs.map(function(m){
+        /* Gemini calls the assistant "model" */
+        return { role: m.role === "assistant" ? "model" : "user",
+                 parts: geminiParts(m) };
+      }),
+      generationConfig: { maxOutputTokens: 8000 }
+    }
+  };
+}
+
+/* Groq speaks the OpenAI chat format */
+function groqRequest(msgs){
+  var out = msgs.map(function(m){
+    return { role: m.role === "assistant" ? "assistant" : "user", content: m.content };
+  });
+  out.unshift({ role:"system", content: systemPrompt() });
+  return {
+    url: "https://api.groq.com/openai/v1/chat/completions",
+    headers: {
+      "content-type": "application/json",
+      "authorization": "Bearer " + apiKeyNow()
+    },
+    body: { model: store.settings.groqModel, messages: out, stream: true, max_tokens: 8000 }
+  };
+}
+
+/* Ollama on this PC, via its OpenAI-compatible endpoint */
+function localRequest(msgs){
+  var out = msgs.map(function(m){
+    return { role: m.role === "assistant" ? "assistant" : "user", content: m.content };
+  });
+  out.unshift({ role:"system", content: systemPrompt() });
+  return {
+    url: (store.settings.localUrl || "http://localhost:11434").replace(/\/+$/, "") +
+         "/v1/chat/completions",
+    headers: { "content-type": "application/json" },
+    body: { model: store.settings.localModel, messages: out, stream: true }
+  };
+}
+
+function buildRequest(msgs){
+  for(var i = msgs.length - 1; i >= 0; i--)
+    if(msgs[i].role === "user"){ lastUserText = msgs[i].content || ""; break; }
+  if(isGemini()) return geminiRequest(msgs);
+  if(isGroq())   return groqRequest(msgs);
+  if(isLocal())  return localRequest(msgs);
+  return claudeRequest(msgs);
+}
+
+/* pull deltas out of one SSE event, whichever provider sent it */
+function readDelta(ev){
+  var out = { text:"", think:"", stop:null, error:null };
+  if(isOpenAIStyle()){
+    if(ev.error){ out.error = ev.error.message || "Model error"; return out; }
+    var ch = (ev.choices || [])[0];
+    if(!ch) return out;
+    if(ch.delta && typeof ch.delta.content === "string") out.text = ch.delta.content;
+    if(ch.finish_reason && ch.finish_reason !== "stop") out.stop = ch.finish_reason;
+    return out;
+  }
+  if(isGemini()){
+    if(ev.error){ out.error = ev.error.message || "Gemini error"; return out; }
+    var c = (ev.candidates || [])[0];
+    if(!c) return out;
+    var parts = (c.content && c.content.parts) || [];
+    for(var i=0;i<parts.length;i++){
+      if(typeof parts[i].text !== "string") continue;
+      if(parts[i].thought) out.think += parts[i].text;
+      else out.text += parts[i].text;
+    }
+    if(c.finishReason && c.finishReason !== "STOP") out.stop = c.finishReason;
+    return out;
+  }
+  if(ev.type === "content_block_delta"){
+    var d = ev.delta || {};
+    if(d.type === "text_delta") out.text = d.text || "";
+    else if(d.type === "thinking_delta") out.think = d.thinking || "";
+  } else if(ev.type === "message_delta"){
+    out.stop = (ev.delta && ev.delta.stop_reason) || null;
+  } else if(ev.type === "error"){
+    out.error = (ev.error && ev.error.message) || "Stream error";
+  }
+  return out;
+}
+
+function stopNote(stop){
+  if(!stop) return "";
+  if(stop === "refusal" || stop === "SAFETY" || stop === "PROHIBITED_CONTENT")
+    return "_I can't help with that one._";
+  if(stop === "max_tokens" || stop === "MAX_TOKENS")
+    return "_(cut off - ask me to continue)_";
+  return "";
+}
+
+function apiError(status, txt){
+  var m = txt.match(/"message"\s*:\s*"([^"]+)"/);
+  var detail = m ? m[1] : "";
+  if(isLocal()){
+    if(status === 404) return "Ollama doesn't have '" + store.settings.localModel +
+      "'. Run: ollama pull " + store.settings.localModel;
+    return "The local model returned error " + status + (detail ? ": " + detail : "");
+  }
+  if(isGroq()){
+    if(status === 401) return "That Groq key was rejected. Check it in Settings.";
+    if(status === 404) return "That Groq model doesn't exist - pick another in Settings.";
+    if(status === 429) return "Groq's free limit hit. Wait a minute, or switch provider.";
+    if(status >= 500) return "Groq is busy. Retrying…";
+    return "Error " + status + (detail ? ": " + detail : "");
+  }
+  if(isGemini()){
+    if(status === 503) return "Google's servers are overloaded for this model.";
+    if(status === 400 && /API key not valid|API_KEY_INVALID/i.test(txt))
+      return "That Gemini key was rejected. Check it in Settings.";
+    if(status === 403) return "This key isn't allowed to use that model.";
+    if(status === 404){
+      var have = "";
+      try{
+        var opts = $("setGemModel").options;
+        var names = [];
+        for(var i=0;i<opts.length && i<6;i++) names.push(opts[i].value);
+        if(names.length) have = " Your key does have: " + names.join(", ") + ".";
+      }catch(e){}
+      return "Google says '" + store.settings.geminiModel + "' isn't available on your key." +
+        have + " Open Settings and pick a different model.";
+    }
+    if(status === 429) return "Hit Gemini's free limit. Wait a minute, or pick another model.";
+    if(status >= 500) return "Google's API is busy. Try again in a second.";
+    return "Error " + status + (detail ? ": " + detail : "");
+  }
+  if(status === 401) return "That API key was rejected. Check it in Settings.";
+  if(status === 400 && /credit|balance/i.test(txt)) return "Your Anthropic account is out of credit.";
+  if(status === 429) return "Rate limited - wait a moment and try again.";
+  if(status === 529 || status >= 500) return "Anthropic's API is busy. Try again in a second.";
+  return "Error " + status + (detail ? ": " + detail : "");
+}
+
+/* ============================ send ============================ */
+function send(){
+  var text = input.value.trim();
+  if((!text && !pending.length) || streaming) return;
+  if(!apiKeyNow()){
+    fillSettings(); openPanel(settings);
+    toast("Add your API key first");
+    return;
+  }
+  var c = activeChat() || newChat();
+  if(!c.messages.length){
+    c.title = text.length > 40 ? text.slice(0,40).trim() + "…" : text;
+    chatTitle.textContent = c.title;
+  }
+  if(scroll.querySelector(".empty")) scroll.innerHTML = "";
+
+  var msg = { role:"user", content:text, t:Date.now() };
+  if(pending.length){ msg.images = pending.slice(); }
+  var shotsForImage = pending.slice();
+  pending = []; renderPending();
+
+  c.messages.push(msg);
+  addBubble(msg, c.messages.length-1);
+  input.value = ""; autosize(); save(); jump(true);
+
+  /* they clearly asked for a picture, but this provider can't make one */
+  if(!wantsPicture(text) && DRAW_RE.test(text.trim()) && !isGemini()){
+    banner("warn", "<b>" + esc(providerLabel(store.settings.provider)) +
+      " can't make pictures.</b> Only Gemini can. Switch in Settings, or ask for " +
+      "something else - I've answered as text below.");
+  }
+
+  if(wantsPicture(text)){
+    imgMode = false;
+    $("btnImg").classList.remove("act");
+    input.placeholder = "Message " + aiName() + "…";
+    drawPicture(c, text, shotsForImage);
+  } else {
+    stream(c);
+  }
+}
+
+/* make a picture, then drop it into the chat like any other reply */
+function drawPicture(c, prompt, attach, retried){
+  streaming = true;
+  btnSend.classList.add("stop");
+  btnSend.innerHTML = "&#9632;";
+  btnSend.disabled = false;
+
+  var el = document.createElement("div");
+  el.className = "msg ai";
+  el.innerHTML = '<div class="av bot">' + icon("bot") + '</div><div class="wrap">' +
+    '<div class="who">' + esc(aiName().toUpperCase()) + '</div>' +
+    '<div class="bubble"><em>Drawing…</em> <span class="caret"></span></div></div>';
+  scroll.appendChild(el);
+  jump(true);
+
+  generateImage(c, prompt, attach).then(function(out){
+    var m = { role:"assistant", content: out.text || "", images: out.images, t:Date.now() };
+    c.messages.push(m);
+    save();
+    el.querySelector(".bubble").innerHTML = shots(m) + md(m.content);
+    var hold = document.createElement("div");
+    hold.innerHTML = actsHtml(m);
+    (el.querySelector(".wrap") || el).appendChild(hold.firstChild);
+    wireActs(el, m);
+    endStreamUI();
+    if(nearBottom()) jump(true);
+    renderChatList();
+  }).catch(function(err){
+    el.remove();
+    if(err && err.name === "AbortError"){ endStreamUI(); return; }
+
+    /* the picture model name went stale - ask Google what this key really has */
+    if(err && err.stale && !retried && isGemini()){
+      endStreamUI();
+      loadGeminiModels(true).then(function(sets){
+        var imgs = (sets && sets.image) || [];
+        if(!imgs.length){
+          showError("Your Google key has no picture models on it. Image generation isn't " +
+            "available to this key - text chat still works.");
+          return;
+        }
+        var next = imgs.filter(function(id){ return id !== store.settings.imageModel; });
+        store.settings.imageModel = next.length ? next[0] : imgs[0];
+        save(); syncProviderUI();
+        toast("Trying " + store.settings.imageModel);
+        drawPicture(c, prompt, attach, true);
+      }).catch(function(e){
+        showError("Couldn't find a picture model. " + String(e && e.message || e));
+      });
+      return;
+    }
+
+    showError(String(err && err.message || err));
+    endStreamUI();
+  });
+}
+
+/* a model id can vanish from under us; refresh the list and try once more */
+/* transient - worth retrying the same provider */
+function isBusy(status){ return status === 429 || (status >= 500 && status < 600); }
+
+/* Wait, then run the same turn again. Used for overload and for failover. */
+function retryTurn(c, opts, waitMs, note){
+  if(note) toast(note);
+  setTimeout(function(){ stream(c, opts); }, waitMs);
+}
+
+function healAndRetry(c, retried){
+  if(retried || !isGemini()) return false;
+  var failed = store.settings.geminiModel;
+  loadGeminiModels(true).then(function(sets){
+    var others = (sets && sets.chat || []).filter(function(id){ return id !== failed; });
+    if(others.length){
+      store.settings.geminiModel = bestModel(others);
+      save(); syncProviderUI();
+      toast("Switched to " + store.settings.geminiModel);
+    }
+    stream(c, { retried:true });
+  }).catch(function(e){
+    showError("Couldn't find a working model. " + String(e && e.message || e));
+    endStreamUI();
+  });
+  return true;
+}
+
+function stream(c, opts){
+  opts = opts || {};
+  var retried = opts.retried;        /* already swapped model once */
+  var attempt = opts.attempt || 0;   /* retries against this provider */
+  var tried   = opts.tried || [];    /* providers we've already given up on */
+  if(tried.indexOf(store.settings.provider) < 0) tried = tried.concat([store.settings.provider]);
+  streaming = true;
+  btnSend.classList.add("stop");
+  btnSend.innerHTML = "&#9632;";
+  btnSend.disabled = false;
+
+  var el = document.createElement("div");
+  el.className = "msg ai";
+  el.innerHTML = '<div class="av bot">' + icon("bot") + '</div><div class="wrap">' +
+    '<div class="who">' + esc(aiName().toUpperCase()) + '</div>' +
+    '<div class="think"></div><div class="bubble"><span class="caret"></span></div></div>';
+  scroll.appendChild(el);
+  var thinkEl = el.querySelector(".think");
+  var bubEl = el.querySelector(".bubble");
+  jump(true);
+
+  var acc = "", think = "", stopReason = null;
+  abortCtl = new AbortController();
+
+  /* answering on the phone itself - no request to make */
+  if(isDevice()){
+    askDevice(c.messages).then(function(text){
+      acc = text || "(no answer)";
+      if(!store.settings.deviceSeen){ store.settings.deviceSeen = true; save(); }
+      bubEl.innerHTML = md(acc);
+      finish();
+    }).catch(function(e){
+      el.remove();
+      var msg = String(e && e.message || e);
+      var nxt = nextProvider(tried);
+      if(nxt && store.settings.autoFailover !== false){
+        store.settings.provider = nxt; save(); syncProviderUI();
+        retryTurn(c, { attempt:0, tried:tried }, 300,
+          "The phone's model couldn't answer - switched to " + providerLabel(nxt));
+        return;
+      }
+      showError("The phone's own model couldn't answer: " + msg);
+      endStreamUI();
+    });
+    return;
+  }
+
+  var req = buildRequest(c.messages);
+
+  fetch(req.url, {
+    method: "POST",
+    signal: abortCtl.signal,
+    headers: req.headers,
+    body: JSON.stringify(req.body)
+  }).then(function(res){
+    if(!res.ok){
+      return res.text().then(function(t){
+        if(res.status === 404 && !retried && isGemini()){
+          var e = new Error("stale-model"); e.stale = true; throw e;
+        }
+        if(isBusy(res.status)){
+          var b = new Error("busy"); b.busy = true; b.status = res.status; throw b;
+        }
+        throw new Error(apiError(res.status, t));
+      });
+    }
+    var reader = res.body.getReader();
+    var dec = new TextDecoder();
+    var buf = "";
+
+    function paint(){
+      if(think){
+        thinkEl.textContent = think;
+        if(store.settings.showThink) thinkEl.classList.add("on");
+      }
+      bubEl.innerHTML = md(acc) + '<span class="caret"></span>';
+      if(nearBottom()) jump(false);
+    }
+
+    function pump(){
+      return reader.read().then(function(r){
+        if(r.done) return;
+        buf += dec.decode(r.value, { stream:true });
+        var parts = buf.split("\n\n");
+        buf = parts.pop();
+        for(var i=0;i<parts.length;i++){
+          var lines = parts[i].split("\n");
+          for(var j=0;j<lines.length;j++){
+            var ln = lines[j];
+            if(ln.indexOf("data:") !== 0) continue;
+            var payload = ln.slice(5).trim();
+            if(!payload || payload === "[DONE]") continue;
+            var ev;
+            try{ ev = JSON.parse(payload); }catch(e){ continue; }
+            var d = readDelta(ev);
+            if(d.error) throw new Error(d.error);
+            acc += d.text; think += d.think;
+            if(d.stop) stopReason = d.stop;
+          }
+        }
+        paint();
+        return pump();
+      });
+    }
+
+    return pump();
+  }).then(function(){
+    if(isLocal() && !store.settings.localSeen){ store.settings.localSeen = true; save(); }
+    var note = stopNote(stopReason);
+    if(note) acc += (acc ? "\n\n" : "") + note;
+    finish();
+  }).catch(function(err){
+    if(err && err.name === "AbortError"){ finish(true); return; }
+    el.remove();
+    if(err && err.stale && healAndRetry(c, retried)) return;
+
+    /* the provider is overloaded, or we couldn't reach it at all */
+    var netFail = err && /Failed to fetch|NetworkError|load failed/i.test(String(err.message || ""));
+    if((err && err.busy) || netFail){
+      endStreamUI();
+      var who = providerLabel(store.settings.provider);
+
+      /* give the same provider a couple of goes first - overload is usually brief */
+      if(err && err.busy && attempt < 2){
+        var wait = 1500 * Math.pow(2, attempt);
+        retryTurn(c, { retried:retried, attempt:attempt + 1, tried:tried }, wait,
+          who + " is busy - retrying…");
+        return;
+      }
+
+      /* still stuck: move to another provider that's set up */
+      var nxt = nextProvider(tried);
+      if(nxt){
+        store.settings.provider = nxt; save(); syncProviderUI(); renderChatList();
+        retryTurn(c, { attempt:0, tried:tried }, 350,
+          who + " wasn't available - switched to " + providerLabel(nxt));
+        return;
+      }
+
+      showError(netFail
+        ? (isLocal()
+            ? (location.protocol === "https:" && location.hostname !== "localhost"
+                ? "This is the online version, so it can't reach the model on your PC. Open Settings and switch to Gemini."
+                : "Can't reach Ollama. Is it running? Open a terminal and run: ollama serve")
+            : "Couldn't reach " + who + ". Check your connection.")
+        : who + " is overloaded and there's no other provider set up. Add a second one in Settings, or try again shortly.");
+      return;
+    }
+
+    var msg = String(err && err.message || err);
+    if(/Failed to fetch|NetworkError|load failed/i.test(msg))
+      msg = navigator.onLine
+        ? "Couldn't reach the AI service. Try again."
+        : "You're offline - answering needs a connection (wifi or mobile data).";
+    showError(msg);
+    endStreamUI();
+  });
+
+  function finish(aborted){
+    var body = acc.trim();
+    if(!body && !aborted) body = "(empty response)";
+    if(!body){ el.remove(); endStreamUI(); return; }
+    bubEl.innerHTML = md(body);
+    var m = { role:"assistant", content:body, t:Date.now() };
+    if(think) m.thinking = think;
+    c.messages.push(m);
+    save();
+    var idx = c.messages.length - 1;
+    el.dataset.idx = idx;
+    var holder = document.createElement("div");
+    holder.innerHTML = actsHtml(m);
+    var acts = holder.firstChild;
+    (el.querySelector(".wrap") || el).appendChild(acts);
+    wireActs(el, m);
+    decorateCode(el);
+    if(store.settings.tts && !aborted) speak(body);
+    endStreamUI();
+    if(nearBottom()) jump(true);
+    renderChatList();
+  }
+}
+
+function endStreamUI(){
+  streaming = false; abortCtl = null;
+  btnSend.classList.remove("stop");
+  btnSend.innerHTML = "&#10148;";
+  syncSend();
+}
+
+/* ==================== running inside the iPhone app ====================
+   When Pedro is wrapped as a real app, two extra things become possible:
+   answering with the model built into the phone (no internet at all), and
+   Apple's speech recogniser (which Safari refuses web pages).
+
+   In a browser none of this exists, so everything here stays switched off. */
+
+var Native = (window.Capacitor && window.Capacitor.Plugins &&
+              window.Capacitor.Plugins.PedroNative) || null;
+var deviceModel = { checked:false, available:false, reason:"" };
+
+function inApp(){ return !!Native; }
+function isDevice(){ return store.settings.provider === "device"; }
+
+/* ask the phone whether it can answer offline */
+function checkDeviceModel(){
+  if(!Native) return Promise.resolve(deviceModel);
+  return Native.available().then(function(r){
+    deviceModel = { checked:true, available:!!r.available, reason:r.reason || "" };
+    if(deviceModel.available && !store.settings.deviceSeen){
+      store.settings.deviceSeen = true; save();
+    }
+    return deviceModel;
+  }).catch(function(e){
+    deviceModel = { checked:true, available:false, reason:String(e && e.message || e) };
+    return deviceModel;
+  });
+}
+
+/* one answer, entirely on the phone */
+function askDevice(msgs){
+  var question = "";
+  for(var i = msgs.length - 1; i >= 0; i--)
+    if(msgs[i].role === "user"){ question = msgs[i].content || ""; break; }
+
+  /* the on-device model has a small context, so send recent turns only */
+  var recent = msgs.slice(-6).filter(function(m){ return m.role === "assistant"; }).slice(-2);
+  var carry = recent.map(function(m){ return "Earlier you said: " + m.content.slice(0, 300); }).join("\n");
+
+  return Native.ask({
+    prompt: question,
+    system: systemPrompt() + (carry ? "\n\n" + carry : "")
+  }).then(function(r){ return String(r.reply || "").trim(); });
+}
+
+/* ---- Apple's speech recogniser, used instead of the browser's ---- */
+var nativeListening = false;
+function nativeMicSupported(){ return !!Native; }
+
+function nativeMicStart(onText, onDone){
+  if(!Native) return Promise.reject(new Error("not in the app"));
+  if(Native.removeAllListeners) Native.removeAllListeners();
+  Native.addListener("pedroSpeech", function(ev){
+    onText(ev.text || "", !!ev.final);
+    if(ev.final){ nativeListening = false; if(onDone) onDone(null); }
+  });
+  Native.addListener("pedroSpeechEnd", function(ev){
+    nativeListening = false;
+    if(onDone) onDone(ev && ev.error ? new Error(ev.error) : null);
+  });
+  return Native.startListening().then(function(){ nativeListening = true; });
+}
+function nativeMicStop(){
+  nativeListening = false;
+  if(Native) Native.stopListening().catch(function(){});
+}
+
+/* ==================== photos in, pictures out ====================
+   Images are shrunk on-device before they're sent (smaller = faster = cheaper),
+   held as base64, and stored with the chat. localStorage is small, so save()
+   sheds old images rather than losing your messages. */
+
+var pending = [];        /* attachments queued for the next message */
+var imgMode = false;     /* next message generates a picture instead of text */
+
+/* ---- shrink + encode ---- */
+function shrinkImage(file, maxDim){
+  return new Promise(function(resolve){
+    if(!/^image\//.test(file.type)){ resolve(null); return; }
+    var url = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function(){
+      var w = img.width, h = img.height;
+      var s = Math.min(1, maxDim / Math.max(w, h));
+      var cv = document.createElement("canvas");
+      cv.width = Math.max(1, Math.round(w * s));
+      cv.height = Math.max(1, Math.round(h * s));
+      cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+      URL.revokeObjectURL(url);
+      var durl;
+      try{ durl = cv.toDataURL("image/jpeg", 0.85); }
+      catch(e){ resolve(null); return; }
+      resolve({ mime:"image/jpeg", data:durl.split(",")[1] });
+    };
+    img.onerror = function(){ URL.revokeObjectURL(url); resolve(null); };
+    img.src = url;
+  });
+}
+function dataUrl(im){ return "data:" + (im.mime || "image/jpeg") + ";base64," + im.data; }
+
+/* ---- the attachment strip under the composer ---- */
+function renderPending(){
+  var strip = $("attach");
+  strip.innerHTML = "";
+  strip.style.display = pending.length ? "flex" : "none";
+  pending.forEach(function(im, i){
+    var d = document.createElement("div");
+    d.className = "thumb";
+    d.innerHTML = '<img alt=""><button aria-label="Remove">&#10005;</button>';
+    d.querySelector("img").src = dataUrl(im);
+    d.querySelector("button").addEventListener("click", function(){
+      pending.splice(i, 1); renderPending(); syncSend();
+    });
+    strip.appendChild(d);
+  });
+}
+function addFiles(files){
+  var list = Array.prototype.slice.call(files || []).slice(0, 6);
+  if(!list.length) return;
+  Promise.all(list.map(function(f){ return shrinkImage(f, 1024); })).then(function(ims){
+    ims.forEach(function(im){ if(im && pending.length < 6) pending.push(im); });
+    renderPending(); syncSend();
+    if(pending.length >= 6) toast("6 photos max per message");
+  });
+}
+$("fileIn").addEventListener("change", function(){ addFiles(this.files); this.value = ""; });
+$("btnAttach").addEventListener("click", function(){ $("fileIn").click(); });
+
+/* paste and drag-drop, for when it's open on a computer */
+window.addEventListener("paste", function(e){
+  var items = (e.clipboardData || {}).items || [];
+  var files = [];
+  for(var i=0;i<items.length;i++)
+    if(items[i].type && items[i].type.indexOf("image/") === 0) files.push(items[i].getAsFile());
+  if(files.length){ e.preventDefault(); addFiles(files); }
+});
+["dragover","drop"].forEach(function(ev){
+  document.addEventListener(ev, function(e){
+    e.preventDefault();
+    if(ev === "drop" && e.dataTransfer) addFiles(e.dataTransfer.files);
+  });
+});
+
+/* ---- picture mode ---- */
+$("btnImg").addEventListener("click", function(){
+  if(!isGemini()){
+    banner("warn", "<b>Picture-making needs Gemini.</b> You're on " +
+      esc(providerLabel(store.settings.provider)) + ". Change it in Settings under 'Powered by'.");
+    toast("Switch to Gemini for pictures");
+    return;
+  }
+  imgMode = !imgMode;
+  this.classList.toggle("act", imgMode);
+  input.placeholder = imgMode ? "Describe the picture to make…" : "Message " + aiName() + "…";
+  if(imgMode) toast("Next message makes a picture");
+});
+/* obvious phrasings switch it on by themselves */
+var DRAW_RE = /^(draw|paint|sketch|generate|create|make|design|render)\b[^.?!]{0,40}\b(image|picture|photo|logo|drawing|painting|illustration|art|wallpaper|icon|poster)\b/i;
+function wantsPicture(text){ return imgMode || (isGemini() && DRAW_RE.test(text.trim())); }
+
+/* ---- ask Gemini for a picture ---- */
+function generateImage(c, prompt, attach){
+  var s = store.settings;
+  var parts = [];
+  (attach || []).forEach(function(im){
+    parts.push({ inline_data: { mime_type:im.mime, data:im.data } });
+  });
+  parts.push({ text: prompt });
+
+  var url = "https://generativelanguage.googleapis.com/v1beta/models/" +
+    encodeURIComponent(s.imageModel || "gemini-2.5-flash-image") +
+    ":generateContent?key=" + encodeURIComponent(apiKeyNow());
+
+  abortCtl = new AbortController();
+  return fetch(url, {
+    method:"POST",
+    signal: abortCtl.signal,
+    headers:{ "content-type":"application/json" },
+    body: JSON.stringify({
+      contents: [{ role:"user", parts: parts }],
+      generationConfig: { responseModalities: ["TEXT","IMAGE"] }
+    })
+  }).then(function(res){
+    return res.text().then(function(t){
+      if(!res.ok){
+        if(res.status === 404){
+          var e = new Error("'" + (s.imageModel || "gemini-2.5-flash-image") +
+            "' isn't available on your key.");
+          e.stale = true; throw e;
+        }
+        throw new Error(apiError(res.status, t));
+      }
+      var d = JSON.parse(t);
+      var cand = (d.candidates || [])[0] || {};
+      var ps = (cand.content && cand.content.parts) || [];
+      var imgs = [], text = "";
+      ps.forEach(function(p){
+        var inl = p.inlineData || p.inline_data;
+        if(inl && inl.data) imgs.push({ mime: inl.mimeType || inl.mime_type || "image/png", data: inl.data });
+        else if(typeof p.text === "string") text += p.text;
+      });
+      if(!imgs.length)
+        throw new Error(text.trim() || "It didn't return a picture that time.");
+      return { text: text.trim(), images: imgs };
+    });
+  });
+}
+
+/* ---- code blocks get a copy button ---- */
+function decorateCode(el){
+  var pres = el.querySelectorAll("pre");
+  for(var i=0;i<pres.length;i++){
+    if(pres[i].querySelector(".cp")) continue;
+    var b = document.createElement("button");
+    b.className = "cp";
+    b.textContent = "copy";
+    (function(pre, btn){
+      btn.addEventListener("click", function(e){
+        e.stopPropagation();
+        var code = pre.querySelector("code");
+        navigator.clipboard.writeText(code ? code.textContent : pre.textContent)
+          .then(function(){ btn.textContent = "copied"; setTimeout(function(){ btn.textContent = "copy"; }, 1400); });
+      });
+    })(pres[i], b);
+    pres[i].appendChild(b);
+  }
+}
+
+/* ==================== teaching ====================
+   You teach Pedro two things: facts (always true, always sent) and lessons
+   (a question plus the answer you wanted). Lessons are picked by relevance to
+   what you just asked, so the prompt stays small however many you add.
+
+   This takes effect immediately - no training run needed. The same file also
+   exports as JSONL, which is exactly the format a real fine-tune needs later. */
+
+function lessons(){ return store.settings.lessons || (store.settings.lessons = []); }
+function facts(){ return store.settings.facts || (store.settings.facts = []); }
+
+/* crude but effective: how much do two bits of text overlap? */
+function relevance(text, lesson){
+  var stop = " the a an and or but if is are was were be been to of in on for with that this it as at by from i you my your me we ".split(" ");
+  var words = String(text).toLowerCase().match(/[a-z0-9']+/g) || [];
+  var hay = (lesson.q + " " + (lesson.tag || "")).toLowerCase();
+  var score = 0, seen = {};
+  for(var i=0;i<words.length;i++){
+    var w = words[i];
+    if(w.length < 3 || stop.indexOf(w) >= 0 || seen[w]) continue;
+    seen[w] = 1;
+    if(hay.indexOf(w) >= 0) score += (w.length > 5 ? 2 : 1);
+  }
+  return score;
+}
+
+/* the lessons worth sending for this particular message */
+function pickLessons(text, max){
+  var all = lessons();
+  if(!all.length) return [];
+  var scored = all.map(function(l){ return { l:l, s:relevance(text, l) }; })
+                  .filter(function(x){ return x.s > 0; })
+                  .sort(function(a,b){ return b.s - a.s; });
+  /* nothing matched? send the most recent few so teaching still shows through */
+  if(!scored.length) return all.slice(-Math.min(3, max));
+  return scored.slice(0, max).map(function(x){ return x.l; });
+}
+
+/* the block that gets appended to the system prompt */
+function taughtBlock(text){
+  var out = "";
+  var f = facts();
+  if(f.length){
+    out += "\n\nThings " + (store.settings.name || "the user") + " has told you to remember:\n";
+    for(var i=0;i<f.length;i++) out += "- " + f[i] + "\n";
+  }
+  var picked = pickLessons(text || "", 6);
+  if(picked.length){
+    out += "\nThey have taught you how to answer things like this. Follow these closely - " +
+           "match the style and the substance, and prefer them over your default answer:\n";
+    for(var j=0;j<picked.length;j++){
+      out += "\nQ: " + picked[j].q + "\nA: " + picked[j].a + "\n";
+    }
+  }
+  return out;
+}
+
+/* ---- storing what you teach ---- */
+function addLesson(q, a, tag){
+  q = String(q || "").trim(); a = String(a || "").trim();
+  if(!q || !a) return false;
+  var all = lessons();
+  /* replace a lesson for the same question rather than piling up duplicates */
+  for(var i=0;i<all.length;i++){
+    if(all[i].q.toLowerCase() === q.toLowerCase()){
+      all[i].a = a; all[i].tag = tag || all[i].tag; all[i].t = Date.now();
+      save(); return true;
+    }
+  }
+  all.push({ id:uid(), q:q, a:a, tag:tag || "", t:Date.now() });
+  save(); return true;
+}
+function addFact(text){
+  text = String(text || "").trim();
+  if(!text) return false;
+  var f = facts();
+  if(f.indexOf(text) >= 0) return false;
+  f.push(text); save(); return true;
+}
+
+/* ---- the teach panel ---- */
+function renderTeach(){
+  var box = $("teachList");
+  var f = facts(), l = lessons();
+  var html = "";
+
+  html += '<div class="secttl" style="padding-left:0">Facts (' + f.length + ')</div>';
+  if(!f.length) html += '<div class="hint" style="margin:0 0 10px">Nothing yet. Facts are always sent - keep them short and true.</div>';
+  for(var i=0;i<f.length;i++){
+    html += '<div class="taught"><div class="tt">' + esc(f[i]) + '</div>' +
+            '<button data-df="' + i + '" aria-label="Delete">&times;</button></div>';
+  }
+
+  html += '<div class="secttl" style="padding-left:0;margin-top:14px">Lessons (' + l.length + ')</div>';
+  if(!l.length) html += '<div class="hint" style="margin:0">Nothing yet. Ask Pedro something, then tap <b>Teach</b> under its answer to show it a better one.</div>';
+  for(var j=l.length-1;j>=0;j--){
+    html += '<div class="taught"><div class="tt"><b>' + esc(l[j].q) + '</b><br>' +
+            '<span style="color:var(--tx2)">' + esc(l[j].a.slice(0,160)) +
+            (l[j].a.length > 160 ? "…" : "") + '</span></div>' +
+            '<button data-dl="' + esc(l[j].id) + '" aria-label="Delete">&times;</button></div>';
+  }
+  box.innerHTML = html;
+
+  var n = f.length + l.length;
+  var badge = $("teachCount");
+  if(badge) badge.textContent = n ? (n + " taught") : "nothing taught yet";
+}
+
+$("teachList").addEventListener("click", function(ev){
+  var b = ev.target.closest ? ev.target.closest("button") : null;
+  if(!b) return;
+  if(b.dataset.df !== undefined){
+    facts().splice(parseInt(b.dataset.df, 10), 1); save(); renderTeach();
+  } else if(b.dataset.dl){
+    store.settings.lessons = lessons().filter(function(x){ return x.id !== b.dataset.dl; });
+    save(); renderTeach();
+  }
+});
+
+$("btnAddFact").addEventListener("click", function(){
+  var v = $("newFact").value;
+  if(addFact(v)){ $("newFact").value = ""; renderTeach(); toast("Learned it"); }
+});
+$("btnAddLesson").addEventListener("click", function(){
+  var q = $("newQ").value, a = $("newA").value;
+  if(addLesson(q, a)){
+    $("newQ").value = ""; $("newA").value = "";
+    renderTeach(); toast("Taught");
+  } else toast("Fill in both boxes");
+});
+
+/* teach from a real answer: prefill with what you actually asked */
+function teachFrom(m){
+  var c = activeChat();
+  var q = "";
+  if(c){
+    var idx = c.messages.indexOf(m);
+    for(var i = idx - 1; i >= 0; i--)
+      if(c.messages[i].role === "user"){ q = c.messages[i].content; break; }
+  }
+  $("newQ").value = q;
+  $("newA").value = m.content;
+  renderTeach();
+  openPanel($("teach"));
+  setTimeout(function(){ $("newA").focus(); }, 250);
+  toast("Edit the answer into what you wanted");
+}
+
+/* ---- move your teaching between devices ---- */
+$("btnTeachExport").addEventListener("click", function(){
+  var data = { facts:facts(), lessons:lessons(), exported:new Date().toISOString() };
+  var blob = new Blob([JSON.stringify(data, null, 2)], { type:"application/json" });
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "pedro-brain.json";
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+});
+$("btnTeachImport").addEventListener("click", function(){ $("teachFile").click(); });
+$("teachFile").addEventListener("change", function(){
+  var f = this.files && this.files[0];
+  if(!f) return;
+  var r = new FileReader();
+  r.onload = function(){
+    try{
+      var d = JSON.parse(r.result);
+      var added = 0;
+      (d.facts || []).forEach(function(x){ if(addFact(x)) added++; });
+      (d.lessons || []).forEach(function(x){ if(addLesson(x.q, x.a, x.tag)) added++; });
+      renderTeach();
+      toast("Merged " + added + " item(s)");
+    }catch(e){ toast("That file didn't look right"); }
+  };
+  r.readAsText(f);
+  this.value = "";
+});
+
+/* ---- export in the shape a real fine-tune wants ---- */
+$("btnTeachJsonl").addEventListener("click", function(){
+  var l = lessons();
+  if(!l.length){ toast("Teach it something first"); return; }
+  var lines = l.map(function(x){
+    return JSON.stringify({ messages: [
+      { role:"system", content:"You are " + aiName() + "." },
+      { role:"user", content:x.q },
+      { role:"assistant", content:x.a }
+    ]});
+  }).join("\n");
+  var blob = new Blob([lines], { type:"application/jsonl" });
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "pedro-training.jsonl";
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+  toast(l.length + " examples exported");
+});
+
+/* Work out precisely why voice input isn't working, one layer at a time:
+   secure page -> API present -> real microphone access -> speech recognition.
+   Each layer failing means something different, and needs different advice. */
+function testMic(){
+  var out = $("micHint"), btn = $("btnMicTest");
+  btn.disabled = true; btn.textContent = "Testing…";
+  var lines = [];
+  function done(verdict){
+    out.innerHTML = lines.map(esc).join("<br>") + "<br><b>" + esc(verdict) + "</b>";
+    btn.disabled = false; btn.textContent = "Test microphone";
+  }
+
+  /* 1. secure page? */
+  var secure = window.isSecureContext || location.hostname === "localhost";
+  lines.push((secure ? "OK  " : "NO  ") + "secure page (" + location.protocol + "//" + location.hostname + ")");
+  if(!secure) return done("Open the https version - browsers block the mic on plain http.");
+
+  /* 2. does this browser have speech recognition at all? */
+  lines.push((SR ? "OK  " : "NO  ") + "speech recognition available" + (isiOS ? " (iPhone/iPad)" : ""));
+
+  /* 3. can we actually open the microphone? */
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    lines.push("NO  microphone access API");
+    return done("This browser can't reach the microphone at all.");
+  }
+  navigator.mediaDevices.getUserMedia({ audio:true }).then(function(stream){
+    stream.getTracks().forEach(function(t){ t.stop(); });
+    lines.push("OK  microphone permission granted");
+
+    if(!SR){
+      return done(isiOS
+        ? "Your mic is fine - Safari just won't do speech-to-text for web apps. Use the microphone key on your keyboard."
+        : "Your mic is fine, but this browser has no speech recognition. Chrome or Edge do.");
+    }
+
+    /* 4. does speech recognition actually start? */
+    var r, settled = false;
+    function finish(msg){ if(settled) return; settled = true; try{ r.abort(); }catch(e){} done(msg); }
+    try{ r = new SR(); }
+    catch(e){ return done("Speech recognition exists but won't start: " + (e.message || e)); }
+    r.lang = navigator.language || "en-US";
+    r.onstart = function(){
+      lines.push("OK  speech recognition started");
+      finish("Everything works. Tap the mic in the message box and talk.");
+    };
+    r.onerror = function(ev){
+      lines.push("NO  speech recognition (" + ev.error + ")");
+      finish(micError(ev.error) || ("Speech recognition failed: " + ev.error));
+    };
+    r.onend = function(){
+      if(!settled){
+        lines.push("NO  speech recognition stopped immediately");
+        finish(isiOS
+          ? "Safari started then dropped it - this is an iOS limitation, not your settings. Use the keyboard's microphone key."
+          : "It stopped straight away. Try again, or check nothing else is using the mic.");
+      }
+    };
+    try{ r.start(); }
+    catch(e){ finish("Couldn't start listening: " + (e.message || e)); }
+    setTimeout(function(){ finish("Timed out waiting for the microphone."); }, 6000);
+
+  }).catch(function(e){
+    var n = e && e.name;
+    lines.push("NO  microphone permission (" + (n || e) + ")");
+    if(n === "NotAllowedError")
+      return done(isiOS
+        ? "Safari is refusing microphone access. Settings > Safari > Microphone > Allow, then reload."
+        : "Permission was refused. Click the padlock in the address bar, allow the microphone, then reload.");
+    if(n === "NotFoundError") return done("No microphone found on this device.");
+    if(n === "NotReadableError") return done("Another app is using the microphone. Close it and try again.");
+    done("Couldn't open the microphone: " + (n || e));
+  });
+}
+$("btnMicTest").addEventListener("click", testMic);
+
+/* ==================== hands-free ("Pedro") mode ====================
+   Continuous listening with a wake word, spoken answers, screen kept awake.
+   Honest limit, surfaced in the UI: a web app can only listen while it is
+   open and on screen - the phone's OS suspends it once you lock the screen
+   or switch away. That's a browser rule, not something this app can opt out of. */
+
+var hfEl=$("hf"), hfOrb=$("hfOrb"), hfState=$("hfState"),
+    hfHeard=$("hfHeard"), hfSaid=$("hfSaid"), hfWarn=$("hfWarn");
+
+var hf = { on:false, phase:"wait", rec:null, restart:null, quiet:null,
+           want:false, answering:false };
+
+function aiName(){ return (store.settings.aiName || "Pedro").trim(); }
+
+function wakeRe(){
+  var n = aiName().toLowerCase().replace(/[^a-z0-9 ]/g, "");
+  var alts = [n];
+  /* what phone dictation commonly hears instead of "Pedro" */
+  if(n === "pedro") alts = alts.concat(["pedros", "petro", "pedrow", "peter o", "pedro's"]);
+  alts = alts.map(function(a){ return a.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); });
+  return new RegExp("\\b(" + alts.join("|") + ")\\b", "i");
+}
+
+function hfSet(phase, label){
+  hf.phase = phase;
+  hfOrb.className = ({ wait:"wait", hear:"hear", busy:"busy", talk:"talk" })[phase] || "wait";
+  hfState.textContent = label;
+}
+function hfIdleLabel(){ return "Say “" + aiName() + "”"; }
+
+function hfOpen(){
+  if(!SR){ toast("This browser can't do voice input"); return; }
+  if(!apiKeyNow()){
+    fillSettings(); openPanel(settings);
+    banner("warn", "<b>No API key yet.</b> Paste your free Google AI Studio key in " +
+      "Settings, then send again. Get one at " +
+      "<a href=\"https://aistudio.google.com/apikey\" target=\"_blank\" rel=\"noopener\">" +
+      "aistudio.google.com/apikey</a>.");
+    return;
+  }
+  hf.on = true; hf.want = true; hf.answering = false;
+  hfEl.classList.add("on");
+  hfHeard.textContent = ""; hfSaid.textContent = "";
+  hfWarn.textContent = "Keep this screen open - phones stop web apps listening once the screen "
+    + "locks. Speaking works offline; answering needs a connection.";
+  hfSet("wait", hfIdleLabel());
+  keepAwake(true);
+  hfListen();
+}
+function hfClose(){
+  hf.on = false; hf.want = false;
+  hfEl.classList.remove("on");
+  clearTimeout(hf.restart); clearTimeout(hf.quiet);
+  try{ if(hf.rec) hf.rec.abort(); }catch(e){}
+  hf.rec = null;
+  if(window.speechSynthesis) speechSynthesis.cancel();
+  keepAwake(false);
+}
+
+/* --- keep the screen awake so it can keep listening --- */
+var wakeLock = null;
+function keepAwake(want){
+  if(!("wakeLock" in navigator)) return;
+  if(want){
+    navigator.wakeLock.request("screen").then(function(l){
+      wakeLock = l;
+      l.addEventListener("release", function(){ wakeLock = null; });
+    }).catch(function(){});
+  } else if(wakeLock){
+    try{ wakeLock.release(); }catch(e){}
+    wakeLock = null;
+  }
+}
+document.addEventListener("visibilitychange", function(){
+  if(document.visibilityState === "visible" && hf.on){ keepAwake(true); hfListen(); }
+});
+
+/* --- the listening loop --- */
+function hfListen(){
+  if(!hf.want || hf.rec) return;
+  var r;
+  try{ r = new SR(); }catch(e){ return; }
+  r.lang = navigator.language || "en-US";
+  r.continuous = true;
+  r.interimResults = true;
+  /* ask for on-device recognition where the browser offers it (newer Chrome);
+     harmless where it doesn't exist - it just falls back to network speech */
+  try{ if("processLocally" in r) r.processLocally = true; }catch(e){}
+
+  r.onresult = function(ev){
+    var finalTxt = "", interim = "";
+    for(var i = ev.resultIndex; i < ev.results.length; i++){
+      var t = ev.results[i][0].transcript;
+      if(ev.results[i].isFinal) finalTxt += t; else interim += t;
+    }
+    var live = (finalTxt || interim).trim();
+    if(live) hfHeard.textContent = live;
+
+    if(hf.phase === "wait"){
+      if(hf.answering) return;
+      var m = live.match(wakeRe());
+      if(!m) return;
+      var at = live.toLowerCase().indexOf(m[0].toLowerCase());
+      var after = live.slice(at + m[0].length).replace(/^[\s,.:;!?-]+/, "").trim();
+      if(finalTxt && after.split(/\s+/).length >= 3){
+        hfAsk(after);                        /* "Pedro, what's the weather like" */
+      } else {
+        hf.answering = true;                 /* just the name - acknowledge, then listen */
+        hfSet("hear", "Yeah?");
+        hfHeard.textContent = "";
+        hfSpeak("Yeah?", function(){
+          hf.answering = false;
+          hfSet("hear", "Listening…");
+          hfQuietTimer();
+        });
+      }
+      return;
+    }
+
+    if(hf.phase === "hear"){
+      if(finalTxt.trim()) hfAsk(finalTxt.trim());
+      else hfQuietTimer();
+    }
+  };
+
+  r.onerror = function(ev){
+    if(ev.error === "not-allowed" || ev.error === "service-not-allowed"){
+      hfWarn.textContent = "Microphone permission is blocked - allow it in your browser settings.";
+      hf.want = false;
+    } else if(ev.error === "network"){
+      hfWarn.textContent = "Speech recognition needs a connection on this browser - it sends "
+        + "audio to the system speech service.";
+    }
+  };
+  r.onend = function(){
+    hf.rec = null;
+    /* browsers cut recognition off periodically - just start it again */
+    if(hf.want){ clearTimeout(hf.restart); hf.restart = setTimeout(hfListen, 350); }
+  };
+
+  hf.rec = r;
+  try{ r.start(); }catch(e){ hf.rec = null; }
+}
+
+function hfPause(){
+  clearTimeout(hf.restart);
+  try{ if(hf.rec) hf.rec.stop(); }catch(e){}
+  hf.rec = null;
+}
+function hfQuietTimer(){
+  clearTimeout(hf.quiet);
+  hf.quiet = setTimeout(function(){
+    if(hf.phase === "hear"){ hfSet("wait", hfIdleLabel()); hfHeard.textContent = ""; }
+  }, 7000);
+}
+
+/* --- speak without hearing ourselves --- */
+function hfSpeak(text, done){
+  hfPause();
+  speak(text, function(){
+    if(hf.want) setTimeout(hfListen, 250);
+    if(done) done();
+  });
+}
+
+/* --- ask, then answer out loud --- */
+function hfAsk(question){
+  clearTimeout(hf.quiet);
+  hfPause();
+  hf.answering = false;
+  hfHeard.textContent = "“" + question + "”";
+  hfSaid.textContent = "";
+  hfSet("busy", "Thinking…");
+
+  var c = activeChat() || newChat();
+  c.messages.push({ role:"user", content:question, t:Date.now() });
+  save();
+
+  voiceMode = true;
+  askOnce(c).then(function(answer){
+    voiceMode = false;
+    hfSaid.textContent = answer;
+    hfSet("talk", "Speaking");
+    hfSpeak(answer, function(){
+      hfSet("wait", hfIdleLabel());
+      hfHeard.textContent = "";
+    });
+    renderAll();
+  }).catch(function(err){
+    voiceMode = false;
+    hfSaid.textContent = String(err && err.message || err);
+    hfSet("talk", "Sorry");
+    hfSpeak(navigator.onLine ? "Sorry, that didn't work." : "I need a connection to answer that.",
+      function(){ hfSet("wait", hfIdleLabel()); });
+  });
+}
+
+/* one non-streaming request; resolves with the answer text */
+function askOnce(c){
+  var req = buildRequest(c.messages);
+  if(isGemini()) req.url = req.url.replace(":streamGenerateContent?alt=sse&", ":generateContent?");
+  else req.body.stream = false;
+
+  return fetch(req.url, { method:"POST", headers:req.headers, body:JSON.stringify(req.body) })
+    .then(function(res){
+      return res.text().then(function(t){
+        if(!res.ok) throw new Error(apiError(res.status, t));
+        var d = JSON.parse(t), out = "";
+        if(isGemini()){
+          var cand = (d.candidates || [])[0] || {};
+          var parts = (cand.content && cand.content.parts) || [];
+          for(var i=0;i<parts.length;i++)
+            if(typeof parts[i].text === "string" && !parts[i].thought) out += parts[i].text;
+        } else {
+          (d.content || []).forEach(function(b){ if(b.type === "text") out += b.text; });
+        }
+        out = out.trim() || "I didn't get an answer that time.";
+        c.messages.push({ role:"assistant", content:out, t:Date.now() });
+        if(c.messages.length === 2) c.title = c.messages[0].content.slice(0, 40);
+        save();
+        return out;
+      });
+    });
+}
+
+$("btnHF").addEventListener("click", hfOpen);
+$("hfExit").addEventListener("click", hfClose);
+
+/* ==================== visible diagnostics ====================
+   Silent failures cost us two rounds of guessing. Anything that goes wrong
+   now says so on screen, with enough detail to act on. */
+var BUILD = "2026-08-20.13";
+
+function banner(kind, html){
+  var b = $("banner");
+  if(!b) return;
+  b.className = kind + " on";
+  $("bannerTx").innerHTML = html;
+}
+$("bannerX").addEventListener("click", function(){ $("banner").classList.remove("on"); });
+
+window.addEventListener("error", function(e){
+  banner("bad", "<b>Something broke in the app.</b><br>" +
+    esc(String(e.message || "unknown error")) +
+    (e.lineno ? " <code>line " + e.lineno + "</code>" : "") +
+    "<br>Build " + BUILD + " - tell Claude this message.");
+});
+window.addEventListener("unhandledrejection", function(e){
+  var m = (e.reason && (e.reason.message || e.reason)) || "unknown";
+  banner("bad", "<b>A request failed.</b><br>" + esc(String(m)) +
+    "<br>Build " + BUILD + " - tell Claude this message.");
+});
+
+/* opening the file directly disables several browser features outright */
+function checkOrigin(){
+  var el = $("buildId"), or = $("originId");
+  if(el) el.textContent = BUILD;
+  if(or) or.textContent = location.protocol === "file:" ? "opened as a local file" : location.host;
+  if(location.protocol !== "file:") return;
+  banner("warn",
+    "<b>You're opening this as a file, not a website.</b> The microphone, " +
+    "hands-free mode, the PIN lock and home-screen install are all switched off by the " +
+    "browser here, and Google may refuse the connection.<br>" +
+    "Drag this folder onto <a href=\"https://app.netlify.com/drop\" target=\"_blank\" rel=\"noopener\">app.netlify.com/drop</a> " +
+    "and open the address it gives you.");
+}
+
+/* ============================ boot ============================ */
+if(!store.chats.length) newChat();
+if(!store.activeId) store.activeId = store.chats[0].id;
+applyTheme();
+if(inApp()){
+  checkDeviceModel().then(function(d){
+    syncProviderUI();
+    if(!d.available && d.reason)
+      banner("warn", "<b>Offline answers aren't available.</b> " + esc(d.reason));
+  });
+}
+syncProviderUI();   /* otherwise the sidebar keeps the placeholder labels */
+checkOrigin();
+syncSpeakBtn();
+syncLockSub();
+if(isLocked()) showLock("unlock");   /* covers the app until the PIN is entered */
+/* first run with a key but no discovery yet - find real model ids before the first send */
+if(!isLocked() && store.settings.geminiKey && !store.settings.modelsLoaded){
+  setTimeout(function(){
+    loadGeminiModels(true).catch(function(e){
+      banner("warn", "<b>Couldn't check which models your key can use.</b><br>" +
+        esc(String(e && e.message || e)) +
+        "<br>Open Settings and tap <b>Test connection</b> for the details.");
+    });
+  }, 400);
+}
+renderAll();
+autosize();
+syncSend();
+
+if("serviceWorker" in navigator && location.protocol !== "file:"){
+  navigator.serviceWorker.register("sw.js").catch(function(){});
+}
+window.addEventListener("beforeunload", function(e){
+  if(streaming){ e.preventDefault(); e.returnValue = ""; }
+});
+</script>
+</body>
+</html>

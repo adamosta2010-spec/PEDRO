@@ -1,0 +1,98 @@
+global.window = {};
+/* Provider routing, local model, and the failover chain. */
+const fs = require("fs");
+const src = fs.readFileSync(process.argv[2], "utf8");
+function grab(name){
+  const i = src.indexOf("function " + name + "(");
+  if(i < 0) throw new Error("no such function: " + name);
+  let d = 0, j = src.indexOf("{", i);
+  for(let k = j; k < src.length; k++){
+    if(src[k] === "{") d++;
+    else if(src[k] === "}"){ d--; if(!d) return src.slice(i, k + 1); }
+  }
+}
+const names = ["isDevice","inApp","isGemini","isGroq","isLocal","isOpenAIStyle","allKeys","apiKeyNow","activeModel",
+               "systemPrompt","taughtBlock","pickLessons","relevance","lessons","facts","claudeContent","geminiParts","claudeRequest","geminiRequest",
+               "groqRequest","localRequest","buildRequest","readDelta","apiError",
+               "usableProviders","nextProvider","providerLabel","isBusy"];
+let store = { settings:{ provider:"gemini", aiName:"Pedro",
+  apiKey:"", geminiKey:"", groqKey:"", model:"claude-opus-5",
+  geminiModel:"gemini-2.5-flash", imageModel:"gemini-2.5-flash-image",
+  groqModel:"llama-3.3-70b-versatile", localUrl:"http://localhost:11434",
+  localModel:"qwen2.5:7b", localSeen:false, effort:"low", name:"", about:"", facts:[], lessons:[] } };
+let voiceMode = false;
+const isLocked = () => false;
+eval(names.map(grab).join("\n"));
+
+let fail = 0, pass = 0;
+const t = (n, g, w) => {
+  const ok = JSON.stringify(g) === JSON.stringify(w);
+  if(!ok){ fail++; console.log("FAIL " + n + "\n  got:  " + JSON.stringify(g) + "\n  want: " + JSON.stringify(w)); }
+  else { pass++; console.log("ok   " + n); }
+};
+const S = store.settings;
+const msgs = [{role:"user",content:"hi"},{role:"assistant",content:"yo"},{role:"user",content:"weather?"}];
+
+/* ---- local model ---- */
+S.provider = "local";
+t("local needs no key", apiKeyNow(), "local");
+const L = buildRequest(msgs);
+t("local hits ollama openai endpoint", L.url, "http://localhost:11434/v1/chat/completions");
+t("local sends no auth header", L.headers.authorization, undefined);
+t("local puts the system prompt first", L.body.messages[0].role, "system");
+t("local maps roles", L.body.messages.slice(1).map(m => m.role), ["user","assistant","user"]);
+t("local streams", L.body.stream, true);
+t("local uses the chosen model", L.body.model, "qwen2.5:7b");
+S.localUrl = "http://localhost:11434/";
+t("trailing slash in url is handled", buildRequest(msgs).url, "http://localhost:11434/v1/chat/completions");
+S.localUrl = "http://localhost:11434";
+
+/* ---- openai-shaped streaming, shared by local and groq ---- */
+t("local delta parsed", readDelta({choices:[{delta:{content:"Hi"}}]}).text, "Hi");
+t("local finish reason ignored when normal", readDelta({choices:[{delta:{},finish_reason:"stop"}]}).stop, null);
+t("local length cutoff flagged", readDelta({choices:[{delta:{},finish_reason:"length"}]}).stop, "length");
+t("empty local chunk safe", readDelta({}).text, "");
+S.provider = "groq"; S.groqKey = "gsk_TEST";
+t("groq uses bearer auth", buildRequest(msgs).headers.authorization, "Bearer gsk_TEST");
+t("groq and local share the parser", isOpenAIStyle(), true);
+S.provider = "gemini";
+t("gemini is not openai-shaped", isOpenAIStyle(), false);
+
+/* ---- what counts as worth retrying ---- */
+t("429 is busy", isBusy(429), true);
+t("500 is busy", isBusy(500), true);
+t("503 is busy", isBusy(503), true);
+t("529 is busy", isBusy(529), true);
+t("404 is not busy", isBusy(404), false);
+t("401 is not busy", isBusy(401), false);
+t("400 is not busy", isBusy(400), false);
+
+/* ---- failover ordering ---- */
+S.provider = "gemini"; S.geminiKey = "AIza"; S.groqKey = "gsk"; S.apiKey = ""; S.localSeen = false;
+t("current provider comes first", usableProviders()[0], "gemini");
+t("unconfigured providers excluded", usableProviders(), ["gemini","groq"]);
+t("next after gemini is groq", nextProvider(["gemini"]), "groq");
+t("nothing left once both tried", nextProvider(["gemini","groq"]), null);
+
+S.localSeen = true;
+t("local joins the chain once it has answered", usableProviders().indexOf("local") >= 0, true);
+t("gemini still first while selected", usableProviders()[0], "gemini");
+S.provider = "local";
+t("local first when selected", usableProviders()[0], "local");
+t("falls back off local to a cloud one", ["gemini","groq"].indexOf(nextProvider(["local"])) >= 0, true);
+
+S.geminiKey = ""; S.groqKey = ""; S.apiKey = ""; S.localSeen = false;
+t("no providers set up yields empty chain", usableProviders(), []);
+t("nextProvider copes with an empty chain", nextProvider([]), null);
+
+/* ---- labels used in the switch message ---- */
+t("labels read naturally", [providerLabel("local"), providerLabel("gemini"), providerLabel("groq")],
+  ["the local model","Gemini","Groq"]);
+
+/* ---- local error guidance ---- */
+S.provider = "local";
+t("missing local model tells you the pull command",
+  apiError(404, "{}").includes("ollama pull qwen2.5:7b"), true);
+
+console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " provider tests passed");
+process.exit(fail ? 1 : 0);

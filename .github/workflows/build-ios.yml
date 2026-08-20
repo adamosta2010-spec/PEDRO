@@ -1,0 +1,76 @@
+# Builds Pedro into an installable .ipa on a free GitHub macOS machine.
+# No Mac needed on your side, and no Apple Developer account:
+# the .ipa comes out unsigned, and AltStore signs it with your free Apple ID.
+
+name: Build iPhone app
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:        # lets you start a build by hand from the Actions tab
+
+jobs:
+  build:
+    runs-on: macos-15       # newest available - the on-device model needs a recent SDK
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Capacitor
+        run: npm install
+
+      - name: Make sure the web app is present
+        run: |
+          test -f dist/index.html || { echo "dist/index.html missing"; exit 1; }
+          grep -o 'var BUILD = "[^"]*"' dist/index.html | head -1
+
+      - name: Create the iOS project
+        run: npx cap add ios
+
+      - name: Copy the web app into it
+        run: npx cap sync ios
+
+      - name: Add the native bridge (on-device model + speech)
+        run: |
+          cp ios/native/PedroNative.swift ios/App/App/PedroNative.swift
+          ls -l ios/App/App/
+
+      - name: Allow microphone and speech recognition
+        run: |
+          PLIST=ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'Pedro listens when you tap the microphone.'" "$PLIST" || true
+          /usr/libexec/PlistBuddy -c "Add :NSSpeechRecognitionUsageDescription string 'Pedro turns what you say into text.'" "$PLIST" || true
+          /usr/libexec/PlistBuddy -c "Print" "$PLIST" | head -40
+
+      - name: Build (unsigned - AltStore signs it later)
+        run: |
+          cd ios/App
+          xcodebuild \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            ONLY_ACTIVE_ARCH=NO \
+            build
+
+      - name: Package it as an .ipa
+        run: |
+          cd ios/App/build/Build/Products/Release-iphoneos
+          mkdir -p Payload
+          cp -R App.app Payload/
+          zip -qry Pedro.ipa Payload
+          ls -lh Pedro.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pedro-ipa
+          path: ios/App/build/Build/Products/Release-iphoneos/Pedro.ipa
+          retention-days: 30

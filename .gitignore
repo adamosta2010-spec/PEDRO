@@ -1,0 +1,8 @@
+node_modules/
+ios/App/Pods/
+ios/App/build/
+ios/App/App/public/
+*.log
+pedro-api.json
+pedro-brain.json
+selftest/_app.js

@@ -1,0 +1,10 @@
+{
+  "appId": "com.adam.pedro",
+  "appName": "Pedro",
+  "webDir": "dist",
+  "server": { "androidScheme": "https", "iosScheme": "https" },
+  "ios": { "contentInset": "always", "backgroundColor": "#04060f" },
+  "plugins": {
+    "SplashScreen": { "launchShowDuration": 0 }
+  }
+}
