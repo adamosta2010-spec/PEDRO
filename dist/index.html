@@ -270,6 +270,8 @@
   @media(prefers-reduced-motion:reduce){
     #voiceBar, #voiceBar *{animation:none !important}
     .vwave i{height:12px}
+    /* the reactor still glows, it just stops spinning */
+    #hfOrb .ticks, #hfOrb .orbits i, #hfOrb .spokes, #hfOrb .swirl{animation:none !important}
   }
 
   /* ============ panels ============ */
@@ -449,6 +451,31 @@
   /* The core: a blue ball that lights the whole middle. Drawn here rather than
      borrowed from an icon, which is what left the centre black. */
   #hfOrb .core{position:absolute;inset:26%;display:grid;place-items:center;border-radius:50%}
+  /* a swirl inside the glass, so the ball reads as turning rather than static */
+  /* a ring of ticks, like a dial */
+  #hfOrb .ticks{position:absolute;inset:2%;border-radius:50%;
+    background:repeating-conic-gradient(from 0deg,
+      color-mix(in srgb,var(--hud) 55%,transparent) 0 .6deg, transparent .6deg 6deg);
+    -webkit-mask:radial-gradient(circle, transparent 88%, #000 89%, #000 96%, transparent 97%);
+    mask:radial-gradient(circle, transparent 88%, #000 89%, #000 96%, transparent 97%);
+    animation:hudSpin 40s linear infinite}
+
+  /* three orbits, tilted, each carrying a light around */
+  #hfOrb .orbits{position:absolute;inset:-7%;pointer-events:none;perspective:600px}
+  #hfOrb .orbits i{position:absolute;inset:0;border-radius:50%;
+    border:1px solid color-mix(in srgb,var(--hud) 30%,transparent)}
+  #hfOrb .orbits i b{position:absolute;top:-3px;left:50%;width:6px;height:6px;margin-left:-3px;
+    border-radius:50%;background:var(--hud);
+    box-shadow:0 0 10px 2px color-mix(in srgb,var(--hud) 80%,transparent)}
+  #hfOrb .o1{transform:rotateX(74deg);animation:hudSpin 9s linear infinite}
+  #hfOrb .o2{transform:rotateX(74deg) rotateY(62deg);animation:hudSpin 14s linear infinite reverse}
+  #hfOrb .o3{transform:rotateX(66deg) rotateY(-58deg);animation:hudSpin 21s linear infinite}
+
+  #hfOrb .swirl{position:absolute;inset:14%;border-radius:50%;mix-blend-mode:screen;opacity:.55;
+    background:conic-gradient(from 0deg,
+      transparent 0 30deg, color-mix(in srgb,#bff3ff 65%,transparent) 60deg,
+      transparent 110deg 200deg, color-mix(in srgb,#7fe4ff 55%,transparent) 250deg, transparent 300deg);
+    animation:hudSpin 5.5s linear infinite}
   #hfOrb .ball{position:absolute;inset:14%;border-radius:50%;
     background:
       radial-gradient(circle at 50% 42%, #ffffff 0%, #bff3ff 14%, #35d7f5 34%, #0a86c9 62%, #04314f 100%);
@@ -482,8 +509,9 @@
   #hfOrb .wave i:nth-child(7){animation-delay:.12s}
   #hfOrb .wave i:nth-child(8){animation-delay:.06s}
   @keyframes hudWave{from{height:7px;opacity:.5}to{height:52px;opacity:1}}
-  /* while he talks the bars read over the glow rather than fighting it */
-  #hfOrb.talk .spokes{opacity:.35}
+  /* while he talks the bars read over the ring, and the ball stays bright */
+  #hfOrb.talk .spokes{opacity:.3}
+  #hfOrb.talk .swirl{animation-duration:2.2s}
 
   /* a ripple that only exists while it is hearing you */
   #hfOrb .pulse{position:absolute;inset:30px;border-radius:50%;
@@ -494,9 +522,15 @@
     100%{transform:scale(1.5);opacity:0}}
 
   /* what each state does */
+  /* the ball is lit in every state - idle just breathes more slowly */
+  #hfOrb.wait .ball{animation-duration:4.5s}
   #hfOrb.hear .ball{animation-duration:1.2s}
   #hfOrb.busy .ball{animation-duration:.7s}
   #hfOrb.busy .spokes{animation-duration:3s}
+  #hfOrb.busy .swirl{animation-duration:1.6s}
+  #hfOrb.hear .orbits i{border-color:color-mix(in srgb,var(--hud) 55%,transparent)}
+  #hfOrb.busy .o1{animation-duration:2.4s}
+  #hfOrb.busy .o2{animation-duration:3.6s}
   #hfOrb.busy .r1{animation-duration:1.1s}
   #hfOrb.busy .r3{animation-duration:.8s}
   #hfOrb.talk .ball{animation:hudTalk .42s ease-in-out infinite alternate}
@@ -1027,8 +1061,15 @@
         <span class="ring r2"></span>
         <span class="ring r3"></span>
         <span class="pulse"></span>
+        <span class="ticks"></span>
+        <span class="orbits">
+          <i class="o1"><b></b></i>
+          <i class="o2"><b></b></i>
+          <i class="o3"><b></b></i>
+        </span>
         <span class="core">
           <span class="spokes"></span>
+          <span class="swirl"></span>
           <span class="ball"></span>
         </span>
         <span class="wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
@@ -5111,7 +5152,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-20.47";
+var BUILD = "2026-08-20.48";
 
 function banner(kind, html){
   var b = $("banner");

@@ -554,5 +554,21 @@ function nativeFrom(cap, exp){
     inSrc('store.settings.elevenVoice === "wDsJlOXPqcvIUKdLXjDs"'), true);
 }
 
+
+/* ---- the reactor keeps moving ---- */
+{
+  const page = require("fs").readFileSync("index.html", "utf8");
+  const inPage = bit => page.indexOf(bit) > -1;
+  t("the ball is lit when nothing is happening", inPage("#hfOrb.wait .ball{animation-duration"), true);
+  t("it has orbits around it", inPage("#hfOrb .orbits{"), true);
+  t("three of them, tilted", inPage("#hfOrb .o1{") && inPage("#hfOrb .o2{") && inPage("#hfOrb .o3{"), true);
+  t("each carries a light", inPage("#hfOrb .orbits i b{"), true);
+  t("there is a ring of ticks", inPage("#hfOrb .ticks{"), true);
+  t("the ball turns inside the glass", inPage("#hfOrb .swirl{"), true);
+  t("the orbits are in the markup too", inPage('<i class="o1"><b></b></i>'), true);
+  t("it stops spinning for anyone who dislikes motion",
+    inPage("#hfOrb .ticks, #hfOrb .orbits i, #hfOrb .spokes, #hfOrb .swirl{animation:none"), true);
+}
+
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " mic/image tests passed");
 process.exit(fail ? 1 : 0);
