@@ -416,6 +416,7 @@
   #cam.on{display:block}
   #camView{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
   /* a frame, so it reads as something looking rather than a photo app */
+  #camBoxes{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
   #camFrame{position:absolute;inset:18px;pointer-events:none;border-radius:14px;
     box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--hud) 35%,transparent)}
   #camFrame::before,#camFrame::after{content:"";position:absolute;width:26px;height:26px;
@@ -893,6 +894,7 @@
 
 <div id="cam">
   <video id="camView" playsinline muted autoplay></video>
+  <canvas id="camBoxes"></canvas>
   <div id="camFrame"></div>
   <div id="camTop">
     <span id="camState">Point it at something and ask</span>
@@ -2224,10 +2226,32 @@ if(window.speechSynthesis)
   window.speechSynthesis.onvoiceschanged = function(){ chosenVoice = null; pickVoice(); };
 
 function speak(text, onEnd){
-  if(!window.speechSynthesis){ if(onEnd) onEnd(); return; }
   /* A live recording session makes playback almost inaudible, and he would
      hear himself anyway - so let go of the microphone first. */
   if(nativeListening) nativeMicStop();
+
+  /* The web view's speech engine is suspended while the app is off screen, so
+     answers would queue until it was opened. The app's own voice is not. */
+  if(Native && Native.speak){
+    var saying = plain(text).slice(0, 4000);
+    var r = parseFloat(store.settings.rate);
+    var vol = parseFloat(store.settings.volume);
+    if(!hf.on) voiceUI("speak", saying.slice(0, 90));
+    Native.speak({
+      text: saying,
+      rate: isNaN(r) ? 1 : Math.max(0.7, Math.min(1.3, r)),
+      volume: isNaN(vol) ? 1 : Math.max(0, Math.min(1, vol)),
+      voice: store.settings.voiceName || ""
+    }).catch(function(){});
+    /* no end event from the native side yet, so estimate from the length */
+    setTimeout(function(){
+      if(!hf.on) voiceUI("off");
+      if(onEnd) onEnd();
+    }, Math.min(90000, 1200 + saying.length * 62));
+    return;
+  }
+
+  if(!window.speechSynthesis){ if(onEnd) onEnd(); return; }
   speechSynthesis.cancel();
   var say = plain(text).slice(0,4000);
   var u = new SpeechSynthesisUtterance(say);
@@ -2404,7 +2428,31 @@ function localRequest(msgs){
   };
 }
 
+/* Old pictures in a long conversation confuse a new question and make every
+   request enormous. Keep the most recent two; the words all stay. */
+function trimImages(msgs, keep){
+  keep = keep || 2;
+  var seen = 0;
+  var out = [];
+  for(var i = msgs.length - 1; i >= 0; i--){
+    var m = msgs[i];
+    if(m.images && m.images.length){
+      if(seen >= keep){
+        var copy = {};
+        for(var k in m) if(Object.prototype.hasOwnProperty.call(m, k)) copy[k] = m[k];
+        delete copy.images;
+        out.unshift(copy);
+        continue;
+      }
+      seen++;
+    }
+    out.unshift(m);
+  }
+  return out;
+}
+
 function buildRequest(msgs){
+  msgs = trimImages(msgs, 2);
   for(var i = msgs.length - 1; i >= 0; i--)
     if(msgs[i].role === "user"){ lastUserText = msgs[i].content || ""; break; }
   /* falling through to Claude for a provider that is not Claude produced a key
@@ -3187,6 +3235,10 @@ var COUNT_ABSTRACT_RE = /^(?:count|counting)\s+(?:to|up to|down|backwards|back|f
 /* "how many days in a year" is about the world, not about the room */
 var ELSEWHERE_RE = /\b(?:in|of|per|around|across)\b/i;
 
+/* "highlight the screws", "show me where the fan is" - answered by drawing on
+   the picture rather than describing it */
+var HIGHLIGHT_RE = /^(?:highlight|point out|show me where|mark|find|circle)\s+(?:the\s+|all\s+(?:the\s+)?)?(.{1,60})$/i;
+
 /* does this question need him to look? */
 function needsEyes(q){
   q = String(q || "").trim();
@@ -3251,6 +3303,7 @@ function camOpen(){
 }
 
 function camClose(){
+  camClearBoxes();
   cam.open = false;
   camStop();
   if(camEl) camEl.classList.remove('on');
@@ -3258,6 +3311,7 @@ function camClose(){
 }
 
 function camFlip(){
+  camClearBoxes();
   cam.facing = cam.facing === 'environment' ? 'user' : 'environment';
   camSet(cam.facing === 'user' ? 'Front camera' : 'Back camera');
   camStart().catch(function(){ camSet('That camera would not start'); });
@@ -3280,8 +3334,114 @@ function camGrab(){
 
 /* Ask about what it can see. Counting is the case that goes wrong quietly, so
    the model is told to count carefully and to say when it cannot. */
+/* Clear whatever was drawn over the picture. */
+function camClearBoxes(){
+  var cv = $("camBoxes");
+  if(!cv) return;
+  var ctx = cv.getContext("2d");
+  ctx.clearRect(0, 0, cv.width, cv.height);
+}
+
+/* Draw what he found. Boxes come back as numbers out of 1000, which is how
+   these models are asked to give coordinates. */
+function camDrawBoxes(found){
+  var cv = $("camBoxes"), vid = $("camView");
+  if(!cv || !vid) return;
+  cv.width = cv.clientWidth;
+  cv.height = cv.clientHeight;
+  var ctx = cv.getContext("2d");
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  if(!found || !found.length) return;
+
+  /* the picture is cropped to fill the screen, so match that when placing boxes */
+  var vw = vid.videoWidth || cv.width, vh = vid.videoHeight || cv.height;
+  var scale = Math.max(cv.width / vw, cv.height / vh);
+  var offX = (cv.width - vw * scale) / 2, offY = (cv.height - vh * scale) / 2;
+  var accent = getComputedStyle(document.documentElement).getPropertyValue("--hud").trim() || "#38e1f0";
+
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = accent;
+  ctx.fillStyle = accent;
+  ctx.font = "600 13px -apple-system, system-ui, sans-serif";
+
+  found.forEach(function(f){
+    var b = f.box;
+    if(!b || b.length !== 4) return;
+    var y1 = b[0] / 1000 * vh, x1 = b[1] / 1000 * vw;
+    var y2 = b[2] / 1000 * vh, x2 = b[3] / 1000 * vw;
+    var X = offX + x1 * scale, Y = offY + y1 * scale;
+    var Wd = (x2 - x1) * scale, Ht = (y2 - y1) * scale;
+    ctx.strokeRect(X, Y, Wd, Ht);
+    var label = String(f.label || "").slice(0, 24);
+    if(!label) return;
+    var tw = ctx.measureText(label).width + 10;
+    ctx.fillRect(X, Math.max(0, Y - 19), tw, 18);
+    ctx.save();
+    ctx.fillStyle = "#001014";
+    ctx.fillText(label, X + 5, Math.max(13, Y - 6));
+    ctx.restore();
+  });
+}
+
+/* Ask him to point something out, and draw the answer. */
+function camHighlight(what){
+  if(cam.busy) return;
+  var shot = camGrab();
+  if(!shot){ camSet("Nothing to look at yet"); return; }
+  cam.busy = true;
+  camEl.classList.add("busy");
+  camSet("Looking for " + what + "…");
+  camClearBoxes();
+
+  var ask = "Find every " + what + " in this picture. Reply with ONLY a JSON array, " +
+    "no other words, in this exact shape: " +
+    '[{"label":"short name","box":[ymin,xmin,ymax,xmax]}] ' +
+    "where the four numbers are whole numbers from 0 to 1000 measured from the top " +
+    "left of the picture. If there are none, reply with []";
+
+  var only = { messages: [{ role:"user", content: ask, images:[shot], t:Date.now() }] };
+  askOnce(only).then(function(answer){
+    cam.busy = false;
+    camEl.classList.remove("busy");
+    var found = [];
+    try{
+      /* models wrap JSON in chatter and code fences, so take the outermost
+         brackets rather than trusting the reply to be clean */
+      var txt = String(answer);
+      var a = txt.indexOf("["), z = txt.lastIndexOf("]");
+      if(a > -1 && z > a) found = JSON.parse(txt.slice(a, z + 1));
+    }catch(e){ found = []; }
+    if(!Array.isArray(found)) found = [];
+    camDrawBoxes(found);
+    if(found.length){
+      camSet(found.length + " found");
+      $("camSaid").textContent = found.map(function(f){ return f.label; }).join(", ");
+      speak(found.length === 1 ? ("There's one " + what + ".")
+                               : ("I found " + found.length + " of them."));
+    } else {
+      camSet("Nothing found");
+      $("camSaid").textContent = "I couldn't see any " + what + " in that.";
+      speak("I couldn't see any.");
+    }
+  }).catch(function(e){
+    cam.busy = false;
+    camEl.classList.remove("busy");
+    camSet("That didn't work");
+    $("camSaid").textContent = String(e && e.message || e);
+  });
+}
+
 function camAsk(question){
   if(cam.busy) return;
+  var hl = String(question || "").trim().match(HIGHLIGHT_RE);
+  if(hl){
+    var what = hl[1].replace(/[.?!]+$/, "")
+                    .replace(/\s+(?:is|are|were|was)$/i, "")   /* ...where the fan IS */
+                    .trim();
+    camHighlight(what);
+    return;
+  }
+  camClearBoxes();
   var shot = camGrab();
   if(!shot){ camSet('Nothing to look at yet'); return; }
   question = camQuestion(question) || 'What am I looking at?';
@@ -3291,10 +3451,13 @@ function camAsk(question){
   $('camSaid').textContent = '';
 
   var c = activeChat() || newChat();
+  /* Deliberately its own little conversation: one question, one picture. Sent
+     with the history attached, the model would answer about an older photo. */
+  var only = { messages: [{ role:'user', content: question, images:[shot], t:Date.now() }] };
   c.messages.push({ role:'user', content: question, images:[shot], t:Date.now() });
   save();
   voiceMode = true;
-  askOnce(c).then(function(answer){
+  askOnce(only).then(function(answer){
     voiceMode = false;
     cam.busy = false;
     camEl.classList.remove('busy');
@@ -3954,6 +4117,7 @@ $("btnMicTest").addEventListener("click", testMic);
 
 /* one button, whichever thing is happening */
 $("vbStop").addEventListener("click", function(){
+  if(Native && Native.stopSpeaking) Native.stopSpeaking().catch(function(){});
   if(window.speechSynthesis && speechSynthesis.speaking){ speechSynthesis.cancel(); }
   if(nativeListening) stopListening();
   voiceUI("off");
@@ -4208,8 +4372,18 @@ function hfSpeak(text, done){
 function hfAsk(question){
   clearTimeout(hf.quiet);
   hfPause();
-  /* if he is already looking, the question is about what he can see */
-  if(cam.open){ camAsk(question); return; }
+  /* If he is already looking, the question is usually about what he can see -
+     but "count to a hundred" is not, and attaching a picture to it made him
+     describe the room as well. */
+  if(cam.open){
+    var q = String(question).trim();
+    if(COUNT_ABSTRACT_RE.test(q) || (ELSEWHERE_RE.test(q) && !needsEyes(q))){
+      /* answer it normally, with no picture attached */
+    } else {
+      camAsk(question);
+      return;
+    }
+  }
   if(needsEyes(question) && nativeMicSupported()){
     camOpen();
     setTimeout(function(){ camAsk(question); }, 1100);   /* let the picture arrive */
@@ -4326,7 +4500,7 @@ $("hfExit").addEventListener("click", hfClose);
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-20.40";
+var BUILD = "2026-08-20.41";
 
 function banner(kind, html){
   var b = $("banner");

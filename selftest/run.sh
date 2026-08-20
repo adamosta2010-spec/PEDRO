@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Static checks for index.html - run from the project folder: bash selftest/run.sh
-set -e
+# a failing suite must fail the run - without pipefail the pipe to tail
+# swallows the exit code and everything looks green
+set -eo pipefail
 cd "$(dirname "$0")/.."
 node -e 'const fs=require("fs");const h=fs.readFileSync("index.html","utf8");
 fs.writeFileSync("selftest/_app.js", h.match(/<script>([\s\S]*?)<\/script>/)[1]);'

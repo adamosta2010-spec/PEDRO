@@ -28,7 +28,9 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "startListening", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopListening",  returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setBackground",  returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "openURL",        returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "openURL",        returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "speak",          returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stopSpeaking",   returnType: CAPPluginReturnPromise)
     ]
 
     // MARK: - on-device model
@@ -133,6 +135,51 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin {
     /// Hand a URL to iOS so it opens whatever app owns that scheme - maps,
     /// music, a phone number, or one of their own Shortcuts. iOS decides what
     /// happens next, and anything that sends still needs a tap in that app.
+    // MARK: - speaking
+
+    /// The web view's own speech engine is suspended while the app is off
+    /// screen, so anything he said queued up until the app was opened. Speaking
+    /// here goes through the audio session that is already keeping us alive.
+    private let synth = AVSpeechSynthesizer()
+
+    @objc func speak(_ call: CAPPluginCall) {
+        let text = call.getString("text") ?? ""
+        if text.isEmpty { call.reject("nothing to say"); return }
+        let rate = Float(call.getDouble("rate") ?? 1.0)
+        let volume = Float(call.getDouble("volume") ?? 1.0)
+        let voiceName = call.getString("voice") ?? ""
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.synth.stopSpeaking(at: .immediate)
+            let u = AVSpeechUtterance(string: text)
+            // the system default is about half of the scale, so scale around it
+            u.rate = max(0.3, min(0.7, AVSpeechUtteranceDefaultSpeechRate * rate))
+            u.volume = max(0, min(1, volume))
+            u.pitchMultiplier = 1.0
+            if !voiceName.isEmpty,
+               let match = AVSpeechSynthesisVoice.speechVoices().first(where: { $0.name == voiceName }) {
+                u.voice = match
+            } else {
+                let code = Locale.preferredLanguages.first ?? "en-US"
+                // the enhanced voices sound like a person rather than a machine
+                let best = AVSpeechSynthesisVoice.speechVoices().first(where: {
+                    $0.language.hasPrefix(String(code.prefix(2))) && $0.quality != .default
+                })
+                u.voice = best ?? AVSpeechSynthesisVoice(language: code)
+            }
+            self.synth.speak(u)
+            call.resolve(["speaking": true])
+        }
+    }
+
+    @objc func stopSpeaking(_ call: CAPPluginCall) {
+        DispatchQueue.main.async { [weak self] in
+            self?.synth.stopSpeaking(at: .immediate)
+            call.resolve(["speaking": false])
+        }
+    }
+
     @objc func openURL(_ call: CAPPluginCall) {
         guard let raw = call.getString("url"), let url = URL(string: raw) else {
             call.reject("that is not a URL")

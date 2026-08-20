@@ -369,8 +369,53 @@ function nativeFrom(cap, exp){
   t("flipping swaps which camera", grab("camFlip").indexOf("environment") > -1, true);
   t("closing lets go of the camera", grab("camClose").indexOf("camStop()") > -1, true);
   t("stopping actually stops the tracks", grab("camStop").indexOf("t.stop()") > -1, true);
-  t("questions go to the camera while it is open", inSrc("if(cam.open){ camAsk(question); return; }"), true);
+  t("questions go to the camera while it is open", inSrc("camAsk(question);") && inSrc("if(cam.open){"), true);
   t("the answer is spoken", grab("camAsk").indexOf("speak(answer)") > -1, true);
+}
+
+
+/* ---- pointing things out on the picture ---- */
+{
+  const v = n => src.slice(src.indexOf("var " + n), src.indexOf(";", src.indexOf("var " + n)) + 1);
+  const HL = new Function(v("HIGHLIGHT_RE") + "; return HIGHLIGHT_RE;")();
+  const strip = new RegExp("\\s+(?:is|are)$", "i");
+  const target = q => { const m = q.match(HL); return m ? m[1].replace(strip, "").trim() : null; };
+  const inSrc = bit => src.indexOf(bit) > -1;
+
+  t("highlighting draws instead of describing", inSrc("function camHighlight"), true);
+  t("highlight the screws", target("highlight the screws"), "screws");
+  t("point out the fan", target("point out the fan"), "fan");
+  t("show me where the power button is", target("show me where the power button is"), "power button");
+  t("mark all the boxes", target("mark all the boxes"), "boxes");
+  t("counting is not a highlight", target("count to ten"), null);
+  t("small talk is not a highlight", target("how are you"), null);
+
+  t("it asks for coordinates it can draw", inSrc("[ymin,xmin,ymax,xmax]"), true);
+  t("it reads the boxes out of a chatty reply", inSrc('txt.lastIndexOf("]")'), true);
+  t("a reply it cannot parse leaves nothing drawn", grab("camHighlight").indexOf("found = []") > -1, true);
+  t("boxes are cleared on a new question", grab("camAsk").indexOf("camClearBoxes()") > -1, true);
+  t("and when the camera flips", grab("camFlip").indexOf("camClearBoxes()") > -1, true);
+  t("and when it closes", grab("camClose").indexOf("camClearBoxes()") > -1, true);
+  t("the drawing matches how the picture is cropped",
+    grab("camDrawBoxes").indexOf("Math.max(cv.width / vw, cv.height / vh)") > -1, true);
+
+  t("an abstract question does not get a picture attached",
+    inSrc("if(COUNT_ABSTRACT_RE.test(q) || (ELSEWHERE_RE.test(q) && !needsEyes(q))){"), true);
+}
+
+
+/* ---- being heard from the background ---- */
+{
+  const sp = grab("speak");
+  const inSrc = bit => src.indexOf(bit) > -1;
+  t("it speaks with the app's own voice when there is one",
+    sp.indexOf("Native.speak({") > -1, true);
+  t("and only falls back to the browser without one",
+    sp.indexOf("Native.speak") < sp.indexOf("window.speechSynthesis"), true);
+  t("the chosen speed goes with it", sp.indexOf("rate: isNaN(r)") > -1, true);
+  t("so does the volume", sp.indexOf("volume: isNaN(vol)") > -1, true);
+  t("so does the chosen voice", sp.indexOf("voice: store.settings.voiceName") > -1, true);
+  t("stopping stops the app's voice too", inSrc("Native.stopSpeaking"), true);
 }
 
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " mic/image tests passed");
