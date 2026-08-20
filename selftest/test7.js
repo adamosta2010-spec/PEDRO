@@ -18,59 +18,54 @@ const t = (n, g, w) => {
   else { pass++; console.log("ok   " + n); }
 };
 
-/* ---- mic error wording ---- */
-/* micError branches on platform, so test both */
-let isiOS = false;
-/* not running inside the iOS app during tests */
-const nativeMicSupported = () => false;
-/* micError also checks the page protocol now */
-global.location = { protocol: "https:" };
+/* ---- what the phone's recogniser says when it refuses ---- */
 eval(grab("micError"));
-const micErrorOnHttp = code => { location.protocol = "http:"; const r = micError(code); location.protocol = "https:"; return r; };
-const micErrorOn = (ios, code) => { isiOS = ios; const r = micError(code); isiOS = false; return r; };
-t("desktop: blocked permission points at the padlock",
-  /padlock/i.test(micErrorOn(false,"not-allowed")) && /reload/i.test(micErrorOn(false,"not-allowed")), true);
-t("iPhone: no padlock advice - points at the keyboard instead",
-  /padlock/i.test(micErrorOn(true,"not-allowed")) === false &&
-  /keyboard/i.test(micErrorOn(true,"not-allowed")), true);
-t("iPhone advice says access being allowed is not the problem",
-  /even with the microphone allowed/i.test(micErrorOn(true,"service-not-allowed")), true);
-t("service-not-allowed handled too", micError("service-not-allowed"), micError("not-allowed"));
-t("no microphone hardware is its own message", /No microphone found/i.test(micError("audio-capture")), true);
-t("silence is explained", /speak up/i.test(micError("no-speech")), true);
-t("network failure is explained", /connection/i.test(micError("network")), true);
-t("stopping it yourself says nothing", micError("aborted"), "");
-t("unknown codes still name the code", micError("weird-thing").includes("weird-thing"), true);
-t("every code returns a string",
-  ["not-allowed","audio-capture","no-speech","network","aborted","x"].every(c => typeof micError(c) === "string"), true);
+t("permission trouble points at the phone's own settings",
+  /Settings/i.test(micError("not allowed")) && /Speech Recognition/i.test(micError("not allowed")), true);
+t("a denial is treated the same as a refusal",
+  micError("denied"), micError("not allowed"));
+t("a missing language is its own message",
+  /language/i.test(micError("recogniser unavailable")), true);
+t("silence is explained", /speak up/i.test(micError("no speech detected")), true);
+t("nothing to report stays quiet", micError(""), "");
+t("anything else still names the reason",
+  micError("something odd").includes("something odd"), true);
+t("every reason returns a string",
+  ["not allowed", "denied", "no speech", "", "x"].every(c => typeof micError(c) === "string"), true);
 
-/* ---- micProblem across environments ---- */
-function micProblemIn(env){
-  global.window = { isSecureContext: env.secure };
-  global.isSecureContext = env.secure;
-  global.location = { hostname: env.host };
-  global.navigator = { userAgent: env.ua, platform: env.platform || "Win32", maxTouchPoints: env.touch || 0 };
-  global.SR = env.hasSR ? function(){} : undefined;
-  global.isiOS = /iPad|iPhone|iPod/.test(env.ua);
-  const fn = new Function("SR", "isiOS", "window", "location", "navigator", "nativeMicSupported",
-    grab("micProblem") + "; return micProblem();");
-  return fn(global.SR, global.isiOS, global.window, global.location, global.navigator, () => false);
+/* ---- it says which Pedro is running, because that decides everything ---- */
+function whereIn(env){
+  const fn = new Function("Native", "window", "isiOS",
+    grab("runningWhere") + "; return runningWhere();");
+  return fn(env.native || null, { Capacitor: env.capacitor || undefined }, !!env.ios);
 }
-const CHROME = "Mozilla/5.0 (Windows NT 10.0) Chrome/131";
-const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0) Safari/605";
+t("the app with its native half is the working case",
+  whereIn({ native:{}, capacitor:{}, ios:true }).ok, true);
+t("the app without its native half is named as such",
+  /native half/i.test(whereIn({ capacitor:{}, ios:true }).text), true);
+t("a half-loaded app is still reported as the app",
+  whereIn({ capacitor:{}, ios:true }).app, true);
+t("the website is told it cannot listen at all",
+  /website/i.test(whereIn({ ios:true }).text) &&
+  /installed app/i.test(whereIn({ ios:true }).text), true);
+t("the website is not mistaken for the app", whereIn({ ios:true }).app, false);
+t("no version of this blames Safari any more",
+  [whereIn({ native:{}, capacitor:{} }), whereIn({ capacitor:{} }), whereIn({})]
+    .every(r => !/Safari/i.test(r.text)), true);
 
-t("https chrome with support: no complaint",
-  micProblemIn({ secure:true, host:"example.com", ua:CHROME, hasSR:true }), null);
-t("localhost counts as secure",
-  micProblemIn({ secure:false, host:"localhost", ua:CHROME, hasSR:true }), null);
-t("plain http is called out",
-  /https/i.test(micProblemIn({ secure:false, host:"example.com", ua:CHROME, hasSR:true })), true);
-t("iphone gets the keyboard-dictation tip",
-  /keyboard/i.test(micProblemIn({ secure:true, host:"x.com", ua:IPHONE, hasSR:false })), true);
-t("desktop without support is told to use Chrome",
-  /Chrome/.test(micProblemIn({ secure:true, host:"x.com", ua:CHROME, hasSR:false })), true);
-t("http beats missing-support in the message order",
-  /https/i.test(micProblemIn({ secure:false, host:"x.com", ua:CHROME, hasSR:false })), true);
+/* ---- and the complaint itself follows from that ---- */
+function micProblemIn(env){
+  const fn = new Function("Native", "window", "isiOS", "nativeMicSupported",
+    grab("runningWhere") + ";" + grab("micProblem") + "; return micProblem();");
+  return fn(env.native || null, { Capacitor: env.capacitor || undefined }, !!env.ios,
+            () => !!env.native);
+}
+t("in the app there is nothing to complain about",
+  micProblemIn({ native:{}, capacitor:{} }), null);
+t("on the website it explains the app is needed",
+  /installed app/i.test(micProblemIn({})), true);
+t("the Web Speech API is gone from the app entirely",
+  src.includes("webkitSpeechRecognition") || src.includes("new SR()"), false);
 
 /* ---- picture recovery is actually wired up ---- */
 const draw = grab("drawPicture");
@@ -84,15 +79,6 @@ t("no image models at all is explained",
   /no picture models/i.test(draw), true);
 t("a cancelled draw stays silent", draw.includes('err.name === "AbortError"'), true);
 
-/* ---- the http hint added after the localhost mic failure ---- */
-t("http on desktop tells you Chrome needs https",
-  /https/i.test(micErrorOnHttp("not-allowed")), true);
-t("https on desktop still gives the padlock advice",
-  /padlock/i.test(micError("not-allowed")), true);
-t("iPhone advice is unaffected by protocol",
-  /keyboard/i.test(micErrorOn(true, "not-allowed")), true);
-
-
 /* ---- hands-free has to use whichever recogniser the device actually has ---- */
 /* the failure mode here is silence: the orb says Listening and nothing happens */
 {
@@ -103,8 +89,8 @@ t("iPhone advice is unaffected by protocol",
   const close  = grab("hfClose");
   const inIt = (src, bit) => src.indexOf(bit) > -1;
 
-  t("hands-free uses the recogniser built into the phone when there is one", inIt(listen, "if(nativeMicSupported()) return hfListenNative();"), true);
-  t("it checks before touching the browser recogniser", listen.indexOf("nativeMicSupported") < listen.indexOf("new SR()"), true);
+  t("hands-free listens through the phone", inIt(listen, "hfListenNative()"), true);
+  t("there is no browser recogniser left to fall back to", inIt(listen, "new SR"), false);
   t("the native path starts the microphone the button uses", inIt(nat, "nativeMicStart("), true);
   t("it marks itself so stopping knows which one is running", inIt(nat, "native: true"), true);
   t("it listens again after Apple stops itself on a pause", inIt(nat, "setTimeout(hfListen"), true);

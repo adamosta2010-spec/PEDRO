@@ -1799,145 +1799,86 @@ btnSend.addEventListener("click", function(){
 });
 
 /* ============================ voice in ============================ */
-var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-var rec = null, listening = false;
+/* One microphone, one recogniser: the phone's own, through the installed app.
+   Safari's Web Speech API used to sit here as a fallback, but Safari refuses it
+   to web pages on iPhone - so it never worked, it only explained itself. */
 var isiOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
             (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
-/* There are two Pedros - the website and the installed app - and they can do
-   different things. Almost every microphone complaint comes down to which one
-   is open, so work it out once and say it plainly. */
+/* There are two Pedros - the website and the installed app - and only the app
+   can listen. Almost every microphone complaint is really about which is open. */
 function runningWhere(){
   if(Native)
     return { app:true, ok:true,
-      text:"Running in the installed app, using the iPhone's own microphone." };
+      text:"Running in the installed app, using the phone's own microphone." };
   if(window.Capacitor)
     return { app:true, ok:false,
       text:"Running in the app, but its native half didn't load - so no microphone " +
            "and no on-device model. Install the newest build and this clears up." };
   return { app:false, ok:false,
-    text:(isiOS ? "Running as a website in Safari." : "Running as a website.") +
-         " Safari won't give a web page speech-to-text, whatever the microphone " +
-         "permission says. The installed app has its own and works offline." };
+    text:"Running as a website, which cannot use the microphone at all. " +
+         "Voice needs the installed app." };
 }
 
 /* Why the mic isn't working, in words that suggest a fix. */
 function micProblem(){
-  if(nativeMicSupported()) return null;     /* the app has its own recogniser */
-  if(!window.isSecureContext && location.hostname !== "localhost")
-    return "The microphone only works on a secure (https) address. Open the hosted version instead.";
-  if(!SR)
-    return isiOS
-      ? "This is the website, and Safari doesn't give web pages the microphone. " +
-        "The installed app has its own - or use the microphone key on your keyboard, " +
-        "which types straight into the box."
-      : "This browser has no speech recognition. Chrome or Edge do.";
-  return null;
+  if(nativeMicSupported()) return null;
+  return runningWhere().text;
 }
 
-function micError(code){
-  switch(code){
-    case "not-allowed":
-    case "service-not-allowed":
-      if(location.protocol === "http:" && !isiOS)
-        return "Chrome won't do speech recognition on an http address, even localhost. " +
-               "Use the hosted https version and it works.";
-      return isiOS
-        ? "Safari won't give a web page speech-to-text, even with the microphone allowed. " +
-          "The installed app has its own recogniser - or use the microphone key on your " +
-          "keyboard, which types straight into the box."
-        : "Microphone blocked. Tap the padlock in the address bar, allow the microphone, then reload.";
-    case "audio-capture":
-      return "No microphone found. Check it's plugged in and not in use by another app.";
-    case "no-speech":
-      return "Didn't hear anything - try again and speak up.";
-    case "network":
-      return "Speech recognition needs a connection on this browser.";
-    case "aborted":
-      return "";                       /* you stopped it on purpose - stay quiet */
-    default:
-      return "Voice input failed (" + code + ").";
-  }
+/* What the phone's recogniser means when it refuses. */
+function micError(reason){
+  var r = String(reason || "").toLowerCase();
+  if(!r) return "";
+  if(r.indexOf("not allowed") > -1 || r.indexOf("denied") > -1 || r.indexOf("permission") > -1)
+    return "Microphone or speech access is off. Open Settings on the phone, find " +
+           "Pedro, and turn on Microphone and Speech Recognition.";
+  if(r.indexOf("unavailable") > -1)
+    return "The speech recogniser isn't ready for this language yet.";
+  if(r.indexOf("no speech") > -1)
+    return "Didn't hear anything - try again and speak up.";
+  return "Voice input stopped: " + reason;
 }
 
 function stopListening(){
-  listening = false;
+  nativeMicStop();
   btnMic.classList.remove("rec");
-  try{ if(rec) rec.stop(); }catch(e){}
-  rec = null;
 }
 
-if(micProblem() && !SR) btnMic.style.display = "none";
+/* a button that cannot work is worse than no button */
+if(!nativeMicSupported()) btnMic.style.display = "none";
 
 btnMic.addEventListener("click", function(){
-  /* inside the iOS app we get the real speech recogniser, which also works offline */
-  if(nativeMicSupported()){
-    if(nativeListening){ nativeMicStop(); btnMic.classList.remove("rec"); return; }
-    var base = input.value ? input.value.replace(/\s+$/,"") + " " : "";
-    btnMic.classList.add("rec");
-    nativeMicStart(function(text){
-      input.value = base + text; autosize(); syncSend();
-    }, function(err){
-      btnMic.classList.remove("rec");
-      if(err){ toast("Voice input stopped: " + err.message); input.focus(); return; }
-      /* asked out loud - so send it and answer out loud, no typing involved */
-      if(store.settings.voiceTalk !== false && input.value.trim()){
-        speakNext = true;
-        send();
-      } else input.focus();
-    }).catch(function(e){
-      btnMic.classList.remove("rec");
-      banner("warn", "Microphone: " + esc(String(e && e.message || e)));
-    });
+  if(!nativeMicSupported()){
+    banner("warn", esc(micProblem()));
+    toast("Voice needs the app");
     return;
   }
-
-  var why = micProblem();
-  if(why){ banner("warn", esc(why)); toast("Mic unavailable"); return; }
-  if(listening){ stopListening(); return; }   /* safe even if onend never fired */
-
-  try{
-    rec = new SR();
-    rec.lang = navigator.language || "en-US";
-    rec.interimResults = true;
-    rec.continuous = false;
-    var base = input.value ? input.value.replace(/\s+$/,"") + " " : "";
-    var heard = false;
-
-    rec.onstart = function(){
-      listening = true; btnMic.classList.add("rec");
-      toast("Listening… tap again to stop");
-    };
-    rec.onresult = function(ev){
-      var txt = "";
-      for(var i=0;i<ev.results.length;i++) txt += ev.results[i][0].transcript;
-      if(txt.trim()) heard = true;
-      input.value = base + txt; autosize(); syncSend();
-    };
-    rec.onerror = function(ev){
-      var msg = micError(ev.error);
-      stopListening();
-      if(msg){
-        toast(msg.length > 60 ? "Mic problem - see the banner" : msg);
-        if(msg.length > 60) banner("warn", esc(msg));
-      }
-    };
-    rec.onend = function(){
-      var was = listening;
-      stopListening();
-      if(was && !heard){ toast("Didn't catch that"); input.focus(); return; }
-      if(was && store.settings.voiceTalk !== false && input.value.trim()){
-        speakNext = true;
-        send();
-        return;
+  if(nativeListening){ stopListening(); return; }
+  var base = input.value ? input.value.replace(/s+$/, "") + " " : "";
+  btnMic.classList.add("rec");
+  nativeMicStart(function(text){
+    input.value = base + text; autosize(); syncSend();
+  }, function(err){
+    btnMic.classList.remove("rec");
+    if(err){
+      var m = micError(err.message || err);
+      if(m){
+        toast(m.length > 60 ? "Mic problem - see the banner" : m);
+        if(m.length > 60) banner("warn", esc(m));
       }
       input.focus();
-    };
-    rec.start();
-  }catch(e){
-    stopListening();
-    banner("warn", "Couldn't start the microphone: " + esc(String(e && e.message || e)));
-  }
+      return;
+    }
+    /* asked out loud - so send it and answer out loud, no typing involved */
+    if(store.settings.voiceTalk !== false && input.value.trim()){
+      speakNext = true;
+      send();
+    } else input.focus();
+  }).catch(function(e){
+    btnMic.classList.remove("rec");
+    banner("warn", "Microphone: " + esc(String(e && e.message || e)));
+  });
 });
 
 /* set when the question was asked out loud, so the answer comes back the same
@@ -2967,70 +2908,54 @@ function testMic(){
   var out = $("micHint"), btn = $("btnMicTest");
   btn.disabled = true; btn.textContent = "Testing…";
   var lines = [];
+  function show(){ out.innerHTML = lines.map(esc).join("<br>"); }
   function done(verdict){
     out.innerHTML = lines.map(esc).join("<br>") + "<br><b>" + esc(verdict) + "</b>";
     btn.disabled = false; btn.textContent = "Test microphone";
   }
 
-  /* 1. secure page? */
-  var secure = window.isSecureContext || location.hostname === "localhost";
-  lines.push((secure ? "OK  " : "NO  ") + "secure page (" + location.protocol + "//" + location.hostname + ")");
-  if(!secure) return done("Open the https version - browsers block the mic on plain http.");
-
-  /* 2. does this browser have speech recognition at all? */
-  lines.push((SR ? "OK  " : "NO  ") + "speech recognition available" + (isiOS ? " (iPhone/iPad)" : ""));
-
-  /* 3. can we actually open the microphone? */
-  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-    lines.push("NO  microphone access API");
-    return done("This browser can't reach the microphone at all.");
+  /* which Pedro is this, and what does the phone run - the two facts that
+     decide everything else, and the two nobody could see before */
+  var where = runningWhere();
+  lines.push((where.ok ? "OK  " : "NO  ") + where.text);
+  var v = navigator.userAgent.match(/OS (d+)[_.](d+)/);
+  if(v) lines.push("    iOS " + v[1] + "." + v[2]);
+  if(window.Capacitor){
+    var names = [];
+    try{ names = Object.keys(window.Capacitor.Plugins || {}); }catch(e){}
+    lines.push("    native plugins: " + (names.length ? names.join(", ") : "none found"));
   }
-  navigator.mediaDevices.getUserMedia({ audio:true }).then(function(stream){
-    stream.getTracks().forEach(function(t){ t.stop(); });
-    lines.push("OK  microphone permission granted");
+  if(!nativeMicSupported())
+    return done("Only the installed app can listen. Open that instead of the website.");
 
-    if(!SR){
-      return done(isiOS
-        ? "Your mic is fine - Safari just won't do speech-to-text for web apps. Use the microphone key on your keyboard."
-        : "Your mic is fine, but this browser has no speech recognition. Chrome or Edge do.");
-    }
+  /* while we are here, say whether the phone can answer on its own, and why not */
+  checkDeviceModel().then(function(d){
+    lines.push((d.available ? "OK  " : "NO  ") + "answers with no internet" +
+               (d.available ? "" : " - " + (d.reason || "no reason given")));
+    syncProviderUI();
+    show();
 
-    /* 4. does speech recognition actually start? */
-    var r, settled = false;
-    function finish(msg){ if(settled) return; settled = true; try{ r.abort(); }catch(e){} done(msg); }
-    try{ r = new SR(); }
-    catch(e){ return done("Speech recognition exists but won't start: " + (e.message || e)); }
-    r.lang = navigator.language || "en-US";
-    r.onstart = function(){
-      lines.push("OK  speech recognition started");
-      finish("Everything works. Tap the mic in the message box and talk.");
-    };
-    r.onerror = function(ev){
-      lines.push("NO  speech recognition (" + ev.error + ")");
-      finish(micError(ev.error) || ("Speech recognition failed: " + ev.error));
-    };
-    r.onend = function(){
-      if(!settled){
-        lines.push("NO  speech recognition stopped immediately");
-        finish(isiOS
-          ? "Safari started then dropped it - this is an iOS limitation, not your settings. Use the keyboard's microphone key."
-          : "It stopped straight away. Try again, or check nothing else is using the mic.");
+    var settled = false;
+    function finish(msg){ if(settled) return; settled = true; nativeMicStop(); done(msg); }
+    nativeMicStart(function(text){
+      var said = String(text || "").trim();
+      if(said){
+        lines.push("OK  heard: " + said.slice(0, 40));
+        finish("Everything works. Tap the mic and talk.");
       }
-    };
-    try{ r.start(); }
-    catch(e){ finish("Couldn't start listening: " + (e.message || e)); }
-    setTimeout(function(){ finish("Timed out waiting for the microphone."); }, 6000);
-
-  }).catch(function(e){
-    var n = e && e.name;
-    lines.push("NO  microphone permission (" + (n || e) + ")");
-    if(n === "NotAllowedError")
-      return done(isiOS
-        ? "Safari is refusing microphone access. Settings > Safari > Microphone > Allow, then reload."
-        : "Permission was refused. Click the padlock in the address bar, allow the microphone, then reload.");
-    if(n === "NotFoundError") return done("No microphone found on this device.");
-    if(n === "NotReadableError") return done("Another app is using the microphone. Close it and try again.");
-    done("Couldn't open the microphone: " + (n || e));
+    }, function(err){
+      if(err){
+        lines.push("NO  " + (err.message || err));
+        finish(micError(err.message || err));
+      }
+    }).then(function(){
+      lines.push("OK  microphone open - say something");
+      show();
+    }).catch(function(e){
+      lines.push("NO  could not start (" + (e && e.message || e) + ")");
+      finish(micError(e && e.message || e));
+    });
+    setTimeout(function(){ finish("The microphone opened but heard nothing. Try again, louder."); }, 8000);
   });
 }
 $("btnMicTest").addEventListener("click", testMic);
@@ -3068,7 +2993,11 @@ function hfSet(phase, label){
 function hfIdleLabel(){ return "Say “" + aiName() + "”"; }
 
 function hfOpen(){
-  if(!SR){ toast("This browser can't do voice input"); return; }
+  if(!nativeMicSupported()){
+    banner("warn", esc(runningWhere().text));
+    toast("Voice needs the app");
+    return;
+  }
   if(!apiKeyNow()){
     fillSettings(); openPanel(settings);
     banner("warn", "<b>No API key yet.</b> Paste your free Google AI Studio key in " +
@@ -3122,42 +3051,7 @@ document.addEventListener("visibilitychange", function(){
 /* --- the listening loop --- */
 function hfListen(){
   if(!hf.want || hf.rec) return;
-  if(nativeMicSupported()) return hfListenNative();
-  var r;
-  try{ r = new SR(); }catch(e){ return; }
-  r.lang = navigator.language || "en-US";
-  r.continuous = true;
-  r.interimResults = true;
-  /* ask for on-device recognition where the browser offers it (newer Chrome);
-     harmless where it doesn't exist - it just falls back to network speech */
-  try{ if("processLocally" in r) r.processLocally = true; }catch(e){}
-
-  r.onresult = function(ev){
-    var finalTxt = "", interim = "";
-    for(var i = ev.resultIndex; i < ev.results.length; i++){
-      var t = ev.results[i][0].transcript;
-      if(ev.results[i].isFinal) finalTxt += t; else interim += t;
-    }
-    hfHeardText((finalTxt || interim).trim(), finalTxt);
-  };
-
-  r.onerror = function(ev){
-    if(ev.error === "not-allowed" || ev.error === "service-not-allowed"){
-      hfWarn.textContent = "Microphone permission is blocked - allow it in your browser settings.";
-      hf.want = false;
-    } else if(ev.error === "network"){
-      hfWarn.textContent = "Speech recognition needs a connection on this browser - it sends "
-        + "audio to the system speech service.";
-    }
-  };
-  r.onend = function(){
-    hf.rec = null;
-    /* browsers cut recognition off periodically - just start it again */
-    if(hf.want){ clearTimeout(hf.restart); hf.restart = setTimeout(hfListen, 350); }
-  };
-
-  hf.rec = r;
-  try{ r.start(); }catch(e){ hf.rec = null; }
+  hfListenNative();
 }
 
 /* Inside the app there is no browser recogniser at all, so hands-free goes
@@ -3336,7 +3230,7 @@ $("hfExit").addEventListener("click", hfClose);
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-20.19";
+var BUILD = "2026-08-20.20";
 
 function banner(kind, html){
   var b = $("banner");
