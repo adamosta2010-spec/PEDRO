@@ -79,12 +79,15 @@ jobs:
         run: |
           exec > >(tee -a build.log) 2>&1
           cp native/PedroNative.swift ios/App/App/PedroNative.swift
+          cp native/MainViewController.swift ios/App/App/MainViewController.swift
           ls -l ios/App/App/
           # a copied file is not a built file - register it with the Xcode project
           sudo gem install xcodeproj --no-document || gem install xcodeproj --no-document
           ruby native/add_source.rb
           # the page has no bundler, so Capacitor's own JavaScript has to ride along
           node native/add_capacitor_js.js
+          # a compiled plugin still has to be handed to the bridge
+          node native/patch_storyboard.js
 
       - name: Microphone and speech permissions
         run: |
@@ -128,6 +131,9 @@ jobs:
           test -f "$APP/public/capacitor.js" || { echo "capacitor.js never made it into the app"; exit 1; }
           grep -q 'src="capacitor.js"' "$APP/public/index.html" || { echo "the page does not load capacitor.js"; exit 1; }
           echo "  the page loads Capacitor's JavaScript"
+          strings "$BIN" | grep -q MainViewController || { echo "the plugin registration did not compile in"; exit 1; }
+          strings "$BIN" | grep -q registerPluginInstance || { echo "nothing registers the plugin"; exit 1; }
+          echo "  the plugin is registered with the bridge"
           # a permission the app never declares is a crash the moment it is used
           PL=ios/App/build/Build/Products/Release-iphoneos/App.app/Info.plist
           for k in NSMicrophoneUsageDescription NSSpeechRecognitionUsageDescription NSCameraUsageDescription NSPhotoLibraryUsageDescription; do
