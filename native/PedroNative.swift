@@ -18,7 +18,7 @@ import FoundationModels
 /// Everything degrades politely: if the on-device model isn't there, `available`
 /// reports why, and the web app falls back to Gemini.
 @objc(PedroNative)
-public class PedroNative: CAPPlugin, CAPBridgedPlugin {
+public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelegate {
 
     public let identifier = "PedroNative"
     public let jsName = "PedroNative"
@@ -141,6 +141,16 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin {
     /// screen, so anything he said queued up until the app was opened. Speaking
     /// here goes through the audio session that is already keeping us alive.
     private let synth = AVSpeechSynthesizer()
+    private var synthWired = false
+
+    /// Tell the web app the moment he stops talking, so it can start listening
+    /// again straight away instead of guessing from the length of the sentence.
+    public func speechSynthesizer(_ s: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        notifyListeners("pedroSpokeEnd", data: ["done": true])
+    }
+    public func speechSynthesizer(_ s: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
+        notifyListeners("pedroSpokeEnd", data: ["done": false])
+    }
 
     @objc func speak(_ call: CAPPluginCall) {
         let text = call.getString("text") ?? ""
@@ -151,6 +161,7 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin {
 
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
+            if !self.synthWired { self.synth.delegate = self; self.synthWired = true }
             self.synth.stopSpeaking(at: .immediate)
             let u = AVSpeechUtterance(string: text)
             // the system default is about half of the scale, so scale around it
@@ -283,7 +294,7 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin {
     /// layer cannot be relied on to do it once the app is off screen.
     private func resumeIfWanted() {
         guard keepAlive, wantListening else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
             guard let self = self, self.keepAlive, self.wantListening else { return }
             self.restartListening()
         }

@@ -443,5 +443,19 @@ function nativeFrom(cap, exp){
     inSrc("not writing a program that would say them"), true);
 }
 
+
+/* ---- how quickly he is ready again ---- */
+{
+  const sp = grab("speak");
+  const wire = grab("wireNativeSpeech");
+  const inSrc = bit => src.indexOf(bit) > -1;
+  t("it waits for the real end of speech", sp.indexOf("wireNativeSpeech(spoken)") > -1, true);
+  t("the length estimate is only a safety net", sp.indexOf("var spokeTimer = setTimeout(spoken") > -1, true);
+  t("the end only fires once", sp.indexOf("if(finished) return;") > -1, true);
+  t("a failed request does not leave it hanging", sp.indexOf("catch(function(){ spoken(); })") > -1, true);
+  t("the end listener is registered once", wire.indexOf("if(speechWired") > -1, true);
+  t("and never removed out from under itself", wire.indexOf("removeAllListeners") === -1, true);
+}
+
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " mic/image tests passed");
 process.exit(fail ? 1 : 0);
