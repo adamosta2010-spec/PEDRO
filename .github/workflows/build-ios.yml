@@ -90,6 +90,12 @@ jobs:
           PLIST=ios/App/App/Info.plist
           /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'Pedro listens when you tap the microphone.'" "$PLIST" || true
           /usr/libexec/PlistBuddy -c "Add :NSSpeechRecognitionUsageDescription string 'Pedro turns what you say into text.'" "$PLIST" || true
+          # tapping Take Photo in the picker crashes the app without this
+          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'Pedro uses the camera when you take a photo to send it.'" "$PLIST" || true
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 'Pedro opens your photos when you attach one.'" "$PLIST" || true
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryAddUsageDescription string 'Pedro saves pictures it makes for you.'" "$PLIST" || true
+          echo "--- permissions now declared ---"
+          /usr/libexec/PlistBuddy -c "Print" "$PLIST" | grep -i usagedescription || true
 
       - name: Build (unsigned)
         run: |
@@ -116,6 +122,15 @@ jobs:
             if strings "$BIN" | grep -q "$s"; then echo "  FOUND    $s"; else echo "  MISSING  $s"; fi
           done
           strings "$BIN" | grep -q PedroNative || { echo "native bridge did not compile in"; exit 1; }
+          # a permission the app never declares is a crash the moment it is used
+          PL=ios/App/build/Build/Products/Release-iphoneos/App.app/Info.plist
+          for k in NSMicrophoneUsageDescription NSSpeechRecognitionUsageDescription NSCameraUsageDescription NSPhotoLibraryUsageDescription; do
+            if /usr/libexec/PlistBuddy -c "Print :$k" "$PL" >/dev/null 2>&1; then
+              echo "  declared $k"
+            else
+              echo "  MISSING  $k"; exit 1
+            fi
+          done
 
       - name: Package as .ipa
         run: |
