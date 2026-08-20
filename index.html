@@ -757,6 +757,8 @@
     <div class="field">
       <label for="setVoice">Voice</label>
       <select id="setVoice"></select>
+      <label for="setVolume" style="margin-top:10px;display:block">Volume <span id="volNum" style="color:var(--tx2);font-weight:400"></span></label>
+      <input type="range" id="setVolume" min="0" max="100" step="5" style="width:100%">
       <button class="btn ghost" id="btnHearVoice" style="margin-top:8px">Hear it</button>
       <div class="hint" id="voiceHint">Phones ship several. The ones marked Enhanced or Siri
         sound like a person; the plain ones sound like a machine.</div>
@@ -934,6 +936,7 @@ var DEF = {
   tts:false, showThink:false, enterSends:true,
   voiceTalk:true,  /* talking sends straight away and the answer is read back */
   voiceName:"",    /* which of the phone's voices to speak with */
+  volume:1,        /* how loud he is, on top of the phone's own volume */
   background:false, /* keep listening while the app is not on screen */
   voiceFirst:true,  /* open straight into the voice screen - talking is the point */
   lock:null,       /* when set: {salt, iv, ct} - your API keys, encrypted with your password */
@@ -1465,6 +1468,9 @@ function fillSettings(){
   sw($("swVoiceTalk"), s.voiceTalk !== false);
   sw($("swBackground"), s.background);
   sw($("swVoiceFirst"), s.voiceFirst !== false);
+  var volEl = $("setVolume");
+  if(volEl) volEl.value = Math.round((s.volume === undefined ? 1 : s.volume) * 100);
+  showVolume();
   fillVoices();
   sw($("swLock"), isLocked()); syncLockSub();
   syncProviderUI();
@@ -1834,6 +1840,18 @@ $("setVoice").addEventListener("change", function(){
   var v = pickVoice();
   $("voiceHint").textContent = v ? ("Now speaking as " + v.name + ".") : "No voices on this device yet.";
 });
+function showVolume(){
+  var n = $("volNum");
+  var v = Math.round((parseFloat(store.settings.volume) || 0) * 100);
+  if(n) n.textContent = v + "%" + (v === 0 ? " - silent" : "");
+}
+$("setVolume").addEventListener("input", function(){
+  store.settings.volume = Math.max(0, Math.min(1, parseInt(this.value, 10) / 100));
+  save(); showVolume();
+});
+$("setVolume").addEventListener("change", function(){
+  speak("This is how loud I'll be.");
+});
 $("btnHearVoice").addEventListener("click", function(){
   speak("Hello, I'm " + aiName() + ". This is how I sound.");
 });
@@ -2187,6 +2205,9 @@ if(window.speechSynthesis)
 
 function speak(text, onEnd){
   if(!window.speechSynthesis){ if(onEnd) onEnd(); return; }
+  /* A live recording session makes playback almost inaudible, and he would
+     hear himself anyway - so let go of the microphone first. */
+  if(nativeListening) nativeMicStop();
   speechSynthesis.cancel();
   var say = plain(text).slice(0,4000);
   var u = new SpeechSynthesisUtterance(say);
@@ -2196,6 +2217,8 @@ function speak(text, onEnd){
   /* the pace of someone talking to you, not reading to you */
   u.rate = 1;
   u.pitch = 1;
+  var vol = parseFloat(store.settings.volume);
+  u.volume = isNaN(vol) ? 1 : Math.max(0, Math.min(1, vol));
   var done = false;
   function fin(){
     if(done) return;
@@ -3730,7 +3753,7 @@ function backupData(){
       apiKey:s.apiKey, geminiKey:s.geminiKey, groqKey:s.groqKey,
       model:s.model, geminiModel:s.geminiModel, groqModel:s.groqModel,
       imageModel:s.imageModel, localUrl:s.localUrl, localModel:s.localModel,
-      effort:s.effort, tts:s.tts, voiceName:s.voiceName, voiceTalk:s.voiceTalk,
+      effort:s.effort, tts:s.tts, voiceName:s.voiceName, voiceTalk:s.voiceTalk, volume:s.volume,
       background:s.background, voiceFirst:s.voiceFirst, enterSends:s.enterSends,
       showThink:s.showThink, theme:s.theme, authEmail:s.authEmail
     },
@@ -4234,7 +4257,7 @@ $("hfExit").addEventListener("click", hfClose);
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-20.37";
+var BUILD = "2026-08-20.38";
 
 function banner(kind, html){
   var b = $("banner");

@@ -367,5 +367,22 @@ function nativeFrom(cap, exp){
   t("the answer is spoken", grab("camAsk").indexOf("speak(answer)") > -1, true);
 }
 
+
+/* ---- being heard ---- */
+{
+  const sp = grab("speak");
+  const inSrc = bit => src.indexOf(bit) > -1;
+  t("it lets go of the microphone before speaking",
+    sp.indexOf("if(nativeListening) nativeMicStop();") > -1, true);
+  t("the microphone release comes before the speaking",
+    sp.indexOf("nativeMicStop") < sp.indexOf("speechSynthesis.speak"), true);
+  t("volume is applied to what he says", sp.indexOf("u.volume") > -1, true);
+  t("a broken volume setting still speaks", sp.indexOf("isNaN(vol) ? 1") > -1, true);
+  t("volume is clamped to something sane", sp.indexOf("Math.max(0, Math.min(1, vol))") > -1, true);
+  t("there is a control for it", inSrc('$("setVolume")'), true);
+  t("it starts at full", inSrc("volume:1,"), true);
+  t("and travels to a new install", inSrc("volume:s.volume"), true);
+}
+
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " mic/image tests passed");
 process.exit(fail ? 1 : 0);

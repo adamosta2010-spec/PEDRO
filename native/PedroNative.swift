@@ -181,8 +181,11 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin {
 
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playAndRecord, mode: .measurement,
-                                    options: [.duckOthers, .defaultToSpeaker])
+            // .measurement turns off output processing, which leaves anything he
+            // says almost inaudible while the microphone is up - this still
+            // recognises speech well and lets him be heard afterwards
+            try session.setCategory(.playAndRecord, mode: .spokenAudio,
+                                    options: [.duckOthers, .defaultToSpeaker, .allowBluetooth])
             try session.setActive(true, options: .notifyOthersOnDeactivation)
 
             let node = engine.inputNode
