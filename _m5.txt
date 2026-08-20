@@ -1,9 +1,0 @@
-He says when he has stopped talking, instead of being timed
-
-The native voice had no way of reporting that it had finished, so the app waited
-out an estimate based on the length of the sentence - which is the pause after
-every answer. The synthesiser now says when it stops, the app listens for that,
-and the estimate stays only as a safety net. Picking the microphone back up
-happens sooner too.
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
