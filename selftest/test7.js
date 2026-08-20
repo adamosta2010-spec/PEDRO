@@ -180,5 +180,22 @@ function nativeFrom(cap, exp){
     src.indexOf('if(!hf.on) voiceUI("speak"') > -1, true);
 }
 
+
+/* ---- speech events actually reaching the app ---- */
+{
+  const inSrc = bit => src.indexOf(bit) > -1;
+  t("listeners are registered once, not per turn", inSrc("function wireNativeMic"), true);
+  t("and never removed out from under themselves",
+    inSrc("Native.removeAllListeners()"), false);
+  t("starting only swaps who they talk to", inSrc("micHandlers.text = onText"), true);
+  t("stopping clears the pending callback", inSrc("micHandlers.done = null"), true);
+  t("it notices when nothing is heard", inSrc("micHeardAnything"), true);
+  t("and says so instead of sitting there",
+    inSrc("no words reached the app"), true);
+  t("it warns while the bar is still up", inSrc("not picking anything up yet"), true);
+  t("hands-free warns too",
+    grab("hfListenNative").indexOf("nothing is reaching the app") > -1, true);
+}
+
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " mic/image tests passed");
 process.exit(fail ? 1 : 0);

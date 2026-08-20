@@ -1926,12 +1926,25 @@ btnMic.addEventListener("click", function(){
     if(turnOver) return;
     turnOver = true;
     clearTimeout(quiet);
+    clearTimeout(deaf);
     nativeMicStop();
     btnMic.classList.remove("rec");
     voiceUI("off");
-    if(store.settings.voiceTalk !== false && input.value.trim()) send(true);
-    else input.focus();
+    if(store.settings.voiceTalk !== false && input.value.trim()){ send(true); return; }
+    /* nothing at all came through - that is a fault, not a quiet room */
+    if(!micHeardAnything){
+      banner("warn", "<b>The microphone opened but no words reached the app.</b> " +
+        "Check Settings on the phone: Pedro needs both <b>Microphone</b> and " +
+        "<b>Speech Recognition</b> turned on.");
+      toast("Heard nothing");
+    }
+    input.focus();
   }
+
+  /* say something is wrong while it is still on screen, not afterwards */
+  var deaf = setTimeout(function(){
+    if(!micHeardAnything && !turnOver) voiceUI("listen", "not picking anything up yet…");
+  }, 3500);
 
   waitForQuiet(7000);                    /* longer, before the first word arrives */
   nativeMicStart(function(text){
@@ -2694,21 +2707,49 @@ function askDevice(msgs){
 var nativeListening = false;
 function nativeMicSupported(){ return !!Native; }
 
-function nativeMicStart(onText, onDone){
-  if(!Native) return Promise.reject(new Error("not in the app"));
-  if(Native.removeAllListeners) Native.removeAllListeners();
+/* Capacitor removes listeners asynchronously, so removing and re-adding them
+   around every turn meant the removal landed after the additions and threw
+   them away. These are registered once and never touched again; who they talk
+   to changes instead. */
+var micHandlers = { text: null, done: null };
+var micWired = false;
+var micHeardAnything = false;
+
+function wireNativeMic(){
+  if(micWired || !Native || !Native.addListener) return;
+  micWired = true;
   Native.addListener("pedroSpeech", function(ev){
-    onText(ev.text || "", !!ev.final);
-    if(ev.final){ nativeListening = false; if(onDone) onDone(null); }
+    micHeardAnything = true;
+    var text = (ev && ev.text) || "";
+    var final = !!(ev && ev.final);
+    if(micHandlers.text) micHandlers.text(text, final);
+    if(final){
+      nativeListening = false;
+      var d = micHandlers.done;
+      micHandlers.done = null;
+      if(d) d(null);
+    }
   });
   Native.addListener("pedroSpeechEnd", function(ev){
     nativeListening = false;
-    if(onDone) onDone(ev && ev.error ? new Error(ev.error) : null);
+    var d = micHandlers.done;
+    micHandlers.done = null;
+    if(d) d(ev && ev.error ? new Error(ev.error) : null);
   });
+}
+
+function nativeMicStart(onText, onDone){
+  if(!Native) return Promise.reject(new Error("not in the app"));
+  wireNativeMic();
+  micHandlers.text = onText;
+  micHandlers.done = onDone;
+  micHeardAnything = false;
   return Native.startListening().then(function(){ nativeListening = true; });
 }
 function nativeMicStop(){
   nativeListening = false;
+  micHandlers.text = null;
+  micHandlers.done = null;             /* nothing stale left waiting to fire */
   if(Native) Native.stopListening().catch(function(){});
 }
 
@@ -3385,6 +3426,11 @@ function hfListen(){
 function hfListenNative(){
   if(!hf.want || hf.rec) return;
   hf.rec = { native: true };
+  setTimeout(function(){
+    if(hf.want && !micHeardAnything && hf.phase !== "talk")
+      hfWarn.textContent = "The microphone is open but nothing is reaching the app. " +
+        "Check Microphone and Speech Recognition are on for Pedro in Settings.";
+  }, 5000);
   nativeMicStart(function(text, isFinal){
     var live = String(text || "").trim();
     hfHeardText(live, isFinal ? live : "");
@@ -3555,7 +3601,7 @@ $("hfExit").addEventListener("click", hfClose);
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-20.28";
+var BUILD = "2026-08-20.29";
 
 function banner(kind, html){
   var b = $("banner");
