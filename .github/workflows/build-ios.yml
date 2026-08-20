@@ -35,7 +35,7 @@ jobs:
 
       - name: Toolchain
         run: |
-          exec > >(tee -a build.log) 2>&1
+          exec > >(tee -a build.log steps.log) 2>&1
           echo "node   $(node -v)"
           echo "npm    $(npm -v)"
           echo "xcode  $(xcodebuild -version | head -1)"
@@ -45,7 +45,7 @@ jobs:
 
       - name: CocoaPods
         run: |
-          exec > >(tee -a build.log) 2>&1
+          exec > >(tee -a build.log steps.log) 2>&1
           if ! command -v pod >/dev/null 2>&1; then
             echo "installing cocoapods..."
             sudo gem install cocoapods --no-document || brew install cocoapods
@@ -54,30 +54,30 @@ jobs:
 
       - name: Install Capacitor
         run: |
-          exec > >(tee -a build.log) 2>&1
+          exec > >(tee -a build.log steps.log) 2>&1
           npm install
           echo "--- capacitor packages ---"
           npm ls @capacitor/core @capacitor/ios @capacitor/cli || true
 
       - name: Check the web app is there
         run: |
-          exec > >(tee -a build.log) 2>&1
+          exec > >(tee -a build.log steps.log) 2>&1
           test -f dist/index.html || { echo "dist/index.html missing"; exit 1; }
           grep -o 'var BUILD = "[^"]*"' dist/index.html | head -1
 
       - name: Create the iOS project
         run: |
-          exec > >(tee -a build.log) 2>&1
+          exec > >(tee -a build.log steps.log) 2>&1
           npx cap add ios
 
       - name: Sync the web app into it
         run: |
-          exec > >(tee -a build.log) 2>&1
+          exec > >(tee -a build.log steps.log) 2>&1
           npx cap sync ios
 
       - name: Add the native bridge
         run: |
-          exec > >(tee -a build.log) 2>&1
+          exec > >(tee -a build.log steps.log) 2>&1
           cp native/PedroNative.swift ios/App/App/PedroNative.swift
           cp native/MainViewController.swift ios/App/App/MainViewController.swift
           ls -l ios/App/App/
@@ -91,7 +91,7 @@ jobs:
 
       - name: Microphone and speech permissions
         run: |
-          exec > >(tee -a build.log) 2>&1
+          exec > >(tee -a build.log steps.log) 2>&1
           PLIST=ios/App/App/Info.plist
           /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'Pedro listens when you tap the microphone.'" "$PLIST" || true
           /usr/libexec/PlistBuddy -c "Add :NSSpeechRecognitionUsageDescription string 'Pedro turns what you say into text.'" "$PLIST" || true
@@ -113,6 +113,7 @@ jobs:
           exec > >(tee -a build.log) 2>&1
           cd ios/App
           xcodebuild \
+            -quiet \
             -workspace App.xcworkspace \
             -scheme App \
             -configuration Release \
@@ -126,7 +127,7 @@ jobs:
 
       - name: Verify the native code is actually in the binary
         run: |
-          exec > >(tee -a build.log) 2>&1
+          exec > >(tee -a build.log steps.log) 2>&1
           BIN=ios/App/build/Build/Products/Release-iphoneos/App.app/App
           echo "checking $BIN"
           for s in PedroNative FoundationModels SFSpeechRecognizer; do
@@ -154,7 +155,7 @@ jobs:
 
       - name: Package as .ipa
         run: |
-          exec > >(tee -a build.log) 2>&1
+          exec > >(tee -a build.log steps.log) 2>&1
           cd ios/App/build/Build/Products/Release-iphoneos
           mkdir -p Payload
           cp -R App.app Payload/
@@ -172,7 +173,9 @@ jobs:
         if: always()
         run: |
           mkdir -p build-log
-          tail -c 200000 build.log > build-log/last-build.txt 2>/dev/null || echo "no log captured" > build-log/last-build.txt
+          { echo "=== the build steps ==="; cat steps.log 2>/dev/null; 
+            echo; echo "=== the end of the build output ==="; tail -c 60000 build.log; 
+          } > build-log/last-build.txt 2>/dev/null || echo "no log captured" > build-log/last-build.txt
           printf '\n=== finished: %s at %s ===\n' "${{ job.status }}" "$(date -u)" >> build-log/last-build.txt
           git config user.name "build"
           git config user.email "build@users.noreply.github.com"
