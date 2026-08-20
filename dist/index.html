@@ -471,6 +471,20 @@
   #hfWarn{position:absolute;bottom:calc(var(--safe-b) + 14px);left:16px;right:16px;
     color:var(--tx3);font-size:11.5px;line-height:1.45}
 
+  /* ============ visual explanations ============ */
+  #viz{position:fixed;inset:0;z-index:73;background:var(--bg);display:none;
+    flex-direction:column;padding:calc(var(--safe-t) + 10px) 12px calc(var(--safe-b) + 12px)}
+  #viz.on{display:flex}
+  #vizTop{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  #vizTitle{flex:1;font-size:11px;letter-spacing:.24em;text-transform:uppercase;
+    color:var(--hud);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .vizbtns{display:flex;gap:8px}
+  .vizbtns .icobtn{border:1px solid color-mix(in srgb,var(--hud) 30%,transparent);color:var(--hud)}
+  #vizFrame{flex:1;width:100%;border:1px solid color-mix(in srgb,var(--hud) 26%,transparent);
+    border-radius:12px;background:#0b0d12}
+  #vizSaid{margin-top:10px;font-size:13px;line-height:1.5;color:var(--tx2);max-height:22vh;overflow-y:auto}
+  #viz.busy #vizFrame{opacity:.5}
+
   /* ============ camera ============ */
   #cam{position:fixed;inset:0;z-index:72;background:#000;display:none}
   #cam.on{display:block}
@@ -996,6 +1010,18 @@
     </div>
   </div>
   <div id="hfWarn"></div>
+</div>
+
+<div id="viz">
+  <div id="vizTop">
+    <span id="vizTitle">Working it out&hellip;</span>
+    <div class="vizbtns">
+      <button class="icobtn" id="vizAgain" aria-label="Run it again"><svg><use href="#i-flip"/></svg></button>
+      <button class="icobtn" id="vizClose" aria-label="Close"><svg><use href="#i-x"/></svg></button>
+    </div>
+  </div>
+  <iframe id="vizFrame" sandbox="allow-scripts" referrerpolicy="no-referrer" title="Explanation"></iframe>
+  <div id="vizSaid"></div>
 </div>
 
 <div id="cam">
@@ -3451,6 +3477,123 @@ function runActions(list){
   });
 }
 
+/* ==================== visual explanations ====================
+   Asked to show how something works, or to simulate it, he writes a small
+   self-contained page and it runs here. The frame is sandboxed without
+   same-origin, so whatever he writes cannot reach the app, its keys or its
+   memory - it can only draw in its own box. */
+var viz = { open:false, busy:false, last:null, lastAsk:'' };
+
+/* asking to be shown rather than told */
+var VIZ_RE = /^(?:(?:can you )?(?:show|draw|animate|visuali[sz]e|illustrate|diagram|graph|plot|simulate|model)\s+(?:me\s+)?)(.{2,80})$/i;
+var VIZ_HINT_RE = /\b(?:simulation|simulate|animate|animation|diagram|visual(?:ly)?|show me how|how does .* work)\b/i;
+
+function wantsPicture3D(q){
+  q = String(q || '').trim();
+  if(!q) return null;
+  var m = q.match(VIZ_RE);
+  if(m) return m[1].replace(/[.?!]+$/, '').trim();
+  if(VIZ_HINT_RE.test(q)) return q.replace(/[.?!]+$/, '').trim();
+  return null;
+}
+
+function vizOpen(){
+  viz.open = true;
+  $('viz').classList.add('on');
+}
+function vizClose(){
+  viz.open = false;
+  $('viz').classList.remove('on');
+  $('vizFrame').srcdoc = '';        /* stop whatever was running */
+}
+
+/* Wrap what he wrote so it always has a dark page, our colours, and no way to
+   fetch anything from the network. */
+function vizPage(inner){
+  /* A dark page, our colours, and a policy that stops whatever he wrote from
+     fetching anything. The frame is sandboxed without same-origin as well, so
+     it cannot reach the app, its keys or its memory. */
+  var csp = "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:;";
+  var head = "<!doctype html><html><head><meta charset='utf-8'>" +
+    "<meta name='viewport' content='width=device-width,initial-scale=1'>" +
+    "<meta http-equiv='Content-Security-Policy' content=" + JSON.stringify(csp) + ">" +
+    "<style>html,body{margin:0;height:100%;background:#0b0d12;color:#e7e9ee;" +
+      "font:14px -apple-system,system-ui,sans-serif;overflow:hidden}" +
+      "canvas,svg{display:block;max-width:100%;max-height:100%;margin:0 auto}" +
+      "*{box-sizing:border-box}</style></head><body>";
+  return head + inner + "</body></html>";
+}
+
+/* pull the page out of the reply, whatever chatter surrounds it */
+function vizExtract(answer){
+  var t = String(answer || '');
+  var out = { say: '', html: '' };
+  var fence = t.indexOf('```');
+  if(fence > -1){
+    out.say = t.slice(0, fence).trim();
+    var rest = t.slice(fence + 3);
+    var nl = rest.indexOf('\n');
+    if(nl > -1) rest = rest.slice(nl + 1);      /* drop the language tag */
+    var close = rest.indexOf('```');
+    out.html = (close > -1 ? rest.slice(0, close) : rest).trim();
+  } else {
+    var lt = t.indexOf('<');
+    if(lt > -1){ out.say = t.slice(0, lt).trim(); out.html = t.slice(lt).trim(); }
+    else out.say = t.trim();
+  }
+  return out;
+}
+
+function vizBuild(about){
+  if(viz.busy) return;
+  viz.busy = true;
+  viz.lastAsk = about;
+  vizOpen();
+  $('viz').classList.add('busy');
+  $('vizTitle').textContent = about;
+  $('vizSaid').textContent = '';
+
+  var ask = 'Show ' + about + ' as a small animation that runs by itself.' +
+    ' Reply with one short sentence explaining it in plain speech, then a single' +
+    ' fenced html block containing a complete self-contained page.' +
+    ' Rules for the page: no external files, no network, no images, no libraries;' +
+    ' use canvas or inline SVG and plain JavaScript; it must start animating' +
+    ' immediately and loop; dark background; draw in cyan #38e1f0 on #0b0d12;' +
+    ' label the parts; fit any screen size. Keep it under 100 lines.';
+
+  var only = { messages: [{ role:'user', content: ask, t:Date.now() }] };
+  var wasVoice = voiceMode;
+  voiceMode = false;               /* this one needs the long answer, not a spoken one */
+  askOnce(only).then(function(answer){
+    voiceMode = wasVoice;
+    viz.busy = false;
+    $('viz').classList.remove('busy');
+    var parts = vizExtract(answer);
+    if(!parts.html){
+      $('vizTitle').textContent = about;
+      $('vizSaid').textContent = parts.say || 'He could not draw that one.';
+      speak(parts.say || 'I could not draw that one.');
+      return;
+    }
+    viz.last = parts.html;
+    $('vizFrame').srcdoc = vizPage(parts.html);
+    $('vizSaid').textContent = parts.say;
+    if(parts.say) speak(parts.say);
+  }).catch(function(e){
+    voiceMode = wasVoice;
+    viz.busy = false;
+    $('viz').classList.remove('busy');
+    var why = String(e && e.message || e);
+    $('vizSaid').textContent = why;
+    speak(why);
+  });
+}
+
+$('vizClose').addEventListener('click', vizClose);
+$('vizAgain').addEventListener('click', function(){
+  if(viz.lastAsk) vizBuild(viz.lastAsk);
+});
+
 /* ==================== camera ====================
    Point the phone at something and ask about it. The picture is taken at the
    moment of asking, sent with the question, and thrown away after - nothing is
@@ -4703,6 +4846,10 @@ function hfAsk(question){
   /* If he is already looking, the question is usually about what he can see -
      but "count to a hundred" is not, and attaching a picture to it made him
      describe the room as well. */
+  /* asked to be shown rather than told */
+  var toDraw = wantsPicture3D(question);
+  if(toDraw && !cam.open){ vizBuild(toDraw); return; }
+
   if(cam.open){
     var q = String(question).trim();
     if(COUNT_ABSTRACT_RE.test(q) || (ELSEWHERE_RE.test(q) && !needsEyes(q))){
@@ -4830,7 +4977,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-20.45";
+var BUILD = "2026-08-20.46";
 
 function banner(kind, html){
   var b = $("banner");

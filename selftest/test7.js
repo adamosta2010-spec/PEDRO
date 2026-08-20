@@ -489,5 +489,41 @@ function nativeFrom(cap, exp){
   t("the phone's model is warmed up at startup", inSrc("Native.warm({"), true);
 }
 
+
+/* ---- simulations and visual explanations ---- */
+{
+  const v = n => src.slice(src.indexOf("var " + n), src.indexOf(";", src.indexOf("var " + n)) + 1);
+  const wants = new Function(v("VIZ_RE") + v("VIZ_HINT_RE") + grab("wantsPicture3D") +
+    "; return wantsPicture3D;")();
+  const extract = new Function(grab("vizExtract") + "; return vizExtract;")();
+  const page = new Function(grab("vizPage") + "; return vizPage;")();
+  const inSrc = bit => src.indexOf(bit) > -1;
+
+  t("asking to be shown gets a drawing", !!wants("show me how a four stroke engine works"), true);
+  t("simulate gets one too", wants("simulate a bouncing ball"), "a bouncing ball");
+  t("animate gets one", wants("animate the water cycle"), "the water cycle");
+  t("plot gets one", wants("plot x squared"), "x squared");
+  t("how does it work gets one", !!wants("how does a jet engine work"), true);
+  t("a plain fact does not", wants("what is the capital of france"), null);
+  t("counting does not", wants("count to ten"), null);
+  t("opening an app does not", wants("open safari"), null);
+
+  t("the spoken part is separated from the page",
+    extract("It bounces." + String.fromCharCode(10) + "```html" + String.fromCharCode(10) +
+      "<canvas></canvas>" + String.fromCharCode(10) + "```").say, "It bounces.");
+  t("the page is found inside the fence",
+    extract("x" + String.fromCharCode(10) + "```html" + String.fromCharCode(10) +
+      "<canvas></canvas>" + String.fromCharCode(10) + "```").html.indexOf("canvas") > -1, true);
+  t("a reply with no page still says something",
+    extract("I cannot draw that").html, "");
+
+  t("what he writes runs walled off", page("<b>x</b>").indexOf("default-src") > -1, true);
+  t("and cannot fetch anything", page("x").indexOf("img-src data:") > -1, true);
+  t("the frame has no same-origin access",
+    require("fs").readFileSync("index.html", "utf8").indexOf('sandbox="allow-scripts"') > -1, true);
+  t("closing stops whatever was running", grab("vizClose").indexOf("srcdoc = ''") > -1, true);
+  t("it can be run again", inSrc("if(viz.lastAsk) vizBuild(viz.lastAsk);"), true);
+}
+
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " mic/image tests passed");
 process.exit(fail ? 1 : 0);

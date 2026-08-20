@@ -1,0 +1,14 @@
+Simulations and visual explanations
+
+Ask him to show you how something works, to simulate it, animate it or plot it,
+and he writes a small self-contained page and runs it - a bouncing ball, a four
+stroke engine, the water cycle - while explaining it out loud in a sentence.
+
+What he writes runs in a sandboxed frame with no same-origin access and a
+content policy that blocks every kind of fetch, so a generated page can draw in
+its own box and reach nothing else: not the app, not the keys, not the memory.
+
+Questions that want a fact still get a fact - only asking to be shown, drawn,
+animated, simulated or plotted opens the panel.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
