@@ -268,5 +268,25 @@ function nativeFrom(cap, exp){
   t("a missing app is explained", run.indexOf("may not be installed") > -1, true);
 }
 
+
+/* ---- asking a question out loud ---- */
+{
+  const heard = grab("hfHeardText");
+  const settle = grab("hfSettle");
+  const inIt = (src, bit) => src.indexOf(bit) > -1;
+
+  t("a pause is what sends the question", inIt(heard, "hfSettle(live)"), true);
+  t("it no longer waits for a final marker that never comes",
+    inIt(heard, "if(finalTxt.trim()){ clearTimeout(hf.settle); hfAsk(finalTxt.trim()); return; }"), true);
+  t("a question in one breath is sent too", inIt(heard, "hfSettle(after)"), true);
+  t("the wake word alone still just answers", inIt(heard, "Yeah?"), true);
+
+  t("the pause actually asks", inIt(settle, "hfAsk(q)"), true);
+  t("it only fires while still listening", inIt(settle, 'hf.phase !== "hear"'), true);
+  t("anything new resets it", inIt(settle, "clearTimeout(hf.settle)"), true);
+  t("pausing the mic disarms it", inIt(grab("hfPause"), "clearTimeout(hf.settle)"), true);
+  t("closing disarms it", inIt(grab("hfClose"), "clearTimeout(hf.settle)"), true);
+}
+
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " mic/image tests passed");
 process.exit(fail ? 1 : 0);

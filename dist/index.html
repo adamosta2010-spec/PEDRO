@@ -3556,6 +3556,7 @@ var hfEl=$("hf"), hfOrb=$("hfOrb"), hfState=$("hfState"),
 
 var hf = { on:false, phase:"wait", rec:null, restart:null, quiet:null,
            want:false, answering:false,
+           settle:null,        /* the pause that means "I have finished asking" */
            talking:false,      /* Pedro is speaking - used for barge-in */
            turns:0 };          /* how many exchanges this session */
 
@@ -3605,7 +3606,7 @@ function hfOpen(){
 function hfClose(){
   hf.on = false; hf.want = false;
   hfEl.classList.remove("on");
-  clearTimeout(hf.restart); clearTimeout(hf.quiet);
+  clearTimeout(hf.restart); clearTimeout(hf.quiet); clearTimeout(hf.settle);
   try{
     if(hf.rec && hf.rec.native) nativeMicStop();
     else if(hf.rec) hf.rec.abort();
@@ -3691,6 +3692,17 @@ function hfListenNative(){
 }
 
 /* what a heard phrase means - shared, so both recognisers behave the same */
+/* Wait for a gap, then treat what was heard as the finished question. Anything
+   new resets it, so it only fires once they have actually stopped. */
+function hfSettle(text){
+  clearTimeout(hf.settle);
+  hf.settle = setTimeout(function(){
+    var q = String(text || "").trim();
+    if(!q || !hf.want || hf.phase !== "hear") return;
+    hfAsk(q);
+  }, 1700);
+}
+
 function hfHeardText(live, finalTxt){
     finalTxt = finalTxt || "";
     if(live) hfHeard.textContent = live;
@@ -3701,8 +3713,10 @@ function hfHeardText(live, finalTxt){
       if(!m) return;
       var at = live.toLowerCase().indexOf(m[0].toLowerCase());
       var after = live.slice(at + m[0].length).replace(/^[\s,.:;!?-]+/, "").trim();
-      if(finalTxt && after.split(/\s+/).length >= 3){
-        hfAsk(after);                        /* "Pedro, what's the weather like" */
+      if(after.split(/\s+/).filter(Boolean).length >= 3){
+        /* "Pedro, what is the weather like" - all in one breath */
+        hfSet("hear", "Listening…");
+        hfSettle(after);
       } else {
         hf.answering = true;                 /* just the name - acknowledge, then listen */
         hfSet("hear", "Yeah?");
@@ -3717,13 +3731,15 @@ function hfHeardText(live, finalTxt){
     }
 
     if(hf.phase === "hear"){
-      if(finalTxt.trim()) hfAsk(finalTxt.trim());
-      else hfQuietTimer();
+      if(finalTxt.trim()){ clearTimeout(hf.settle); hfAsk(finalTxt.trim()); return; }
+      if(live){ hfSettle(live); return; }     /* they are still talking */
+      hfQuietTimer();
     }
 }
 
 function hfPause(){
   clearTimeout(hf.restart);
+  clearTimeout(hf.settle);
   if(hf.rec && hf.rec.native){ nativeMicStop(); hf.rec = null; return; }
   try{ if(hf.rec) hf.rec.stop(); }catch(e){}
   hf.rec = null;
@@ -3843,7 +3859,7 @@ $("hfExit").addEventListener("click", hfClose);
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-20.31";
+var BUILD = "2026-08-20.32";
 
 function banner(kind, html){
   var b = $("banner");
