@@ -1,0 +1,13 @@
+Counting to a thousand no longer opens the camera
+
+Counting split badly: any sentence starting with count was treated as a question
+about the room, so asking him to count to a thousand pointed the camera at the
+ceiling. It now splits three ways - a number sequence needs no eyes, a thing in
+front of you does, and how many X in Y is a question about the world.
+
+  count to 1000                    -> normal
+  count the boxes                  -> camera
+  how many boxes can you see       -> camera
+  how many days in a year          -> normal
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>

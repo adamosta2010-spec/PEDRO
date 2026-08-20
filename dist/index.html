@@ -3175,10 +3175,29 @@ function camSet(msg){ var s = $('camState'); if(s) s.textContent = msg; }
 
 /* Questions that only make sense if he can see - counting especially, which
    fails quietly when it is answered from memory instead of from the picture. */
-var CAM_RE = /^(?:look at (?:this|that)|what(?:\'s| is| am i looking at)?\s+this|what do you see|can you see\s+.+|count\s+.+|how many\s+.+|open\s+(?:the\s+)?camera|camera)$/i;
+/* Asking him to look. Counting is the awkward one: "count the boxes" is about
+   the room, "count to a thousand" is not - so counting only means looking when
+   it points at something present. */
+var CAM_RE = /^(?:look at (?:this|that)|what(?:\'s| is| am i looking at)?\s+this|what do you see|can you see\s+.+|open\s+(?:the\s+)?camera|camera)$/i;
 var CAM_ONLY_RE = /^(?:open\s+(?:the\s+)?camera|camera)$/i;
+/* words that mean "the thing in front of me" rather than a number in the abstract */
+var HERE_RE = /\b(?:this|these|those|here|in front|on the (?:table|desk|floor|shelf)|i(?:\'m| am) holding|you (?:can )?see|in the (?:picture|photo|room)|there are)\b/i;
+/* counting a number sequence - no eyes needed */
+var COUNT_ABSTRACT_RE = /^(?:count|counting)\s+(?:to|up to|down|backwards|back|from)\b/i;
+/* "how many days in a year" is about the world, not about the room */
+var ELSEWHERE_RE = /\b(?:in|of|per|around|across)\b/i;
 
-/* counting gets answered too casually unless it is asked for properly */
+/* does this question need him to look? */
+function needsEyes(q){
+  q = String(q || "").trim();
+  if(!q) return false;
+  if(CAM_RE.test(q)) return true;
+  if(COUNT_ABSTRACT_RE.test(q)) return false;
+  if(!/^(?:count|how many)\s+/i.test(q)) return false;
+  if(HERE_RE.test(q)) return true;              /* these, this, in front of me */
+  return !ELSEWHERE_RE.test(q);                 /* counting things, not facts */
+}
+
 function camQuestion(q){
   q = String(q || "").trim();
   if(!q || CAM_ONLY_RE.test(q)) return "What am I looking at?";
@@ -4191,7 +4210,7 @@ function hfAsk(question){
   hfPause();
   /* if he is already looking, the question is about what he can see */
   if(cam.open){ camAsk(question); return; }
-  if(CAM_RE.test(String(question).trim()) && nativeMicSupported()){
+  if(needsEyes(question) && nativeMicSupported()){
     camOpen();
     setTimeout(function(){ camAsk(question); }, 1100);   /* let the picture arrive */
     return;
@@ -4307,7 +4326,7 @@ $("hfExit").addEventListener("click", hfClose);
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-20.39";
+var BUILD = "2026-08-20.40";
 
 function banner(kind, html){
   var b = $("banner");

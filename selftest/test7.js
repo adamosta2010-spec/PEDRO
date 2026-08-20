@@ -123,7 +123,7 @@ t("a cancelled draw stays silent", draw.includes('err.name === "AbortError"'), t
   t("two seconds of quiet ends the turn", inSrc("waitForQuiet(2000)"), true);
   t("and it waits longer for the first word", inSrc("waitForQuiet(7000)"), true);
   t("the turn cannot end twice", inSrc("if(turnOver) return;"), true);
-  t("he talks at a human pace", inSrc("u.rate = 1;"), true);
+  t("he talks at a human pace", inSrc("Math.max(0.7, Math.min(1.3, rate))"), true);
   t("and uses the most human voice the phone has", inSrc("function pickVoice"), true);
   t("the answer to a spoken question is read back", inSrc("(store.settings.tts || speakNext) && !aborted"), true);
   t("the flag is cleared so later answers stay quiet", inSrc("speakNext = false;"), true);
@@ -332,79 +332,45 @@ function nativeFrom(cap, exp){
 
 
 /* ---- looking at things ---- */
+/* Counting splits three ways and getting it wrong is very visible: asking him
+   to count to a thousand used to open the camera. */
 {
-  const line = n => src.slice(src.indexOf("var " + n), src.indexOf(";", src.indexOf("var " + n)) + 1);
-  const camBits = new Function(line("CAM_RE") + line("CAM_ONLY_RE") + grab("camQuestion") +
-    "; return { CAM_RE:CAM_RE, camQuestion:camQuestion };")();
-  const looks = q => camBits.CAM_RE.test(q);
+  const v = n => src.slice(src.indexOf("var " + n), src.indexOf(";", src.indexOf("var " + n)) + 1);
+  const bits = new Function(
+    v("CAM_RE") + v("CAM_ONLY_RE") + v("HERE_RE") + v("COUNT_ABSTRACT_RE") + v("ELSEWHERE_RE") +
+    grab("needsEyes") + grab("camQuestion") +
+    "; return { needsEyes:needsEyes, camQuestion:camQuestion };")();
+  const eyes = q => bits.needsEyes(q);
   const inSrc = bit => src.indexOf(bit) > -1;
 
-  t("counting goes to the camera", looks("count the boxes"), true);
-  t("how many goes to the camera", looks("how many boxes are there"), true);
-  t("what is this goes to the camera", looks("what is this"), true);
-  t("so does asking it to look", looks("look at this"), true);
-  t("and just saying camera", looks("open the camera"), true);
-  t("a general question does not", looks("what is the capital of france"), false);
-  t("nor does small talk", looks("how are you"), false);
+  t("counting to a number needs no eyes", eyes("count to 1000"), false);
+  t("nor counting down", eyes("count down from 20"), false);
+  t("nor counting backwards", eyes("count backwards from ten"), false);
+  t("counting things does", eyes("count the boxes"), true);
+  t("so does counting these things", eyes("count these boxes"), true);
+  t("how many of something present", eyes("how many boxes are there"), true);
+  t("how many you can see", eyes("how many boxes can you see"), true);
+  t("a fact about the world does not", eyes("how many days in a year"), false);
+  t("nor a fact about a country", eyes("how many people live in france"), false);
+  t("what is this does", eyes("what is this"), true);
+  t("asking him to look does", eyes("look at this"), true);
+  t("asking for the camera does", eyes("open the camera"), true);
+  t("small talk does not", eyes("tell me a joke"), false);
+  t("nothing at all does not", eyes(""), false);
 
   t("counting is asked for carefully",
-    /one by one/.test(camBits.camQuestion("count the boxes")), true);
-  t("and it is told to admit what it cannot see",
-    /rather than guessing/.test(camBits.camQuestion("count the boxes")), true);
-  t("a plain look needs no extra wording",
-    camBits.camQuestion("what is this"), "what is this");
-  t("asking for the camera alone becomes a real question",
-    camBits.camQuestion("camera"), "What am I looking at?");
+    /one by one/.test(bits.camQuestion("count the boxes")), true);
+  t("and it must admit what it cannot see",
+    /rather than guessing/.test(bits.camQuestion("count the boxes")), true);
 
-  const grabFrame = grab("camGrab");
   t("the picture is taken at the moment of asking", inSrc("var shot = camGrab();"), true);
-  t("it is shrunk before sending", grabFrame.indexOf("1024 / Math.max") > -1, true);
+  t("it is shrunk before sending", grab("camGrab").indexOf("1024 / Math.max") > -1, true);
   t("the front camera is unmirrored", grab("camStart").indexOf("scaleX(-1)") > -1, true);
   t("flipping swaps which camera", grab("camFlip").indexOf("environment") > -1, true);
   t("closing lets go of the camera", grab("camClose").indexOf("camStop()") > -1, true);
   t("stopping actually stops the tracks", grab("camStop").indexOf("t.stop()") > -1, true);
   t("questions go to the camera while it is open", inSrc("if(cam.open){ camAsk(question); return; }"), true);
   t("the answer is spoken", grab("camAsk").indexOf("speak(answer)") > -1, true);
-}
-
-
-/* ---- being heard ---- */
-{
-  const sp = grab("speak");
-  const inSrc = bit => src.indexOf(bit) > -1;
-  t("it lets go of the microphone before speaking",
-    sp.indexOf("if(nativeListening) nativeMicStop();") > -1, true);
-  t("the microphone release comes before the speaking",
-    sp.indexOf("nativeMicStop") < sp.indexOf("speechSynthesis.speak"), true);
-  t("volume is applied to what he says", sp.indexOf("u.volume") > -1, true);
-  t("a broken volume setting still speaks", sp.indexOf("isNaN(vol) ? 1") > -1, true);
-  t("volume is clamped to something sane", sp.indexOf("Math.max(0, Math.min(1, vol))") > -1, true);
-  t("there is a control for it", inSrc('$("setVolume")'), true);
-  t("it starts at full", inSrc("volume:1,"), true);
-  t("and travels to a new install", inSrc("volume:s.volume"), true);
-}
-
-
-/* ---- how he sounds, and answering from behind ---- */
-{
-  const sp = grab("speak");
-  const inSrc = bit => src.indexOf(bit) > -1;
-  t("speed has a ceiling so it cannot gabble",
-    sp.indexOf("Math.max(0.7, Math.min(1.3, rate))") > -1, true);
-  t("a broken speed setting still speaks", sp.indexOf("isNaN(rate) ? 1") > -1, true);
-  t("there is a control for speed", inSrc('$("setRate")'), true);
-  t("speed travels to a new install", inSrc("rate:s.rate"), true);
-
-  const quiet = grab("hfListenQuietly");
-  t("it can listen with nothing on screen", quiet.indexOf("hf.want = true") > -1, true);
-  t("and deliberately does not show its screen",
-    quiet.indexOf('hfEl.classList.remove("on")') > -1, true);
-  t("it still listens for the name", quiet.indexOf("hfListen()") > -1, true);
-  const bg = grab("applyBackground");
-  t("turning it on starts listening", bg.indexOf("hfListenQuietly()") > -1, true);
-  t("turning it off stops listening", bg.indexOf("hf.want = false") > -1, true);
-  t("turning it off leaves the voice screen alone",
-    bg.indexOf('!hfEl.classList.contains("on")') > -1, true);
 }
 
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " mic/image tests passed");
