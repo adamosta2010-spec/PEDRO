@@ -1179,7 +1179,16 @@
 
   <div id="dockPanel">
     <div class="dockrow">
-      <label for="dockVoice">Voice</label>
+      <label>Using</label>
+      <b id="dockUsing" style="flex:1;color:var(--hud);font-size:12px"></b>
+    </div>
+    <div class="dockrow">
+      <label for="dockEleven">Better voice</label>
+      <input type="password" id="dockEleven" placeholder="ElevenLabs key (sk_...)"
+             autocomplete="off" spellcheck="false">
+    </div>
+    <div class="dockrow">
+      <label for="dockVoice">Phone voice</label>
       <select id="dockVoice"></select>
     </div>
     <div class="dockrow">
@@ -4099,6 +4108,14 @@ function camAsk(question){
 $('btnCam').addEventListener('click', camOpen);
 /* ---- the dock ---- */
 function dockFill(){
+  var k = $("dockEleven");
+  if(k) k.value = store.settings.elevenKey || "";
+  var using = $("dockUsing");
+  if(using){
+    using.textContent = elevenReady()
+      ? "the better voice"
+      : (store.settings.elevenKey ? "the phone (the key was refused)" : "the phone - add a key above");
+  }
   var sel = $("dockVoice");
   if(sel){
     var all = allVoices();
@@ -4141,6 +4158,13 @@ $("dockSettings").addEventListener("click", function(){ fillSettings(); openPane
 $("dockMore").addEventListener("click", function(){ dockToggle(); fillSettings(); openPanel(settings); });
 $("dockHear").addEventListener("click", function(){
   speak("This is how I sound.");
+});
+$("dockEleven").addEventListener("input", function(){
+  store.settings.elevenKey = this.value.trim();
+  elevenFailed = false;
+  save();
+  dockFill();
+  hudSync();
 });
 $("dockVoice").addEventListener("change", function(){
   store.settings.voiceName = this.value;
@@ -5047,7 +5071,8 @@ function hudSync(){
     ? (deviceModel.available ? "ready" : (deviceModel.checked ? (deviceModel.reason || "no") : "checking…"))
     : "app only");
   var v = pickVoice();
-  hudSet("hudVoice", (store.settings.voiceName || (v && v.name) || "default").slice(0, 22));
+  hudSet("hudVoice", elevenReady() ? "ElevenLabs"
+    : (store.settings.voiceName || (v && v.name) || "phone default").slice(0, 22));
   hudSet("hudMem", String(memories().length));
   var st = $("hudStudied");
   if(st) st.textContent = studies().length ? (studies().length + " studied") : "none studied";
@@ -5450,7 +5475,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-20.51";
+var BUILD = "2026-08-20.52";
 
 function banner(kind, html){
   var b = $("banner");

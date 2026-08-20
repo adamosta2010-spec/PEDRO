@@ -1,0 +1,8 @@
+Say which voice is being used, and put the key where it can be reached
+
+The better voice needs an ElevenLabs key, and the only place to enter one was
+inside Settings - which was opening behind the dashboard until the last build,
+so it could not be reached at all. The dock now has the field, a line saying
+plainly which voice is in use, and the dashboard names it too.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
