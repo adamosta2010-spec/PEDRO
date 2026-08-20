@@ -5,6 +5,7 @@ cd "$(dirname "$0")/.."
 node -e 'const fs=require("fs");const h=fs.readFileSync("index.html","utf8");
 fs.writeFileSync("selftest/_app.js", h.match(/<script>([\s\S]*?)<\/script>/)[1]);'
 node --check selftest/_app.js && echo "syntax ok"
+node selftest/escapes.js | tail -1
 node selftest/boot.js
 node selftest/checkui.js  | tail -1
 node selftest/layers.js | tail -1

@@ -117,7 +117,14 @@ t("a cancelled draw stays silent", draw.includes('err.name === "AbortError"'), t
 /* ---- asking out loud gets an answer out loud ---- */
 {
   const inSrc = bit => src.indexOf(bit) > -1;
-  t("a spoken question is sent rather than left in the box", inSrc("speakNext = true;"), true);
+  t("a spoken question is sent rather than left in the box", inSrc("send(true)"), true);
+  t("typing is silent - the flag is set per message, never left on",
+    inSrc("speakNext = !!spoken;"), true);
+  t("two seconds of quiet ends the turn", inSrc("waitForQuiet(2000)"), true);
+  t("and it waits longer for the first word", inSrc("waitForQuiet(7000)"), true);
+  t("the turn cannot end twice", inSrc("if(turnOver) return;"), true);
+  t("he talks at a human pace", inSrc("u.rate = 1;"), true);
+  t("and uses the most human voice the phone has", inSrc("function pickVoice"), true);
   t("the answer to a spoken question is read back", inSrc("(store.settings.tts || speakNext) && !aborted"), true);
   t("the flag is cleared so later answers stay quiet", inSrc("speakNext = false;"), true);
   t("it can be turned off", inSrc('bindSwitch("swVoiceTalk","voiceTalk")'), true);

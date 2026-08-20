@@ -28,14 +28,19 @@ t("all " + used.size + " icon refs resolve", missingSym.length === 0, "missing: 
 /* 2. CSS braces balance and no stray garbage */
 const opens = (css.match(/{/g) || []).length, closes = (css.match(/}/g) || []).length;
 t("css braces balance (" + opens + ")", opens === closes, opens + " { vs " + closes + " }");
-t("no leftover placeholder values", !/#\d*category|undefined|NaN/.test(css));
+t("no leftover placeholder values", !/undefined|NaN/.test(css));
+/* every # colour must be 3, 4, 6 or 8 hex digits and nothing else */
+const values = (css.match(/:[^;{}]+/g) || []).join(" ");
+const badHex = (values.match(/#[0-9a-zA-Z]+/g) || [])
+  .filter(c => !/^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(c));
+t("every colour is a real colour", badHex.length === 0, "not colours: " + badHex.join(", "));
 
 /* 3. classes the JS sets must exist in the stylesheet */
 const jsClasses = new Set();
 let cre = /class="([a-z][a-z0-9 _-]*)"/gi;
 while((m = cre.exec(js))) m[1].split(/\s+/).forEach(c => c && jsClasses.add(c));
 ["msg","user","ai","av","bot","me","wrap","who","time","bubble","think","acts","more",
- "chip","ic","empty","hero","lede","caret","err","shots","one","thumb","citem","nm","dl",
+ "ic","empty","lede","caret","err","shots","one","thumb","citem","nm","dl",
  "tool","tx","swatch","on","act","rec","stop"].forEach(c => jsClasses.add(c));
 const missingCss = [...jsClasses].filter(c => !new RegExp("\\." + c + "[^a-zA-Z0-9_-]").test(css));
 t("all " + jsClasses.size + " rendered classes are styled", missingCss.length === 0,
@@ -47,7 +52,7 @@ t("old off-canvas drawer is gone", !/class="panel" id="drawer"/.test(body));
 t("mascot symbol defined", defined.has("bot"));
 t("composer present", /id="input"/.test(body) && /id="btnSend"/.test(body));
 t("tools sheet present", /id="tools"/.test(body));
-t("disclaimer line present", /can make mistakes/.test(body));
+t("no disclaimer strip - it read as a product, not an app", !/can make mistakes/.test(body));
 t("responsive breakpoint present", /@media\(max-width:899px\)/.test(css));
 t("light theme defined", /data-theme="light"/.test(css));
 t("all 5 accents defined",
