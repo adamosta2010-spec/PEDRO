@@ -2422,6 +2422,14 @@ function noKeyYet(){
 }
 
 function apiError(status, txt){
+  /* every message below is about one provider - name it, because the app can
+     switch underneath you and then the complaint makes no sense */
+  var who = providerLabel(store.settings.provider);
+  var out = apiErrorBody(status, txt);
+  return /^[A-Z][a-z]+ /.test(out) && out.indexOf(who) === 0 ? out : who + ": " + out;
+}
+
+function apiErrorBody(status, txt){
   var m = txt.match(/"message"\s*:\s*"([^"]+)"/);
   var detail = m ? m[1] : "";
   if(isLocal()){
@@ -2621,6 +2629,14 @@ function stream(c, opts){
   abortCtl = new AbortController();
 
   /* answering on the phone itself - no request to make */
+  if(isDevice() && deviceModel.checked && !deviceModel.available){
+    el.remove();
+    showError("The phone's own model isn't ready: " + (deviceModel.reason || "no reason given") +
+      ". Until it is, pick another in Settings.");
+    endStreamUI();
+    checkDeviceModel().then(syncProviderUI);   /* it may have finished by now */
+    return;
+  }
   if(isDevice()){
     askDevice(c.messages).then(function(text){
       acc = text || "(no answer)";
@@ -2633,6 +2649,8 @@ function stream(c, opts){
       var nxt = nextProvider(tried);
       if(nxt && store.settings.autoFailover !== false){
         store.settings.provider = nxt; save(); syncProviderUI();
+        banner("warn", "<b>The phone's own model couldn't answer.</b> " + esc(msg) +
+          " Switched to " + esc(providerLabel(nxt)) + " for this one.");
         retryTurn(c, { attempt:0, tried:tried }, 300,
           "The phone's model couldn't answer - switched to " + providerLabel(nxt));
         return;
@@ -4201,7 +4219,7 @@ $("hfExit").addEventListener("click", hfClose);
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-20.35";
+var BUILD = "2026-08-20.36";
 
 function banner(kind, html){
   var b = $("banner");

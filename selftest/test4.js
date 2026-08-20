@@ -16,7 +16,7 @@ function grab(name){
 const appList = () => "maps, music, spotify, messages, phone, web";
 const names = ["memories","recallFor","onHostMachine","guessLocalUrl","isDevice","inApp","isGemini","isGroq","isLocal","isOpenAIStyle","allKeys","apiKeyNow","activeModel",
                "systemPrompt","taughtBlock","pickLessons","relevance","lessons","facts","claudeContent","geminiParts","claudeRequest","geminiRequest",
-               "groqRequest","localRequest","buildRequest","readDelta","apiError",
+               "groqRequest","localRequest","buildRequest","readDelta","apiError","apiErrorBody","providerLabel",
                "usableProviders","nextProvider","providerLabel","isBusy"];
 let store = { settings:{ provider:"gemini", aiName:"Pedro",
   apiKey:"", geminiKey:"", groqKey:"", model:"claude-opus-5",
