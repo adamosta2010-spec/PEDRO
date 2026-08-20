@@ -249,9 +249,11 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
     /// again straight away instead of guessing from the length of the sentence.
     public func speechSynthesizer(_ s: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
         notifyListeners("pedroSpokeEnd", data: ["done": true])
+        resumeIfWanted()      // start hearing again without waiting for the web layer
     }
     public func speechSynthesizer(_ s: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
         notifyListeners("pedroSpokeEnd", data: ["done": false])
+        resumeIfWanted()
     }
 
     @objc func speak(_ call: CAPPluginCall) {
@@ -264,6 +266,7 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             if !self.synthWired { self.synth.delegate = self; self.synthWired = true }
+            self.pauseForSpeech()          // do not hear himself, do not stop listening
             self.synth.stopSpeaking(at: .immediate)
             let u = AVSpeechUtterance(string: text)
             // the system default is about half of the scale, so scale around it
@@ -398,11 +401,28 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
     /// audio. While background listening is on, start another one - the web
     /// layer cannot be relied on to do it once the app is off screen.
     private func resumeIfWanted() {
-        guard keepAlive, wantListening else { return }
+        // Listening is meant to be happening and nothing is - that is true
+        // whether the app is on screen or behind something else.
+        guard wantListening, task == nil else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-            guard let self = self, self.keepAlive, self.wantListening else { return }
+            guard let self = self, self.wantListening, self.task == nil else { return }
             self.restartListening()
         }
+    }
+
+    /// Stop hearing while he talks, without giving up on listening: the
+    /// difference between a pause and a decision, and the reason background
+    /// listening used to die after the first answer.
+    private func pauseForSpeech() {
+        if engine.isRunning {
+            engine.stop()
+            engine.inputNode.removeTap(onBus: 0)
+        }
+        request?.endAudio()
+        task?.cancel()
+        request = nil
+        task = nil
+        // wantListening deliberately left alone
     }
 
     /// beginListening, without a call waiting for an answer

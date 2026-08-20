@@ -739,5 +739,16 @@ function nativeFrom(cap, exp){
   t("and admits it is not a proper model", grab("lookOnDevice").indexOf("add a Gemini key") > -1, true);
 }
 
+
+/* ---- listening survives him answering, off screen ---- */
+{
+  const inSrc = bit => src.indexOf(bit) > -1;
+  const sp = grab("speak");
+  t("speaking does not cancel listening when the app has its own voice",
+    sp.indexOf("!(Native && Native.speak)") > -1, true);
+  t("it still lets go of the microphone in a browser",
+    sp.indexOf("nativeMicStop();") > -1, true);
+}
+
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " mic/image tests passed");
 process.exit(fail ? 1 : 0);

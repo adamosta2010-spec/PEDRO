@@ -2666,9 +2666,11 @@ if(window.speechSynthesis)
   window.speechSynthesis.onvoiceschanged = function(){ chosenVoice = null; pickVoice(); };
 
 function speak(text, onEnd){
-  /* A live recording session makes playback almost inaudible, and he would
-     hear himself anyway - so let go of the microphone first. */
-  if(nativeListening) nativeMicStop();
+  /* He would hear himself otherwise. When the app has its own voice it handles
+     this itself - pausing the microphone and picking it up again when it stops
+     talking - and telling it to stop listening here is what used to kill
+     background listening after the first answer. */
+  if(nativeListening && !(Native && Native.speak)) nativeMicStop();
 
   /* The better voice first, if there is a key for it. Anything that goes wrong
      drops through to the phone's own voice rather than leaving silence. */
@@ -2704,6 +2706,8 @@ function speak(text, onEnd){
       if(!hf.on) voiceUI("off");
       if(onEnd) onEnd();
     }
+    /* the app resumes listening itself the moment it stops talking, so the
+       web layer only needs to know it has finished */
     wireNativeSpeech(spoken);
     var spokeTimer = setTimeout(spoken, Math.min(90000, 2000 + saying.length * 75));
     Native.speak({
@@ -5886,7 +5890,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.57";
+var BUILD = "2026-08-21.58";
 
 function banner(kind, html){
   var b = $("banner");
