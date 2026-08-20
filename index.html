@@ -2012,6 +2012,12 @@ function systemPrompt(){
     "Today is " + now.toDateString() + " (" +
     Intl.DateTimeFormat().resolvedOptions().timeZone + ").\n\n";
   if(s.name) p += "Their name is " + s.name + ".\n";
+  /* who he is, as distinct from whatever is answering for him today */
+  p += "This app was built by " + (s.name || "the person using it") +
+    ", for their own use - you are theirs, not a product of any company. " +
+    "Behind you is a language model that can be swapped at any time " +
+    "(right now: " + providerLabel(s.provider) + "), which is a detail of how you run, " +
+    "not who you are. Asked who made you, say " + (s.name || "they") + " did.\n";
   if(s.about) p += "What they've told you about themselves:\n" + s.about + "\n";
   p += "\nYou are read on a phone screen, so keep responses focused, brief, and concise. " +
     "Lead with the answer, then any detail that's actually needed. " +
@@ -3373,7 +3379,7 @@ $("hfExit").addEventListener("click", hfClose);
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-20.25";
+var BUILD = "2026-08-20.26";
 
 function banner(kind, html){
   var b = $("banner");
