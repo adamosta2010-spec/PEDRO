@@ -92,5 +92,28 @@ t("https on desktop still gives the padlock advice",
 t("iPhone advice is unaffected by protocol",
   /keyboard/i.test(micErrorOn(true, "not-allowed")), true);
 
+
+/* ---- hands-free has to use whichever recogniser the device actually has ---- */
+/* the failure mode here is silence: the orb says Listening and nothing happens */
+{
+  const listen = grab("hfListen");
+  const nat    = grab("hfListenNative");
+  const heard  = grab("hfHeardText");
+  const pause  = grab("hfPause");
+  const close  = grab("hfClose");
+  const inIt = (src, bit) => src.indexOf(bit) > -1;
+
+  t("hands-free uses the recogniser built into the phone when there is one", inIt(listen, "if(nativeMicSupported()) return hfListenNative();"), true);
+  t("it checks before touching the browser recogniser", listen.indexOf("nativeMicSupported") < listen.indexOf("new SR()"), true);
+  t("the native path starts the microphone the button uses", inIt(nat, "nativeMicStart("), true);
+  t("it marks itself so stopping knows which one is running", inIt(nat, "native: true"), true);
+  t("it listens again after Apple stops itself on a pause", inIt(nat, "setTimeout(hfListen"), true);
+  t("a blocked microphone ends the loop instead of spinning", inIt(nat, "hf.want = false"), true);
+  t("both recognisers share the wake-word logic", inIt(heard, "wakeRe()"), true);
+  t("the shared handler still asks the question", inIt(heard, "hfAsk("), true);
+  t("pausing stops the native microphone too", inIt(pause, "nativeMicStop()"), true);
+  t("closing stops the native microphone too", inIt(close, "nativeMicStop()"), true);
+}
+
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " mic/image tests passed");
 process.exit(fail ? 1 : 0);

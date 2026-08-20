@@ -2460,8 +2460,15 @@ function endStreamUI(){
 
    In a browser none of this exists, so everything here stays switched off. */
 
-var Native = (window.Capacitor && window.Capacitor.Plugins &&
-              window.Capacitor.Plugins.PedroNative) || null;
+var Native = (function(){
+  var C = window.Capacitor;
+  if(!C) return null;                       /* a plain browser - no bridge, and none expected */
+  if(C.Plugins && C.Plugins.PedroNative) return C.Plugins.PedroNative;
+  /* Plugins can still be filling in when this runs, so ask for it by name */
+  try{ if(typeof C.registerPlugin === "function") return C.registerPlugin("PedroNative"); }
+  catch(e){}
+  return null;
+})();
 var deviceModel = { checked:false, available:false, reason:"" };
 
 function inApp(){ return !!Native; }
@@ -3033,7 +3040,10 @@ function hfClose(){
   hf.on = false; hf.want = false;
   hfEl.classList.remove("on");
   clearTimeout(hf.restart); clearTimeout(hf.quiet);
-  try{ if(hf.rec) hf.rec.abort(); }catch(e){}
+  try{
+    if(hf.rec && hf.rec.native) nativeMicStop();
+    else if(hf.rec) hf.rec.abort();
+  }catch(e){}
   hf.rec = null;
   if(window.speechSynthesis) speechSynthesis.cancel();
   keepAwake(false);
@@ -3060,6 +3070,7 @@ document.addEventListener("visibilitychange", function(){
 /* --- the listening loop --- */
 function hfListen(){
   if(!hf.want || hf.rec) return;
+  if(nativeMicSupported()) return hfListenNative();
   var r;
   try{ r = new SR(); }catch(e){ return; }
   r.lang = navigator.language || "en-US";
@@ -3075,7 +3086,54 @@ function hfListen(){
       var t = ev.results[i][0].transcript;
       if(ev.results[i].isFinal) finalTxt += t; else interim += t;
     }
-    var live = (finalTxt || interim).trim();
+    hfHeardText((finalTxt || interim).trim(), finalTxt);
+  };
+
+  r.onerror = function(ev){
+    if(ev.error === "not-allowed" || ev.error === "service-not-allowed"){
+      hfWarn.textContent = "Microphone permission is blocked - allow it in your browser settings.";
+      hf.want = false;
+    } else if(ev.error === "network"){
+      hfWarn.textContent = "Speech recognition needs a connection on this browser - it sends "
+        + "audio to the system speech service.";
+    }
+  };
+  r.onend = function(){
+    hf.rec = null;
+    /* browsers cut recognition off periodically - just start it again */
+    if(hf.want){ clearTimeout(hf.restart); hf.restart = setTimeout(hfListen, 350); }
+  };
+
+  hf.rec = r;
+  try{ r.start(); }catch(e){ hf.rec = null; }
+}
+
+/* Inside the app there is no browser recogniser at all, so hands-free goes
+   through Apple's - the same one the mic button uses. It stops itself after a
+   pause, so it gets started again for as long as the conversation is open. */
+function hfListenNative(){
+  if(!hf.want || hf.rec) return;
+  hf.rec = { native: true };
+  nativeMicStart(function(text, isFinal){
+    var live = String(text || "").trim();
+    hfHeardText(live, isFinal ? live : "");
+  }, function(err){
+    hf.rec = null;
+    if(err && /not allowed|denied|permission/i.test(String(err.message || err))){
+      hfWarn.textContent = "Microphone permission is off - turn it on in Settings, under Pedro.";
+      hf.want = false;
+      return;
+    }
+    if(hf.want){ clearTimeout(hf.restart); hf.restart = setTimeout(hfListen, 300); }
+  }).catch(function(e){
+    hf.rec = null;
+    hfWarn.textContent = "Microphone: " + String(e && e.message || e);
+  });
+}
+
+/* what a heard phrase means - shared, so both recognisers behave the same */
+function hfHeardText(live, finalTxt){
+    finalTxt = finalTxt || "";
     if(live) hfHeard.textContent = live;
 
     if(hf.phase === "wait"){
@@ -3103,29 +3161,11 @@ function hfListen(){
       if(finalTxt.trim()) hfAsk(finalTxt.trim());
       else hfQuietTimer();
     }
-  };
-
-  r.onerror = function(ev){
-    if(ev.error === "not-allowed" || ev.error === "service-not-allowed"){
-      hfWarn.textContent = "Microphone permission is blocked - allow it in your browser settings.";
-      hf.want = false;
-    } else if(ev.error === "network"){
-      hfWarn.textContent = "Speech recognition needs a connection on this browser - it sends "
-        + "audio to the system speech service.";
-    }
-  };
-  r.onend = function(){
-    hf.rec = null;
-    /* browsers cut recognition off periodically - just start it again */
-    if(hf.want){ clearTimeout(hf.restart); hf.restart = setTimeout(hfListen, 350); }
-  };
-
-  hf.rec = r;
-  try{ r.start(); }catch(e){ hf.rec = null; }
 }
 
 function hfPause(){
   clearTimeout(hf.restart);
+  if(hf.rec && hf.rec.native){ nativeMicStop(); hf.rec = null; return; }
   try{ if(hf.rec) hf.rec.stop(); }catch(e){}
   hf.rec = null;
 }
@@ -3244,7 +3284,7 @@ $("hfExit").addEventListener("click", hfClose);
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-20.16";
+var BUILD = "2026-08-20.17";
 
 function banner(kind, html){
   var b = $("banner");
