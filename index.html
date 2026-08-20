@@ -1320,6 +1320,8 @@ function fillSettings(){
   $("setName").value = s.name;
   $("setAbout").value = s.about;
   sw($("swTts"), s.tts); sw($("swThink"), s.showThink); sw($("swEnter"), s.enterSends);
+  var mh = $("micHint");
+  if(mh) mh.textContent = runningWhere().text;
   sw($("swVoiceTalk"), s.voiceTalk !== false);
   sw($("swLock"), isLocked()); syncLockSub();
   syncProviderUI();
@@ -1802,6 +1804,23 @@ var rec = null, listening = false;
 var isiOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
             (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
+/* There are two Pedros - the website and the installed app - and they can do
+   different things. Almost every microphone complaint comes down to which one
+   is open, so work it out once and say it plainly. */
+function runningWhere(){
+  if(Native)
+    return { app:true, ok:true,
+      text:"Running in the installed app, using the iPhone's own microphone." };
+  if(window.Capacitor)
+    return { app:true, ok:false,
+      text:"Running in the app, but its native half didn't load - so no microphone " +
+           "and no on-device model. Install the newest build and this clears up." };
+  return { app:false, ok:false,
+    text:(isiOS ? "Running as a website in Safari." : "Running as a website.") +
+         " Safari won't give a web page speech-to-text, whatever the microphone " +
+         "permission says. The installed app has its own and works offline." };
+}
+
 /* Why the mic isn't working, in words that suggest a fix. */
 function micProblem(){
   if(nativeMicSupported()) return null;     /* the app has its own recogniser */
@@ -1809,7 +1828,9 @@ function micProblem(){
     return "The microphone only works on a secure (https) address. Open the hosted version instead.";
   if(!SR)
     return isiOS
-      ? "Safari on iPhone doesn't give web apps the microphone. Use the microphone key on your keyboard instead - it types straight into the box."
+      ? "This is the website, and Safari doesn't give web pages the microphone. " +
+        "The installed app has its own - or use the microphone key on your keyboard, " +
+        "which types straight into the box."
       : "This browser has no speech recognition. Chrome or Edge do.";
   return null;
 }
@@ -1822,8 +1843,9 @@ function micError(code){
         return "Chrome won't do speech recognition on an http address, even localhost. " +
                "Use the hosted https version and it works.";
       return isiOS
-        ? "Safari won't give web apps speech-to-text, even with microphone access allowed. " +
-          "Use the microphone key on your keyboard instead - it types straight into the box."
+        ? "Safari won't give a web page speech-to-text, even with the microphone allowed. " +
+          "The installed app has its own recogniser - or use the microphone key on your " +
+          "keyboard, which types straight into the box."
         : "Microphone blocked. Tap the padlock in the address bar, allow the microphone, then reload.";
     case "audio-capture":
       return "No microphone found. Check it's plugged in and not in use by another app.";
@@ -3314,7 +3336,7 @@ $("hfExit").addEventListener("click", hfClose);
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-20.18";
+var BUILD = "2026-08-20.19";
 
 function banner(kind, html){
   var b = $("banner");

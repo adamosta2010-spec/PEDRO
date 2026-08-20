@@ -34,7 +34,7 @@ t("iPhone: no padlock advice - points at the keyboard instead",
   /padlock/i.test(micErrorOn(true,"not-allowed")) === false &&
   /keyboard/i.test(micErrorOn(true,"not-allowed")), true);
 t("iPhone advice says access being allowed is not the problem",
-  /even with microphone access allowed/i.test(micErrorOn(true,"service-not-allowed")), true);
+  /even with the microphone allowed/i.test(micErrorOn(true,"service-not-allowed")), true);
 t("service-not-allowed handled too", micError("service-not-allowed"), micError("not-allowed"));
 t("no microphone hardware is its own message", /No microphone found/i.test(micError("audio-capture")), true);
 t("silence is explained", /speak up/i.test(micError("no-speech")), true);
