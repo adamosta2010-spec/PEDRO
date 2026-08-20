@@ -384,5 +384,28 @@ function nativeFrom(cap, exp){
   t("and travels to a new install", inSrc("volume:s.volume"), true);
 }
 
+
+/* ---- how he sounds, and answering from behind ---- */
+{
+  const sp = grab("speak");
+  const inSrc = bit => src.indexOf(bit) > -1;
+  t("speed has a ceiling so it cannot gabble",
+    sp.indexOf("Math.max(0.7, Math.min(1.3, rate))") > -1, true);
+  t("a broken speed setting still speaks", sp.indexOf("isNaN(rate) ? 1") > -1, true);
+  t("there is a control for speed", inSrc('$("setRate")'), true);
+  t("speed travels to a new install", inSrc("rate:s.rate"), true);
+
+  const quiet = grab("hfListenQuietly");
+  t("it can listen with nothing on screen", quiet.indexOf("hf.want = true") > -1, true);
+  t("and deliberately does not show its screen",
+    quiet.indexOf('hfEl.classList.remove("on")') > -1, true);
+  t("it still listens for the name", quiet.indexOf("hfListen()") > -1, true);
+  const bg = grab("applyBackground");
+  t("turning it on starts listening", bg.indexOf("hfListenQuietly()") > -1, true);
+  t("turning it off stops listening", bg.indexOf("hf.want = false") > -1, true);
+  t("turning it off leaves the voice screen alone",
+    bg.indexOf('!hfEl.classList.contains("on")') > -1, true);
+}
+
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " mic/image tests passed");
 process.exit(fail ? 1 : 0);

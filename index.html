@@ -759,6 +759,8 @@
       <select id="setVoice"></select>
       <label for="setVolume" style="margin-top:10px;display:block">Volume <span id="volNum" style="color:var(--tx2);font-weight:400"></span></label>
       <input type="range" id="setVolume" min="0" max="100" step="5" style="width:100%">
+      <label for="setRate" style="margin-top:10px;display:block">Speaking speed <span id="rateNum" style="color:var(--tx2);font-weight:400"></span></label>
+      <input type="range" id="setRate" min="70" max="130" step="5" style="width:100%">
       <button class="btn ghost" id="btnHearVoice" style="margin-top:8px">Hear it</button>
       <div class="hint" id="voiceHint">Phones ship several. The ones marked Enhanced or Siri
         sound like a person; the plain ones sound like a machine.</div>
@@ -937,6 +939,7 @@ var DEF = {
   voiceTalk:true,  /* talking sends straight away and the answer is read back */
   voiceName:"",    /* which of the phone's voices to speak with */
   volume:1,        /* how loud he is, on top of the phone's own volume */
+  rate:1,          /* how fast he talks - deliberately capped short of gabbling */
   background:false, /* keep listening while the app is not on screen */
   voiceFirst:true,  /* open straight into the voice screen - talking is the point */
   lock:null,       /* when set: {salt, iv, ct} - your API keys, encrypted with your password */
@@ -1471,6 +1474,9 @@ function fillSettings(){
   var volEl = $("setVolume");
   if(volEl) volEl.value = Math.round((s.volume === undefined ? 1 : s.volume) * 100);
   showVolume();
+  var rateEl = $("setRate");
+  if(rateEl) rateEl.value = Math.round((s.rate === undefined ? 1 : s.rate) * 100);
+  showRate();
   fillVoices();
   sw($("swLock"), isLocked()); syncLockSub();
   syncProviderUI();
@@ -1852,6 +1858,20 @@ $("setVolume").addEventListener("input", function(){
 $("setVolume").addEventListener("change", function(){
   speak("This is how loud I'll be.");
 });
+
+function showRate(){
+  var n = $("rateNum");
+  if(!n) return;
+  var r = parseFloat(store.settings.rate) || 1;
+  n.textContent = r < 0.9 ? "slower" : (r > 1.1 ? "quicker" : "normal");
+}
+$("setRate").addEventListener("input", function(){
+  store.settings.rate = Math.max(0.7, Math.min(1.3, parseInt(this.value, 10) / 100));
+  save(); showRate();
+});
+$("setRate").addEventListener("change", function(){
+  speak("This is the speed I'll talk at.");
+});
 $("btnHearVoice").addEventListener("click", function(){
   speak("Hello, I'm " + aiName() + ". This is how I sound.");
 });
@@ -2214,8 +2234,10 @@ function speak(text, onEnd){
   u.lang = navigator.language || "en-US";
   var v = pickVoice();
   if(v) u.voice = v;
-  /* the pace of someone talking to you, not reading to you */
-  u.rate = 1;
+  /* the pace of someone talking to you, not reading to you. The ceiling is
+     deliberate: past about 1.3 it stops sounding like speech. */
+  var rate = parseFloat(store.settings.rate);
+  u.rate = isNaN(rate) ? 1 : Math.max(0.7, Math.min(1.3, rate));
   u.pitch = 1;
   var vol = parseFloat(store.settings.volume);
   u.volume = isNaN(vol) ? 1 : Math.max(0, Math.min(1, vol));
@@ -3753,7 +3775,8 @@ function backupData(){
       apiKey:s.apiKey, geminiKey:s.geminiKey, groqKey:s.groqKey,
       model:s.model, geminiModel:s.geminiModel, groqModel:s.groqModel,
       imageModel:s.imageModel, localUrl:s.localUrl, localModel:s.localModel,
-      effort:s.effort, tts:s.tts, voiceName:s.voiceName, voiceTalk:s.voiceTalk, volume:s.volume,
+      effort:s.effort, tts:s.tts, voiceName:s.voiceName, voiceTalk:s.voiceTalk,
+      volume:s.volume, rate:s.rate,
       background:s.background, voiceFirst:s.voiceFirst, enterSends:s.enterSends,
       showThink:s.showThink, theme:s.theme, authEmail:s.authEmail
     },
@@ -3992,6 +4015,19 @@ function hfClose(){
    apps genuinely using audio, which a microphone session is - the app declares
    that, and the native side holds the session open. It costs battery, so it is
    off unless asked for. */
+/* Listening with nothing on screen. The machinery runs exactly as it does in
+   the voice screen - wake word, question, spoken answer - but the screen itself
+   stays closed, so being answered does not mean being pulled into an app. */
+function hfListenQuietly(){
+  if(!nativeMicSupported()) return;
+  hf.want = true;
+  hf.on = true;
+  hf.turns = 0;
+  if(hfEl) hfEl.classList.remove("on");
+  hfSet("wait", hfIdleLabel());
+  hfListen();
+}
+
 function applyBackground(){
   var on = !!store.settings.background;
   if(on && !inApp()){
@@ -4008,7 +4044,15 @@ function applyBackground(){
     });
   }
   keepAwake(on);
-  if(on) toast("It will keep listening in the background");
+  if(on){
+    hfListenQuietly();
+    toast("Listening - say " + aiName() + " any time");
+  } else if(hf.on && !hfEl.classList.contains("on")){
+    /* it was only listening for the background - stop it */
+    hf.want = false;
+    hf.on = false;
+    hfPause();
+  }
 }
 
 /* --- keep the screen awake so it can keep listening --- */
@@ -4027,6 +4071,12 @@ function keepAwake(want){
 }
 document.addEventListener("visibilitychange", function(){
   if(document.visibilityState === "visible" && hf.on){ keepAwake(true); hfListen(); }
+  /* Off screen with background listening on, he carries on hearing and
+     answering out loud. The phone stays where it is - being answered should not
+     mean being dragged into an app. */
+  if(document.visibilityState === "hidden" && store.settings.background && hf.want){
+    hfWarn.textContent = "";
+  }
 });
 
 /* --- the listening loop --- */
@@ -4257,7 +4307,7 @@ $("hfExit").addEventListener("click", hfClose);
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-20.38";
+var BUILD = "2026-08-20.39";
 
 function banner(kind, html){
   var b = $("banner");

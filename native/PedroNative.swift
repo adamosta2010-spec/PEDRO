@@ -127,6 +127,8 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin {
     /// Without the audio background mode in Info.plist iOS suspends us anyway,
     /// so this is only half the story - the build adds the other half.
     private var keepAlive = false
+    /// listening is meant to be happening, as opposed to merely running now
+    private var wantListening = false
 
     /// Hand a URL to iOS so it opens whatever app owns that scheme - maps,
     /// music, a phone number, or one of their own Shortcuts. iOS decides what
@@ -207,20 +209,76 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin {
                     "text": result.bestTranscription.formattedString,
                     "final": result.isFinal
                 ])
-                if result.isFinal { self.stopEverything() }
+                if result.isFinal {
+                    self.stopEverything()
+                    self.resumeIfWanted()
+                }
             }
             if error != nil {
                 self.notifyListeners("pedroSpeechEnd", data: ["error": error!.localizedDescription])
                 self.stopEverything()
+                self.resumeIfWanted()
             }
         }
 
+        wantListening = true
         call.resolve(["listening": true])
     }
 
     @objc func stopListening(_ call: CAPPluginCall) {
+        wantListening = false
         stopEverything()
         call.resolve(["listening": false])
+    }
+
+    /// Apple ends a recognition task after a pause, or after about a minute of
+    /// audio. While background listening is on, start another one - the web
+    /// layer cannot be relied on to do it once the app is off screen.
+    private func resumeIfWanted() {
+        guard keepAlive, wantListening else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+            guard let self = self, self.keepAlive, self.wantListening else { return }
+            self.restartListening()
+        }
+    }
+
+    /// beginListening, without a call waiting for an answer
+    private func restartListening() {
+        recognizer = recognizer ?? SFSpeechRecognizer(locale: Locale.current)
+        guard let recognizer = recognizer, recognizer.isAvailable else { return }
+        let req = SFSpeechAudioBufferRecognitionRequest()
+        req.shouldReportPartialResults = true
+        if recognizer.supportsOnDeviceRecognition { req.requiresOnDeviceRecognition = true }
+        request = req
+        do {
+            let node = engine.inputNode
+            node.removeTap(onBus: 0)
+            node.installTap(onBus: 0, bufferSize: 1024, format: node.outputFormat(forBus: 0)) { buffer, _ in
+                req.append(buffer)
+            }
+            engine.prepare()
+            try engine.start()
+        } catch {
+            notifyListeners("pedroSpeechEnd", data: ["error": error.localizedDescription])
+            return
+        }
+        task = recognizer.recognitionTask(with: req) { [weak self] result, error in
+            guard let self = self else { return }
+            if let result = result {
+                self.notifyListeners("pedroSpeech", data: [
+                    "text": result.bestTranscription.formattedString,
+                    "final": result.isFinal
+                ])
+                if result.isFinal {
+                    self.stopEverything()
+                    self.resumeIfWanted()
+                }
+            }
+            if error != nil {
+                self.stopEverything()
+                self.resumeIfWanted()
+            }
+        }
     }
 
     private func stopEverything() {
