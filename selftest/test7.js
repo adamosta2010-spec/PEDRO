@@ -821,5 +821,15 @@ function nativeFrom(cap, exp){
   t("the voice has a name", inSrc('elevenName:"AI"'), true);
 }
 
+
+/* ---- asking to build a second thing ---- */
+{
+  const ask = grab("hfAsk");
+  const buildAt = ask.indexOf("vizBuild(toDraw)");
+  const showingAt = ask.indexOf("classList.contains(\"showing\")");
+  t("a new build wins over answering about the old one", buildAt > -1 && buildAt < showingAt, true);
+  t("and a question about what is showing still lands there", showingAt > -1, true);
+}
+
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " mic/image tests passed");
 process.exit(fail ? 1 : 0);

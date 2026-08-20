@@ -5993,12 +5993,6 @@ function hfAsk(question){
   /* If he is already looking, the question is usually about what he can see -
      but "count to a hundred" is not, and attaching a picture to it made him
      describe the room as well. */
-  /* something is playing in the ball - the question is about that */
-  if($("hfOrb").classList.contains("showing") && !CLOSE_RE.test(String(question).trim())){
-    vizAsk(question);
-    return;
-  }
-
   /* the ones that need no model at all */
   if(theSmallThings(question)){
     hfSet(hf.want ? "hear" : "wait", hf.want ? "Listening…" : hfIdleLabel());
@@ -6028,9 +6022,18 @@ function hfAsk(question){
     return;
   }
 
-  /* asked to be shown rather than told */
+  /* Asked to build something. This comes before "answer about what is already
+     showing", or asking to simulate a second thing is heard as a question about
+     the first. */
   var toDraw = wantsPicture3D(question);
   if(toDraw && !cam.open){ vizBuild(toDraw); return; }
+
+  /* something is playing in the ball, and this was not a request to build
+     anything new - so the question is about what is on screen */
+  if($("hfOrb").classList.contains("showing")){
+    vizAsk(question);
+    return;
+  }
 
   if(cam.open){
     var q = String(question).trim();
@@ -6303,7 +6306,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.61";
+var BUILD = "2026-08-21.62";
 
 function banner(kind, html){
   var b = $("banner");
