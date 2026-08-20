@@ -3609,6 +3609,10 @@ function nativeMicStop(){
   nativeListening = false;
   micHandlers.text = null;
   micHandlers.done = null;             /* nothing stale left waiting to fire */
+  /* hands-free keeps a marker saying it is listening, and starting again is a
+     no-op while it is set - forgetting to clear it here is why the microphone
+     never came back after an answer */
+  if(hf.rec && hf.rec.native) hf.rec = null;
   if(Native) Native.stopListening().catch(function(){});
 }
 
@@ -3762,7 +3766,9 @@ var viz = { open:false, busy:false, last:null, lastAsk:'' };
 
 /* asking to be shown rather than told */
 var VIZ_RE = /^(?:(?:can you )?(?:show|draw|animate|visuali[sz]e|illustrate|diagram|graph|plot|simulate|model)\s+(?:me\s+)?)(.{2,80})$/i;
-var VIZ_HINT_RE = /\b(?:simulation|simulate|animate|animation|diagram|visual(?:ly)?|show me how|how does .* work)\b/i;
+/* Only when actually asked to build something. Asking how a thing works is a
+   question, and it was being answered with a drawing nobody wanted. */
+var VIZ_HINT_RE = /^(?:build|simulate|animate|model)\s+/i;
 
 function wantsPicture3D(q){
   q = String(q || '').trim();
@@ -3794,10 +3800,31 @@ function vizPage(inner){
     "<meta name='viewport' content='width=device-width,initial-scale=1'>" +
     "<meta http-equiv='Content-Security-Policy' content=" + JSON.stringify(csp) + ">" +
     "<style>html,body{margin:0;height:100%;background:#0b0d12;color:#e7e9ee;" +
-      "font:14px -apple-system,system-ui,sans-serif;overflow:hidden}" +
-      "canvas,svg{display:block;max-width:100%;max-height:100%;margin:0 auto}" +
+      "font:14px -apple-system,system-ui,sans-serif;overflow:hidden;" +
+      "display:flex;align-items:center;justify-content:center}" +
+      "canvas,svg{display:block;width:100vmin;height:100vmin;max-width:100%;max-height:100%}" +
       "*{box-sizing:border-box}</style></head><body>";
-  return head + inner + "</body></html>";
+
+  /* His code usually forgets to size the canvas, and an unsized one is 300 by
+     150 - most of which falls outside the circle, so nothing appears. Size it
+     here, but only if he has not sized it himself: changing a canvas size
+     wipes it, and a drawing made once would be erased. */
+  var boot = [
+    "(function(){",
+    "function fit(){",
+    "var r=Math.min(window.innerWidth,window.innerHeight);",
+    "var dpr=Math.min(2,window.devicePixelRatio||1);",
+    "var list=document.getElementsByTagName('canvas');",
+    "for(var i=0;i<list.length;i++){var c=list[i];",
+    "if(c.width===300&&c.height===150){",
+    "c.width=Math.round(r*dpr);c.height=Math.round(r*dpr);",
+    "var g=c.getContext&&c.getContext('2d');",
+    "if(g&&dpr!==1)g.setTransform(dpr,0,0,dpr,0,0);}}}",
+    "fit();window.addEventListener('resize',fit);",
+    "var n=0,again=setInterval(function(){fit();if(++n>20)clearInterval(again);},120);",
+    "})();"
+  ].join("");
+  return head + inner + "<scr" + "ipt>" + boot + "</scr" + "ipt></body></html>";
 }
 
 /* pull the page out of the reply, whatever chatter surrounds it */
@@ -4153,7 +4180,10 @@ function camHighlight(what){
     "left of the picture. If there are none, reply with []";
 
   var only = { messages: [{ role:"user", content: ask, images:[shot], t:Date.now() }] };
-  withVision(function(){ return askOnce(only); }).then(function(answer){
+  var work = withVision(function(){ return askOnce(only); });
+  /* nothing here can send a picture anywhere - look at it on the phone */
+  if(!work) work = lookOnDevice(shot);
+  work.then(function(answer){
     cam.busy = false;
     camEl.classList.remove("busy");
     var found = [];
@@ -4195,14 +4225,29 @@ function visionProvider(){
   return null;
 }
 
+/* The phone's own eyes. Not a model that can reason about a picture, but it
+   names things, reads text, and needs nothing at all - no key, no signal. */
+function lookOnDevice(shot){
+  if(!Native || !Native.analyse) return Promise.reject(new Error("no camera support here"));
+  return Native.analyse({ image: shot.data }).then(function(r){
+    var labels = (r && r.labels) || [];
+    var words = (r && r.text) || [];
+    var faces = (r && r.faces) || 0;
+    var said = [];
+    if(labels.length) said.push("It looks like " + labels.slice(0, 3).join(", ") + ".");
+    if(faces === 1) said.push("There is one face in it.");
+    else if(faces > 1) said.push("There are " + faces + " faces in it.");
+    if(words.length) said.push("It says: " + words.slice(0, 12).join(" "));
+    if(!said.length) said.push("I can see something, but nothing I can name.");
+    said.push("That is my own eyes rather than a proper model - add a Gemini key and I can say much more.");
+    return said.join(" ");
+  });
+}
+
 /* Run one request through a model that can see, then put things back. */
 function withVision(run){
   var vp = visionProvider();
-  if(!vp){
-    return Promise.reject(new Error(
-      "Nothing on this phone can look at pictures yet. The phone's own model " +
-      "reads text only - add your free Gemini key in Settings and the camera works."));
-  }
+  if(!vp) return null;      /* the caller falls back to the phone's own eyes */
   var was = store.settings.provider;
   if(vp !== was) store.settings.provider = vp;
   function restore(){ if(vp !== was){ store.settings.provider = was; } }
@@ -4236,7 +4281,10 @@ function camAsk(question){
   c.messages.push({ role:'user', content: question, images:[shot], t:Date.now() });
   save();
   voiceMode = true;
-  withVision(function(){ return askOnce(only); }).then(function(answer){
+  var work = withVision(function(){ return askOnce(only); });
+  /* nothing here can send a picture anywhere - look at it on the phone */
+  if(!work) work = lookOnDevice(shot);
+  work.then(function(answer){
     voiceMode = false;
     cam.busy = false;
     camEl.classList.remove('busy');
@@ -4633,10 +4681,50 @@ function rememberFrom(text){
 var OPEN_RE = /^(?:open|show|go to|bring up)?\s*(?:the\s+)?(settings|options|voice|teach|teaching|memory|memories|camera|look)(?:\s+(?:panel|page|screen|tab))?$/i;
 var CLOSE_RE = /^(?:close|hide|dismiss|go back|never mind|nevermind)(?:\s+(?:that|it|this|the\s+(?:panel|settings|camera)))?$/i;
 
+/* Said mid-flow: stop what you are doing. Pause holds everything and waits to
+   be told to carry on; stop ends it and goes back to listening. */
+var STOP_RE = /^(?:stop|stop it|shut up|be quiet|quiet|enough|cancel|forget it)$/i;
+var PAUSE_RE = /^(?:pause|hold on|wait|one moment|one second|hang on)$/i;
+var RESUME_RE = /^(?:carry on|continue|go on|resume|unpause|keep going)$/i;
+
 /* returns true if the words were a request to open or close something */
 function openByVoice(said){
   var q = String(said || "").trim().replace(/[.?!]+$/, "");
   if(!q) return false;
+
+  if(STOP_RE.test(q)){
+    /* everything he is in the middle of */
+    sayStop();
+    if(elevenAudio){ try{ elevenAudio.pause(); }catch(e){} }
+    if(Native && Native.stopSpeaking) Native.stopSpeaking().catch(function(){});
+    if(window.speechSynthesis) speechSynthesis.cancel();
+    if(abortCtl){ try{ abortCtl.abort(); }catch(e){} }
+    viz.busy = false;
+    hf.talking = false;
+    hfSaid.textContent = "";
+    hfSet("hear", "Listening…");
+    hfListen();
+    return true;
+  }
+
+  if(PAUSE_RE.test(q)){
+    sayStop();
+    if(elevenAudio){ try{ elevenAudio.pause(); }catch(e){} }
+    if(Native && Native.stopSpeaking) Native.stopSpeaking().catch(function(){});
+    if(window.speechSynthesis) speechSynthesis.cancel();
+    hf.talking = false;
+    hf.paused = true;
+    hfSet("wait", "Paused - say carry on");
+    return true;
+  }
+
+  if(RESUME_RE.test(q) && hf.paused){
+    hf.paused = false;
+    hfSet("hear", "Listening…");
+    hfListen();
+    speak("Carrying on.");
+    return true;
+  }
 
   if(CLOSE_RE.test(q)){
     if(vizStop()) return true;
@@ -5585,9 +5673,11 @@ function hfAsk(question){
     sayWhenDone(function(){
       hf.talking = false;
       if(!hf.want) return;
-      /* straight back to listening - this is what makes it a conversation */
+      /* straight back to listening - this is what makes it a conversation.
+         Saying the words is not enough: the microphone has to be started. */
       hfSet("hear", "Listening…");
       hfHeard.textContent = "";
+      hfListen();
       hfQuietTimer();
     });
     renderAll();
@@ -5796,7 +5886,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.56";
+var BUILD = "2026-08-21.57";
 
 function banner(kind, html){
   var b = $("banner");

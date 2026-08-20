@@ -432,8 +432,10 @@ function nativeFrom(cap, exp){
   t("and puts the choice back afterwards", wv.indexOf("function restore()") > -1, true);
   t("it restores even when the request fails",
     wv.indexOf("function(e){ restore(); throw e; }") > -1, true);
-  t("with nothing that can see, it says so",
-    wv.indexOf("reads text only") > -1, true);
+  /* it no longer refuses - it uses the phone own eyes instead */
+  t("with nothing that can see, the phone looks itself",
+    wv.indexOf("return null;") > -1 && inSrc("function lookOnDevice"), true);
+  t("and says those eyes are its own", grab("lookOnDevice").indexOf("my own eyes") > -1, true);
   t("looking goes through it", grab("camAsk").indexOf("withVision(") > -1, true);
   t("highlighting goes through it", grab("camHighlight").indexOf("withVision(") > -1, true);
   t("a camera problem is spoken, not just printed",
@@ -503,8 +505,9 @@ function nativeFrom(cap, exp){
   t("simulate gets one too", wants("simulate a bouncing ball"), "a bouncing ball");
   t("animate gets one", wants("animate the water cycle"), "the water cycle");
   t("plot gets one", wants("plot x squared"), "x squared");
-  t("how does it work gets one", !!wants("how does a jet engine work"), true);
-  t("a plain fact does not", wants("what is the capital of france"), null);
+  /* asking how something works is a question now, not a build request */
+  t("how does it work is just a question", wants("how does a jet engine work"), null);
+  t("but build one is a build request", !!wants("build a jet engine"), true);
   t("counting does not", wants("count to ten"), null);
   t("opening an app does not", wants("open safari"), null);
 
@@ -704,6 +707,36 @@ function nativeFrom(cap, exp){
   t("the recogniser is told what to expect", inSrc("function tellMicTheWords"), true);
   t("starting with his own name", grab("tellMicTheWords").indexOf("aiName()") > -1, true);
   t("it is told before every turn", inSrc("tellMicTheWords();"), true);
+}
+
+
+/* ---- pause, stop, and getting the microphone back ---- */
+{
+  const v = n => src.slice(src.indexOf("var " + n), src.indexOf(";", src.indexOf("var " + n)) + 1);
+  const cmd = new Function(v("STOP_RE") + v("PAUSE_RE") + v("RESUME_RE") +
+    "; return { S:STOP_RE, P:PAUSE_RE, R:RESUME_RE };")();
+  const inSrc = bit => src.indexOf(bit) > -1;
+
+  t("stop is heard as a command", cmd.S.test("stop"), true);
+  t("so is be quiet", cmd.S.test("be quiet"), true);
+  t("pause is its own thing", cmd.P.test("pause"), true);
+  t("hold on pauses too", cmd.P.test("hold on"), true);
+  t("carry on resumes", cmd.R.test("carry on"), true);
+  t("a question is none of those", cmd.S.test("what is the capital of france"), false);
+  t("stopping cuts the speech off", inSrc("if(Native && Native.stopSpeaking) Native.stopSpeaking()"), true);
+  t("and abandons the request", inSrc("abortCtl.abort();"), true);
+
+  /* the bug that made him deaf after one answer */
+  t("stopping the microphone clears the marker that blocks starting it",
+    grab("nativeMicStop").indexOf("hf.rec = null") > -1, true);
+  t("and listening is actually started again after speaking",
+    grab("hfAsk").indexOf("hfListen();") > -1, true);
+
+  /* the phone can look at a picture by itself */
+  t("the phone can look at a picture itself", inSrc("function lookOnDevice"), true);
+  t("it reads any words in it", grab("lookOnDevice").indexOf("It says: ") > -1, true);
+  t("it counts faces", grab("lookOnDevice").indexOf("faces in it") > -1, true);
+  t("and admits it is not a proper model", grab("lookOnDevice").indexOf("add a Gemini key") > -1, true);
 }
 
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " mic/image tests passed");

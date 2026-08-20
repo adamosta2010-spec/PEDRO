@@ -3,6 +3,7 @@ import UIKit
 import Capacitor
 import Speech
 import AVFoundation
+import Vision
 
 #if canImport(FoundationModels)
 import FoundationModels
@@ -32,7 +33,8 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
         CAPPluginMethod(name: "speak",          returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopSpeaking",   returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "warm",           returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "setWords",       returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "setWords",       returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "analyse",        returnType: CAPPluginReturnPromise)
     ]
 
     // MARK: - on-device model
@@ -119,7 +121,7 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
                     // a session can be left in a bad state - start fresh next time
                     self.keptSession = nil
                     self.keptFor = ""
-                    call.reject("on-device model failed: (error.localizedDescription)")
+                    call.reject("on-device model failed: \(error.localizedDescription)")
                 }
             }
             return
@@ -183,6 +185,58 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
     /// Hand a URL to iOS so it opens whatever app owns that scheme - maps,
     /// music, a phone number, or one of their own Shortcuts. iOS decides what
     /// happens next, and anything that sends still needs a tap in that app.
+    // MARK: - looking, without the network
+
+    /// What the phone itself can see: what it thinks the thing is, any words
+    /// in it, and how many faces. No key, no signal, nothing leaves the device.
+    /// The language model cannot look at pictures - this can.
+    @objc func analyse(_ call: CAPPluginCall) {
+        guard let b64 = call.getString("image"),
+              let data = Data(base64Encoded: b64),
+              let image = UIImage(data: data),
+              let cg = image.cgImage else {
+            call.reject("that is not a picture")
+            return
+        }
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            let handler = VNImageRequestHandler(cgImage: cg, options: [:])
+            var labels: [String] = []
+            var words: [String] = []
+
+            let classify = VNClassifyImageRequest()
+            let text = VNRecognizeTextRequest()
+            text.recognitionLevel = .accurate
+            text.usesLanguageCorrection = true
+            let faceReq = VNDetectFaceRectanglesRequest()
+
+            do {
+                try handler.perform([classify, text, faceReq])
+            } catch {
+                DispatchQueue.main.async {
+                    call.reject("could not look at that: \(error.localizedDescription)")
+                }
+                return
+            }
+
+            if let found = classify.results as? [VNClassificationObservation] {
+                labels = found
+                    .filter { $0.confidence > 0.12 }
+                    .prefix(6)
+                    .map { $0.identifier.replacingOccurrences(of: "_", with: " ") }
+            }
+            if let found = text.results as? [VNRecognizedTextObservation] {
+                words = Array(found.compactMap { $0.topCandidates(1).first?.string }
+                                   .filter { !$0.isEmpty }.prefix(20))
+            }
+            let faces = faceReq.results?.count ?? 0
+
+            DispatchQueue.main.async {
+                call.resolve(["labels": labels, "text": words, "faces": faces])
+            }
+        }
+    }
+
     // MARK: - speaking
 
     /// The web view's own speech engine is suspended while the app is off
@@ -268,7 +322,7 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
             }
             call.resolve(["enabled": on])
         } catch {
-            call.reject("couldn't hold the audio session: (error.localizedDescription)")
+            call.reject("couldn't hold the audio session: \(error.localizedDescription)")
         }
     }
 

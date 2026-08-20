@@ -1,0 +1,26 @@
+Pause and stop, the microphone comes back, building only when asked, and the phone can look for itself
+
+After one spoken answer he went deaf. Stopping the microphone did not clear the
+marker that says listening is already running, and starting it again is a no-op
+while that marker is set - so the next thing said was never heard. Cleared where
+it is stopped, and listening is now actually started again when he finishes
+speaking rather than only being labelled as listening.
+
+Say stop and he stops - speech cut off, request abandoned, back to listening.
+Say pause and he holds until told to carry on.
+
+Building only happens when asked to build, simulate, animate or model something.
+Asking how a jet engine works is a question again, and gets an answer.
+
+The simulation was drawing into a 300 by 150 canvas - the browser default, most
+of it outside the circle, which is why nothing appeared. The wrapper sizes it
+now, and only when the code has not sized it itself, since resizing a canvas
+wipes what is on it. Tested by running a real generated page through the whole
+pipeline: 110,730 pixels painted where there had been none.
+
+And the phone can look at a picture on its own. The language model reads text
+only, but the phone has had image recognition built in for years: it names what
+it sees, reads any words, counts faces, and needs no key and no signal. It says
+plainly that those are its own eyes rather than a proper model.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
