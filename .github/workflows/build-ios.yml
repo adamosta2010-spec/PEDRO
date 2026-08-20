@@ -1,17 +1,23 @@
 # Builds Pedro into an installable .ipa on a free GitHub macOS machine.
-# No Mac needed on your side, and no Apple Developer account:
-# the .ipa comes out unsigned, and AltStore signs it with your free Apple ID.
+# No Mac needed on your side, and no Apple Developer account: the .ipa comes out
+# unsigned, and AltStore signs it with your free Apple ID.
+#
+# However it ends, the log is committed to build-log/last-build.txt so the error
+# can be read straight from the repo instead of dug out of the Actions UI.
 
 name: Build iPhone app
 
 on:
   push:
     branches: [main]
-  workflow_dispatch:        # lets you start a build by hand from the Actions tab
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
-    runs-on: macos-15       # newest available - the on-device model needs a recent SDK
+    runs-on: macos-15
 
     steps:
       - uses: actions/checkout@v4
@@ -20,43 +26,64 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install Capacitor
-        run: npm install
-
-      - name: Make sure the web app is present
+      - name: Toolchain
         run: |
-          test -f dist/index.html || { echo "dist/index.html missing"; exit 1; }
-          grep -o 'var BUILD = "[^"]*"' dist/index.html | head -1
-
-      - name: Show the toolchain
-        run: |
+          exec > >(tee -a build.log) 2>&1
           echo "node   $(node -v)"
           echo "npm    $(npm -v)"
           echo "xcode  $(xcodebuild -version | head -1)"
-          echo "pod    $(pod --version 2>/dev/null || echo missing)"
-          echo "sdks:"; xcodebuild -showsdks | grep -i ios || true
-          echo "ios/ present before add: $(test -d ios && echo YES || echo no)"
+          echo "ruby   $(ruby -v 2>/dev/null || echo missing)"
+          echo "pod    $(pod --version 2>/dev/null || echo MISSING)"
+          echo "ios dir present: $(test -d ios && echo YES || echo no)"
+
+      - name: CocoaPods
+        run: |
+          exec > >(tee -a build.log) 2>&1
+          if ! command -v pod >/dev/null 2>&1; then
+            echo "installing cocoapods..."
+            sudo gem install cocoapods --no-document || brew install cocoapods
+          fi
+          pod --version
+
+      - name: Install Capacitor
+        run: |
+          exec > >(tee -a build.log) 2>&1
+          npm install
+          echo "--- capacitor packages ---"
+          npm ls @capacitor/core @capacitor/ios @capacitor/cli || true
+
+      - name: Check the web app is there
+        run: |
+          exec > >(tee -a build.log) 2>&1
+          test -f dist/index.html || { echo "dist/index.html missing"; exit 1; }
+          grep -o 'var BUILD = "[^"]*"' dist/index.html | head -1
 
       - name: Create the iOS project
-        run: npx cap add ios --verbose
-
-      - name: Copy the web app into it
-        run: npx cap sync ios
-
-      - name: Add the native bridge (on-device model + speech)
         run: |
+          exec > >(tee -a build.log) 2>&1
+          npx cap add ios --verbose
+
+      - name: Sync the web app into it
+        run: |
+          exec > >(tee -a build.log) 2>&1
+          npx cap sync ios
+
+      - name: Add the native bridge
+        run: |
+          exec > >(tee -a build.log) 2>&1
           cp native/PedroNative.swift ios/App/App/PedroNative.swift
           ls -l ios/App/App/
 
-      - name: Allow microphone and speech recognition
+      - name: Microphone and speech permissions
         run: |
+          exec > >(tee -a build.log) 2>&1
           PLIST=ios/App/App/Info.plist
           /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'Pedro listens when you tap the microphone.'" "$PLIST" || true
           /usr/libexec/PlistBuddy -c "Add :NSSpeechRecognitionUsageDescription string 'Pedro turns what you say into text.'" "$PLIST" || true
-          /usr/libexec/PlistBuddy -c "Print" "$PLIST" | head -40
 
-      - name: Build (unsigned - AltStore signs it later)
+      - name: Build (unsigned)
         run: |
+          exec > >(tee -a build.log) 2>&1
           cd ios/App
           xcodebuild \
             -workspace App.xcworkspace \
@@ -70,8 +97,9 @@ jobs:
             ONLY_ACTIVE_ARCH=NO \
             build
 
-      - name: Package it as an .ipa
+      - name: Package as .ipa
         run: |
+          exec > >(tee -a build.log) 2>&1
           cd ios/App/build/Build/Products/Release-iphoneos
           mkdir -p Payload
           cp -R App.app Payload/
@@ -79,7 +107,21 @@ jobs:
           ls -lh Pedro.ipa
 
       - uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: Pedro-ipa
           path: ios/App/build/Build/Products/Release-iphoneos/Pedro.ipa
           retention-days: 30
+
+      - name: Publish the log
+        if: always()
+        run: |
+          mkdir -p build-log
+          tail -c 200000 build.log > build-log/last-build.txt 2>/dev/null || echo "no log captured" > build-log/last-build.txt
+          printf '\n=== finished: %s at %s ===\n' "${{ job.status }}" "$(date -u)" >> build-log/last-build.txt
+          git config user.name "build"
+          git config user.email "build@users.noreply.github.com"
+          git add -f build-log/last-build.txt
+          git commit -m "build log: ${{ job.status }}" || exit 0
+          git pull --rebase --autostash origin main || true
+          git push origin HEAD:main || true
