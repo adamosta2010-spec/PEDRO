@@ -103,10 +103,20 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin {
                 call.reject("speech recognition not allowed")
                 return
             }
-            AVAudioApplication.requestRecordPermission { granted in
+            self.requestMic { granted in
                 guard granted else { call.reject("microphone not allowed"); return }
                 DispatchQueue.main.async { self.beginListening(call) }
             }
+        }
+    }
+
+    /// Asking for the microphone changed in iOS 17: it used to hang off the
+    /// audio session, now it has its own class. Ask the way this device knows.
+    private func requestMic(_ done: @escaping (Bool) -> Void) {
+        if #available(iOS 17.0, *) {
+            AVAudioApplication.requestRecordPermission { granted in done(granted) }
+        } else {
+            AVAudioSession.sharedInstance().requestRecordPermission { granted in done(granted) }
         }
     }
 
