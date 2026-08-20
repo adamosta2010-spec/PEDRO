@@ -7,7 +7,7 @@ pod    1.17.0
 ios dir present: no
 1.17.0
 
-added 92 packages, and audited 93 packages in 4s
+added 92 packages, and audited 93 packages in 3s
 
 11 packages are looking for funding
   run `npm fund` for details
@@ -20,35 +20,35 @@ pedro@1.0.0 /Users/runner/work/PEDRO/PEDRO
 └─┬ @capacitor/ios@7.6.8
   └── @capacitor/core@7.6.8 deduped
 
-var BUILD = "2026-08-20.39"
-✔ Adding native Xcode project in ios in 12.51ms
-✔ add in 12.74ms
-✔ Copying web assets from dist to ios/App/App/public in 3.26ms
-✔ Creating capacitor.config.json in ios/App/App in 306.79μs
-✔ copy ios in 6.69ms
-✔ Updating iOS plugins in 222.33μs
-✔ Updating iOS native dependencies with pod install in 7.76s
-✔ update ios in 7.79s
+var BUILD = "2026-08-20.40"
+✔ Adding native Xcode project in ios in 16.75ms
+✔ add in 17.07ms
+✔ Copying web assets from dist to ios/App/App/public in 3.66ms
+✔ Creating capacitor.config.json in ios/App/App in 469.12μs
+✔ copy ios in 8.25ms
+✔ Updating iOS plugins in 297.21μs
+✔ Updating iOS native dependencies with pod install in 8.84s
+✔ update ios in 8.87s
 [success] ios platform added!
 Follow the Developer Workflow guide to get building:
 https://capacitorjs.com/docs/basics/workflow
-✔ Copying web assets from dist to ios/App/App/public in 13.01ms
-✔ Creating capacitor.config.json in ios/App/App in 743.25μs
-✔ copy ios in 22.12ms
-✔ Updating iOS plugins in 378.25μs
-✔ Updating iOS native dependencies with pod install in 6.21s
-✔ update ios in 6.25s
-[info] Sync finished in 6.304s
+✔ Copying web assets from dist to ios/App/App/public in 114.34ms
+✔ Creating capacitor.config.json in ios/App/App in 3.56ms
+✔ copy ios in 139.85ms
+✔ Updating iOS plugins in 546.00μs
+✔ Updating iOS native dependencies with pod install in 6.71s
+✔ update ios in 6.76s
+[info] Sync finished in 6.945s
 total 64
 -rw-r--r--   1 runner  staff   3031 Jul 14 17:35 AppDelegate.swift
-drwxr-xr-x   5 runner  staff    160 Aug 20 16:53 Assets.xcassets
-drwxr-xr-x   4 runner  staff    128 Aug 20 16:53 Base.lproj
--rw-r--r--   1 runner  staff    306 Aug 20 16:54 capacitor.config.json
--rw-r--r--   1 runner  staff    185 Aug 20 16:54 config.xml
--rw-r--r--   1 runner  staff   1609 Aug 20 16:53 Info.plist
--rw-r--r--   1 runner  staff    645 Aug 20 16:54 MainViewController.swift
--rw-r--r--   1 runner  staff  12068 Aug 20 16:54 PedroNative.swift
-drwxr-xr-x  12 runner  staff    384 Aug 20 16:54 public
+drwxr-xr-x   5 runner  staff    160 Aug 20 16:58 Assets.xcassets
+drwxr-xr-x   4 runner  staff    128 Aug 20 16:58 Base.lproj
+-rw-r--r--   1 runner  staff    306 Aug 20 16:59 capacitor.config.json
+-rw-r--r--   1 runner  staff    185 Aug 20 16:59 config.xml
+-rw-r--r--   1 runner  staff   1609 Aug 20 16:58 Info.plist
+-rw-r--r--   1 runner  staff    645 Aug 20 16:59 MainViewController.swift
+-rw-r--r--   1 runner  staff  12068 Aug 20 16:59 PedroNative.swift
+drwxr-xr-x  12 runner  staff    384 Aug 20 16:59 public
 Successfully installed xcodeproj-1.28.1
 1 gem installed
 added PedroNative.swift to the App target
@@ -83,7 +83,7 @@ checking ios/App/build/Build/Products/Release-iphoneos/App.app/App
   declared NSSpeechRecognitionUsageDescription
   declared NSCameraUsageDescription
   declared NSPhotoLibraryUsageDescription
--rw-r--r--  1 runner  staff   3.2M Aug 20 16:54 Pedro.ipa
+-rw-r--r--  1 runner  staff   3.2M Aug 20 16:59 Pedro.ipa
 
 === the end of the build output ===
 node   v20.20.2
@@ -94,7 +94,7 @@ pod    1.17.0
 ios dir present: no
 1.17.0
 
-added 92 packages, and audited 93 packages in 4s
+added 92 packages, and audited 93 packages in 3s
 
 11 packages are looking for funding
   run `npm fund` for details
@@ -107,35 +107,35 @@ pedro@1.0.0 /Users/runner/work/PEDRO/PEDRO
 └─┬ @capacitor/ios@7.6.8
   └── @capacitor/core@7.6.8 deduped
 
-var BUILD = "2026-08-20.39"
-✔ Adding native Xcode project in ios in 12.51ms
-✔ add in 12.74ms
-✔ Copying web assets from dist to ios/App/App/public in 3.26ms
-✔ Creating capacitor.config.json in ios/App/App in 306.79μs
-✔ copy ios in 6.69ms
-✔ Updating iOS plugins in 222.33μs
-✔ Updating iOS native dependencies with pod install in 7.76s
-✔ update ios in 7.79s
+var BUILD = "2026-08-20.40"
+✔ Adding native Xcode project in ios in 16.75ms
+✔ add in 17.07ms
+✔ Copying web assets from dist to ios/App/App/public in 3.66ms
+✔ Creating capacitor.config.json in ios/App/App in 469.12μs
+✔ copy ios in 8.25ms
+✔ Updating iOS plugins in 297.21μs
+✔ Updating iOS native dependencies with pod install in 8.84s
+✔ update ios in 8.87s
 [success] ios platform added!
 Follow the Developer Workflow guide to get building:
 https://capacitorjs.com/docs/basics/workflow
-✔ Copying web assets from dist to ios/App/App/public in 13.01ms
-✔ Creating capacitor.config.json in ios/App/App in 743.25μs
-✔ copy ios in 22.12ms
-✔ Updating iOS plugins in 378.25μs
-✔ Updating iOS native dependencies with pod install in 6.21s
-✔ update ios in 6.25s
-[info] Sync finished in 6.304s
+✔ Copying web assets from dist to ios/App/App/public in 114.34ms
+✔ Creating capacitor.config.json in ios/App/App in 3.56ms
+✔ copy ios in 139.85ms
+✔ Updating iOS plugins in 546.00μs
+✔ Updating iOS native dependencies with pod install in 6.71s
+✔ update ios in 6.76s
+[info] Sync finished in 6.945s
 total 64
 -rw-r--r--   1 runner  staff   3031 Jul 14 17:35 AppDelegate.swift
-drwxr-xr-x   5 runner  staff    160 Aug 20 16:53 Assets.xcassets
-drwxr-xr-x   4 runner  staff    128 Aug 20 16:53 Base.lproj
--rw-r--r--   1 runner  staff    306 Aug 20 16:54 capacitor.config.json
--rw-r--r--   1 runner  staff    185 Aug 20 16:54 config.xml
--rw-r--r--   1 runner  staff   1609 Aug 20 16:53 Info.plist
--rw-r--r--   1 runner  staff    645 Aug 20 16:54 MainViewController.swift
--rw-r--r--   1 runner  staff  12068 Aug 20 16:54 PedroNative.swift
-drwxr-xr-x  12 runner  staff    384 Aug 20 16:54 public
+drwxr-xr-x   5 runner  staff    160 Aug 20 16:58 Assets.xcassets
+drwxr-xr-x   4 runner  staff    128 Aug 20 16:58 Base.lproj
+-rw-r--r--   1 runner  staff    306 Aug 20 16:59 capacitor.config.json
+-rw-r--r--   1 runner  staff    185 Aug 20 16:59 config.xml
+-rw-r--r--   1 runner  staff   1609 Aug 20 16:58 Info.plist
+-rw-r--r--   1 runner  staff    645 Aug 20 16:59 MainViewController.swift
+-rw-r--r--   1 runner  staff  12068 Aug 20 16:59 PedroNative.swift
+drwxr-xr-x  12 runner  staff    384 Aug 20 16:59 public
 Successfully installed xcodeproj-1.28.1
 1 gem installed
 added PedroNative.swift to the App target
@@ -159,10 +159,10 @@ Array {
     NSPhotoLibraryAddUsageDescription = Pedro saves pictures it makes for you.
     NSPhotoLibraryUsageDescription = Pedro opens your photos when you attach one.
     NSSpeechRecognitionUsageDescription = Pedro turns what you say into text.
-2026-08-20 16:54:10.152 xcodebuild[17456:53408] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+2026-08-20 16:59:12.069 xcodebuild[2928:11644] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
 --- xcodebuild: WARNING: Using the first of multiple matching destinations:
 { platform:iOS, id:dvtdevice-DVTiPhonePlaceholder-iphoneos:placeholder, name:Any iOS Device }
-{ platform:macOS, arch:arm64, variant:Designed for [iPad,iPhone], id:6c39b3a1df98d09a6daff03dbcb1478cd6ef1000, name:My Mac }
+{ platform:macOS, arch:arm64, variant:Designed for [iPad,iPhone], id:2574fdea6a2b38f674f0940da1409ab6e5b2c70f, name:My Mac }
 { platform:iOS Simulator, id:dvtdevice-DVTiOSDeviceSimulatorPlaceholder-iphonesimulator:placeholder, name:Any iOS Simulator Device }
 <module-includes>:1:9: note: in file included from <module-includes>:1:
 1 | #import "Headers/CapacitorCordova.h"
@@ -236,7 +236,7 @@ Array {
    |            `- note: 'WKProcessPool' has been explicitly marked deprecated here
 39 | @end
 40 | 
-ld: warning: search path '/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.3.7003.10.PJdypI/Metal.xctoolchain/usr/lib/swift/iphoneos' not found
+ld: warning: search path '/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.3.7003.10.Pr7lGX/Metal.xctoolchain/usr/lib/swift/iphoneos' not found
 <module-includes>:1:9: note: in file included from <module-includes>:1:
 1 | #import "Headers/CapacitorCordova.h"
   |         `- note: in file included from <module-includes>:1:
@@ -323,7 +323,7 @@ ld: warning: search path '/var/run/com.apple.security.cryptexd/mnt/com.apple.Mob
                                     options: [.duckOthers, .defaultToSpeaker, .allowBluetooth])
                                                                                ^~~~~~~~~~~~~~
                                                                                AVAudioSession.CategoryOptions.allowBluetoothHFP
-ld: warning: search path '/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.3.7003.10.PJdypI/Metal.xctoolchain/usr/lib/swift/iphoneos' not found
+ld: warning: search path '/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.3.7003.10.Pr7lGX/Metal.xctoolchain/usr/lib/swift/iphoneos' not found
 note: Using codesigning identity override: 
 warning: Run script build phase '[CP] Embed Pods Frameworks' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'App' from project 'App')
 checking ios/App/build/Build/Products/Release-iphoneos/App.app/App
@@ -337,6 +337,6 @@ checking ios/App/build/Build/Products/Release-iphoneos/App.app/App
   declared NSSpeechRecognitionUsageDescription
   declared NSCameraUsageDescription
   declared NSPhotoLibraryUsageDescription
--rw-r--r--  1 runner  staff   3.2M Aug 20 16:54 Pedro.ipa
+-rw-r--r--  1 runner  staff   3.2M Aug 20 16:59 Pedro.ipa
 
-=== finished: success at Thu Aug 20 16:54:59 UTC 2026 ===
+=== finished: success at Thu Aug 20 16:59:55 UTC 2026 ===
