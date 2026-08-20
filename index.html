@@ -1093,6 +1093,7 @@
         <div class="hlabel">Memory</div>
         <div class="hbig sm" id="hudMem">0</div>
         <div class="hsub">things remembered</div>
+        <div class="hsub" id="hudStudied">none studied</div>
       </div>
     </div>
 
@@ -4422,6 +4423,93 @@ function rememberFrom(text){
   return got;
 }
 
+/* ==================== studying a subject ====================
+   Told to go and learn something, he works through it once and keeps the notes.
+   They are recalled the same way memories are, so later questions get the
+   groundwork without paying for it again every time. */
+function studies(){ return store.settings.studies || (store.settings.studies = []); }
+
+var STUDY_RE = /^(?:go\s+)?(?:and\s+)?(?:learn|study|read up)(?:\s+about|\s+on)?\s+(.{2,60})$/i;
+var UNSTUDY_RE = /^forget(?:\s+everything)?\s+about\s+(.{2,60})$/i;
+
+function studyOf(topic){
+  var t = String(topic || "").toLowerCase().trim();
+  return studies().filter(function(s){ return s.topic.toLowerCase() === t; })[0] || null;
+}
+
+/* Ask for the groundwork, not an essay: short facts that answer later questions. */
+function learnAbout(topic, onDone){
+  topic = String(topic || "").replace(/[.?!]+$/, "").trim();
+  if(!topic) return;
+  hfSet("busy", "Reading up on " + topic);
+  hudLog("him", "Reading up on " + topic + "…", false);
+
+  var ask = "Teach yourself " + topic + ", well enough to answer questions about it later. " +
+    "Reply with ONLY a JSON array of 14 short factual notes, each one sentence, no numbering: " +
+    '["...","..."] . Cover the ideas someone would actually ask about: what it is, the parts, ' +
+    "how they work, the rules or laws involved, the common mistakes, and the words used.";
+
+  var only = { messages: [{ role:"user", content: ask, t:Date.now() }] };
+  var wasVoice = voiceMode;
+  voiceMode = false;
+  askOnce(only).then(function(answer){
+    voiceMode = wasVoice;
+    var notes = [];
+    try{
+      var txt = String(answer);
+      var a = txt.indexOf("["), z = txt.lastIndexOf("]");
+      if(a > -1 && z > a) notes = JSON.parse(txt.slice(a, z + 1));
+    }catch(e){ notes = []; }
+    notes = (Array.isArray(notes) ? notes : []).filter(function(n){ return typeof n === "string" && n.trim(); })
+                                               .map(function(n){ return n.trim(); }).slice(0, 20);
+    if(!notes.length){
+      hfSet("wait", hfIdleLabel());
+      speak("I could not get anywhere with " + topic + ". Try again in a moment.");
+      if(onDone) onDone(false);
+      return;
+    }
+    var was = studyOf(topic);
+    if(was){ was.notes = notes; was.t = Date.now(); }
+    else studies().push({ id: uid(), topic: topic, notes: notes, t: Date.now() });
+    if(studies().length > 40) studies().splice(0, studies().length - 40);
+    save();
+    hudSync();
+    hudLog("him", "Learned " + notes.length + " things about " + topic + ".", false);
+    hfSet("wait", hfIdleLabel());
+    speak("Right, I've read up on " + topic + ". Ask me anything about it.");
+    if(onDone) onDone(true);
+  }).catch(function(e){
+    voiceMode = wasVoice;
+    hfSet("wait", hfIdleLabel());
+    var why = String(e && e.message || e);
+    hudLog("him", why, false);
+    speak(why);
+    if(onDone) onDone(false);
+  });
+}
+
+function forgetStudy(topic){
+  var t = String(topic || "").toLowerCase().trim();
+  var before = studies().length;
+  store.settings.studies = studies().filter(function(s){
+    return s.topic.toLowerCase().indexOf(t) < 0 && t.indexOf(s.topic.toLowerCase()) < 0;
+  });
+  save();
+  return before - store.settings.studies.length;
+}
+
+/* whichever subject bears on this question */
+function studyFor(text){
+  var all = studies();
+  if(!all.length) return null;
+  var best = null, bestScore = 0;
+  all.forEach(function(s){
+    var score = relevance(text || "", { q: s.topic + " " + s.notes.slice(0, 6).join(" ") });
+    if(score > bestScore){ bestScore = score; best = s; }
+  });
+  return bestScore >= 2 ? best : null;
+}
+
 /* what to put in front of the model: whatever bears on this question, newest
    first, kept short so it does not crowd out the conversation */
 function recallFor(text, max){
@@ -4472,6 +4560,13 @@ function taughtBlock(text){
            " from earlier conversations:\n";
     for(var k = 0; k < mem.length; k++) out += "- " + mem[k] + "\n";
     out += "Use these when they matter. Do not recite them back unprompted." + "\n";
+  }
+  var learned = studyFor(text || "");
+  if(learned){
+    out += "\n\nYou have already read up on " + learned.topic + ". What you know:\n";
+    for(var s = 0; s < learned.notes.length; s++) out += "- " + learned.notes[s] + "\n";
+    out += "Answer from this where it applies, and say plainly if it does not cover " +
+           "what they asked.\n";
   }
   var f = facts();
   if(f.length){
@@ -4617,6 +4712,7 @@ function backupData(){
       showThink:s.showThink, theme:s.theme, authEmail:s.authEmail
     },
     facts: facts(),
+    studies: studies(),
     lessons: lessons(),
     memories: memories()
   };
@@ -4646,6 +4742,7 @@ $("backupFile").addEventListener("change", function(){
       if(d.settings[k] !== undefined && d.settings[k] !== null) store.settings[k] = d.settings[k];
     });
     if(d.facts) store.settings.facts = d.facts;
+    if(d.studies) store.settings.studies = d.studies;
     if(d.lessons) store.settings.lessons = d.lessons;
     if(d.memories) store.settings.memories = d.memories;
     save();
@@ -4813,21 +4910,28 @@ function hfSet(phase, label){
 function hfIdleLabel(){ return "Say “" + aiName() + "”"; }
 
 function hfOpen(){
+  /* On screen first, always. Anything wrong is reported on the dashboard - a
+     screen that shows nothing is worse than a screen that shows a problem. */
+  hf.on = true;
+  hfEl.classList.add("on");
+  hfHeard.textContent = ""; hfSaid.textContent = "";
+  hudSync();
+
   if(!nativeMicSupported()){
-    banner("warn", esc(runningWhere().text));
-    toast("Voice needs the app");
+    hf.want = false;
+    hfSet("wait", "Voice needs the app");
+    hfWarn.textContent = runningWhere().text;
     return;
   }
   if(!apiKeyNow()){
+    hf.want = false;
+    hfSet("wait", "No key yet");
+    hfSaid.textContent = noKeyYet();
+    hfWarn.textContent = "Tap Settings below, paste the key, and it starts listening.";
     fillSettings(); openPanel(settings);
-    banner("warn", "<b>No API key yet.</b> Paste your free Google AI Studio key in " +
-      "Settings, then send again. Get one at " +
-      "<a href=\"https://aistudio.google.com/apikey\" target=\"_blank\" rel=\"noopener\">" +
-      "aistudio.google.com/apikey</a>.");
     return;
   }
-  hf.on = true; hf.want = true; hf.answering = false;
-  hfEl.classList.add("on");
+  hf.want = true; hf.answering = false;
   hfHeard.textContent = ""; hfSaid.textContent = "";
   hf.turns = 0;
   hfWarn.textContent = "Just talk - it answers, then listens again. Tap the circle to interrupt. "
@@ -4914,6 +5018,8 @@ function hudSync(){
   var v = pickVoice();
   hudSet("hudVoice", (store.settings.voiceName || (v && v.name) || "default").slice(0, 22));
   hudSet("hudMem", String(memories().length));
+  var st = $("hudStudied");
+  if(st) st.textContent = studies().length ? (studies().length + " studied") : "none studied";
   hudSet("hudMic", nativeMicSupported() ? (nativeListening ? "listening" : "ready") : "app only");
   hudSet("hudBg", store.settings.background ? "on" : "off");
   hudSet("hudBuild", BUILD);
@@ -5087,6 +5193,18 @@ function hfAsk(question){
   /* If he is already looking, the question is usually about what he can see -
      but "count to a hundred" is not, and attaching a picture to it made him
      describe the room as well. */
+  /* told to go and learn something */
+  var toLearn = String(question).trim().match(STUDY_RE);
+  if(toLearn){ learnAbout(toLearn[1]); return; }
+  var toForget = String(question).trim().match(UNSTUDY_RE);
+  if(toForget){
+    var n = forgetStudy(toForget[1]);
+    hudSync();
+    speak(n ? ("Forgotten what I knew about " + toForget[1] + ".")
+            : ("I had not read up on " + toForget[1] + "."));
+    return;
+  }
+
   /* asked to be shown rather than told */
   var toDraw = wantsPicture3D(question);
   if(toDraw && !cam.open){ vizBuild(toDraw); return; }
@@ -5218,7 +5336,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-20.49";
+var BUILD = "2026-08-20.50";
 
 function banner(kind, html){
   var b = $("banner");
@@ -5283,6 +5401,16 @@ if(inApp()){
    cannot listen - and never over the sign-in screen. */
 if(inApp() && !isLocked()){
   setTimeout(function(){ if(!hf.on) hfOpen(); }, 300);
+  /* Whatever happened above, the app must not be a black rectangle. If nothing
+     has put the dashboard on screen by now, put it there. */
+  setTimeout(function(){
+    if(!hfEl.classList.contains("on")){
+      hfEl.classList.add("on");
+      hf.on = true;
+      hudSync();
+      hfSet("wait", hfIdleLabel());
+    }
+  }, 1500);
 }
 if(inApp()){
   checkDeviceModel().then(function(d){

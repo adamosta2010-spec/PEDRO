@@ -14,7 +14,7 @@ function grab(name){
 }
 /* the prompt names the apps Pedro can open; the list itself is not what these test */
 const appList = () => "maps, music, spotify, messages, phone, web";
-const names = ["shortContext","trimImages","memories","recallFor","onHostMachine","guessLocalUrl","isDevice","inApp","isGemini","isGroq","isLocal","isOpenAIStyle","allKeys","apiKeyNow","activeModel",
+const names = ["studies","studyFor","studyOf","forgetStudy","shortContext","trimImages","memories","recallFor","onHostMachine","guessLocalUrl","isDevice","inApp","isGemini","isGroq","isLocal","isOpenAIStyle","allKeys","apiKeyNow","activeModel",
                "systemPrompt","taughtBlock","pickLessons","relevance","lessons","facts","claudeContent","geminiParts","claudeRequest","geminiRequest",
                "groqRequest","localRequest","buildRequest","readDelta","apiError","apiErrorBody","providerLabel",
                "usableProviders","nextProvider","providerLabel","isBusy"];
@@ -22,7 +22,7 @@ let store = { settings:{ provider:"gemini", aiName:"Pedro",
   apiKey:"", geminiKey:"", groqKey:"", model:"claude-opus-5",
   geminiModel:"gemini-2.5-flash", imageModel:"gemini-2.5-flash-image",
   groqModel:"llama-3.3-70b-versatile", localUrl:"http://localhost:11434",
-  localModel:"qwen2.5:7b", localSeen:false, effort:"low", name:"", about:"", facts:[], lessons:[], memories:[] } };
+  localModel:"qwen2.5:7b", localSeen:false, effort:"low", name:"", about:"", facts:[], lessons:[], memories:[], studies:[] } };
 let voiceMode = false;
 const isLocked = () => false;
 eval(names.map(grab).join("\n"));

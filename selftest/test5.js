@@ -13,13 +13,13 @@ function grab(name){
 }
 /* the prompt names the apps Pedro can open; the list itself is not what these test */
 const appList = () => "maps, music, spotify, messages, phone, web";
-const names = ["lessons","facts","relevance","pickLessons","taughtBlock","addLesson","addFact",
+const names = ["studies","studyFor","studyOf","forgetStudy","lessons","facts","relevance","pickLessons","taughtBlock","addLesson","addFact",
                "isGemini","isGroq","isLocal","allKeys","apiKeyNow","providerLabel",
                "memories","recallFor","sameMemory","addMemory","forgetMemory","rememberFrom",
                "systemPrompt"];
 let store = { settings:{ provider:"gemini", aiName:"Pedro", name:"Adam", about:"",
   apiKey:"", geminiKey:"", groqKey:"", model:"claude-opus-5", geminiModel:"g",
-  effort:"low", facts:[], lessons:[], memories:[] } };
+  effort:"low", facts:[], lessons:[], memories:[], studies:[] } };
 let voiceMode = false, lastUserText = "";
 const isLocked = () => false;
 let saved = 0;
@@ -142,6 +142,39 @@ t("no overlap scores zero", relevance("bananas", {q:"roblox scripting", tag:""})
   })(), false);
 
   store.settings.memories = [];
+}
+
+
+/* ---- studying a subject ---- */
+{
+  const v = n => src.slice(src.indexOf("var " + n), src.indexOf(";", src.indexOf("var " + n)) + 1);
+  const re = new Function(v("STUDY_RE") + v("UNSTUDY_RE") +
+    "; return { STUDY_RE:STUDY_RE, UNSTUDY_RE:UNSTUDY_RE };")();
+  const heard = q => { const m = q.match(re.STUDY_RE); return m ? m[1] : null; };
+  const inSrc = bit => src.indexOf(bit) > -1;
+
+  t("go and learn about a subject", heard("go and learn about electronics"), "electronics");
+  t("learn about, plainly", heard("learn about electronics"), "electronics");
+  t("study something", heard("study the roman empire"), "the roman empire");
+  t("read up on something", heard("read up on chess openings"), "chess openings");
+  t("an ordinary question is not an instruction to study", heard("what is electronics"), null);
+  t("forgetting a subject is heard",
+    "forget everything about electronics".match(re.UNSTUDY_RE)[1], "electronics");
+
+  store.settings.studies = [
+    { id:"a", topic:"electronics", notes:["A resistor limits current.", "Ohm's law is V equals I times R."], t:1 },
+    { id:"b", topic:"baking", notes:["Yeast needs warmth."], t:2 }
+  ];
+  t("the right subject is recalled", (studyFor("what does a resistor do") || {}).topic, "electronics");
+  t("an unrelated question recalls nothing", studyFor("what time is the train"), null);
+  t("what he learned reaches the prompt",
+    /already read up on electronics/.test(taughtBlock("tell me about a resistor")), true);
+  t("and he is told to admit when it does not cover it",
+    /say plainly if it does not cover/.test(taughtBlock("tell me about a resistor")), true);
+  t("forgetting a subject removes it", forgetStudy("electronics"), 1);
+  t("and the other one is left alone", store.settings.studies.length, 1);
+  t("what he learned travels in the backup", inSrc("studies: studies()"), true);
+  store.settings.studies = [];
 }
 
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " teaching tests passed");

@@ -14,12 +14,12 @@ function grab(name){
 }
 /* the prompt names the apps Pedro can open; the list itself is not what these test */
 const appList = () => "maps, music, spotify, messages, phone, web";
-const names = ["shortContext","providerLabel","apiErrorBody","noKeyYet","trimImages","memories","recallFor","isDevice","inApp","isGemini","isGroq","isLocal","isOpenAIStyle","allKeys","apiKeyNow","activeModel","systemPrompt","taughtBlock","pickLessons","relevance","lessons","facts",
+const names = ["studies","studyFor","studyOf","forgetStudy","shortContext","providerLabel","apiErrorBody","noKeyYet","trimImages","memories","recallFor","isDevice","inApp","isGemini","isGroq","isLocal","isOpenAIStyle","allKeys","apiKeyNow","activeModel","systemPrompt","taughtBlock","pickLessons","relevance","lessons","facts",
                "claudeContent","geminiParts","claudeRequest","geminiRequest","buildRequest","readDelta","stopNote",
                "apiError","aiName","wakeRe","parseKeyPayload"];
 let store = { settings:{ provider:"gemini", aiName:"Pedro", apiKey:"", geminiKey:"AIzaTEST",
   model:"claude-opus-5", geminiModel:"gemini-2.5-flash", effort:"low", groqKey:"", groqModel:"llama-3.3-70b-versatile", localUrl:"http://localhost:11434", localModel:"qwen2.5:7b",
-  name:"Adam", about:"Builds Roblox games.", facts:[], lessons:[], memories:[] } };
+  name:"Adam", about:"Builds Roblox games.", facts:[], lessons:[], memories:[], studies:[] } };
 let voiceMode = false;
 const isLocked = () => false;
 eval(names.map(grab).join("\n"));
