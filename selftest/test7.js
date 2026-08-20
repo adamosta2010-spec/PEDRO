@@ -330,5 +330,42 @@ function nativeFrom(cap, exp){
     src.indexOf("var meant = intentFrom(lastUserText);") > -1, true);
 }
 
+
+/* ---- looking at things ---- */
+{
+  const line = n => src.slice(src.indexOf("var " + n), src.indexOf(";", src.indexOf("var " + n)) + 1);
+  const camBits = new Function(line("CAM_RE") + line("CAM_ONLY_RE") + grab("camQuestion") +
+    "; return { CAM_RE:CAM_RE, camQuestion:camQuestion };")();
+  const looks = q => camBits.CAM_RE.test(q);
+  const inSrc = bit => src.indexOf(bit) > -1;
+
+  t("counting goes to the camera", looks("count the boxes"), true);
+  t("how many goes to the camera", looks("how many boxes are there"), true);
+  t("what is this goes to the camera", looks("what is this"), true);
+  t("so does asking it to look", looks("look at this"), true);
+  t("and just saying camera", looks("open the camera"), true);
+  t("a general question does not", looks("what is the capital of france"), false);
+  t("nor does small talk", looks("how are you"), false);
+
+  t("counting is asked for carefully",
+    /one by one/.test(camBits.camQuestion("count the boxes")), true);
+  t("and it is told to admit what it cannot see",
+    /rather than guessing/.test(camBits.camQuestion("count the boxes")), true);
+  t("a plain look needs no extra wording",
+    camBits.camQuestion("what is this"), "what is this");
+  t("asking for the camera alone becomes a real question",
+    camBits.camQuestion("camera"), "What am I looking at?");
+
+  const grabFrame = grab("camGrab");
+  t("the picture is taken at the moment of asking", inSrc("var shot = camGrab();"), true);
+  t("it is shrunk before sending", grabFrame.indexOf("1024 / Math.max") > -1, true);
+  t("the front camera is unmirrored", grab("camStart").indexOf("scaleX(-1)") > -1, true);
+  t("flipping swaps which camera", grab("camFlip").indexOf("environment") > -1, true);
+  t("closing lets go of the camera", grab("camClose").indexOf("camStop()") > -1, true);
+  t("stopping actually stops the tracks", grab("camStop").indexOf("t.stop()") > -1, true);
+  t("questions go to the camera while it is open", inSrc("if(cam.open){ camAsk(question); return; }"), true);
+  t("the answer is spoken", grab("camAsk").indexOf("speak(answer)") > -1, true);
+}
+
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " mic/image tests passed");
 process.exit(fail ? 1 : 0);
