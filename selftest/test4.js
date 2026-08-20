@@ -94,5 +94,29 @@ S.provider = "local";
 t("missing local model tells you the pull command",
   apiError(404, "{}").includes("ollama pull qwen2.5:7b"), true);
 
-console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " provider tests passed");
+
+/* ---- "On this iPhone" must be impossible outside the wrapped app ---- */
+{
+  const src2 = fs.readFileSync(process.argv[2], "utf8");
+  const isDeviceSrc = (src2.match(/function isDevice\(\)\{[^\n]*\n?/) || [""])[0];
+  t("isDevice requires the native bridge", /&&\s*!!Native/.test(isDeviceSrc), true);
+
+  const askSrc = (() => {
+    const i = src2.indexOf("function askDevice(");
+    return src2.slice(i, i + 400);
+  })();
+  t("askDevice refuses when the bridge is missing", /if\(!Native\)/.test(askSrc), true);
+  t("...and says why in plain words", /only works in the installed app/i.test(askSrc), true);
+
+  const syncSrc = (() => {
+    const i = src2.indexOf("function syncProviderUI(");
+    return src2.slice(i, i + 2000);
+  })();
+  t("the option is removed, not just hidden", /removeChild\(od\)/.test(syncSrc), true);
+
+  t("a stranded 'device' setting is repaired at startup",
+    /function fixStrandedProvider/.test(src2) && /fixStrandedProvider\(\);/.test(src2), true);
+}
+
+console.log(fail ? String.fromCharCode(10) + fail + " FAILURES" : String.fromCharCode(10) + "All " + pass + " provider tests passed");
 process.exit(fail ? 1 : 0);

@@ -1320,7 +1320,13 @@ function syncProviderUI(){
   var pnote = { device:"Free · no internet needed", local:"Free · private · offline",
                 gemini:"Free tier", groq:"Free tier", claude:"Pay as you go" };
   var od = $("optDevice");
-  if(od) od.hidden = !(inApp() && deviceModel.available);
+  if(od){
+    var canDevice = inApp() && deviceModel.available;
+    od.hidden = !canDevice;
+    od.disabled = !canDevice;
+    /* Safari shows hidden options anyway, so take it out of the list entirely */
+    if(!canDevice && od.parentNode){ od.parentNode.removeChild(od); }
+  }
   var p = store.settings.provider;
   if(t) t.textContent = pname[p] || p;
   if(n) n.textContent = (pnote[p] || "") + " · " + (MODEL_NAMES[activeModel()] || activeModel());
@@ -2434,7 +2440,18 @@ var Native = (window.Capacitor && window.Capacitor.Plugins &&
 var deviceModel = { checked:false, available:false, reason:"" };
 
 function inApp(){ return !!Native; }
-function isDevice(){ return store.settings.provider === "device"; }
+function isDevice(){ return store.settings.provider === "device" && !!Native; }
+
+/* Someone could have this stored from a previous pick, or from imported settings.
+   Outside the app it can never work, so fall back to something that can. */
+function fixStrandedProvider(){
+  if(store.settings.provider !== "device" || Native) return;
+  var k = allKeys();
+  store.settings.provider = k.gemini ? "gemini" : (k.groq ? "groq" : (k.claude ? "claude" : "local"));
+  save();
+  banner("warn", "<b>\"On this iPhone\" only works in the installed app.</b> " +
+    "Switched to " + esc(providerLabel(store.settings.provider)) + ".");
+}
 
 /* ask the phone whether it can answer offline */
 function checkDeviceModel(){
@@ -2453,6 +2470,9 @@ function checkDeviceModel(){
 
 /* one answer, entirely on the phone */
 function askDevice(msgs){
+  if(!Native)
+    return Promise.reject(new Error(
+      "The phone's own model only works in the installed app, not in the browser."));
   var question = "";
   for(var i = msgs.length - 1; i >= 0; i--)
     if(msgs[i].role === "user"){ question = msgs[i].content || ""; break; }
@@ -3153,7 +3173,7 @@ $("hfExit").addEventListener("click", hfClose);
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-20.13";
+var BUILD = "2026-08-20.14";
 
 function banner(kind, html){
   var b = $("banner");
@@ -3193,6 +3213,7 @@ function checkOrigin(){
 if(!store.chats.length) newChat();
 if(!store.activeId) store.activeId = store.chats[0].id;
 applyTheme();
+fixStrandedProvider();
 if(inApp()){
   checkDeviceModel().then(function(d){
     syncProviderUI();
