@@ -745,6 +745,15 @@
       <div class="lb">Open straight into voice<small>Talking is the point &mdash; the chat is one tap away</small></div>
       <div class="sw" id="swVoiceFirst"></div>
     </div>
+    <div class="field">
+      <label>Carry everything to a new install</label>
+      <button class="btn ghost" id="btnBackup">Save a backup file</button>
+      <button class="btn ghost" id="btnRestore" style="margin-top:8px">Load a backup file</button>
+      <input type="file" id="backupFile" accept="application/json,.json" hidden>
+      <div class="hint">Keys, teaching, memory and settings - not your chats. Installing the
+        app again starts it empty, so keep this somewhere safe. <b>It contains your API keys,
+        so treat the file like a password.</b></div>
+    </div>
     <div class="row">
       <div class="lb">Talk, don&rsquo;t type<small>Using the microphone sends straight away and reads the answer back</small></div>
       <div class="sw" id="swVoiceTalk"></div>
@@ -2365,6 +2374,14 @@ function stopNote(stop){
   return "";
 }
 
+/* Installing the app again gives it an empty cupboard - the keys live on the
+   device, not in the build. Worth saying plainly rather than blaming the key. */
+function noKeyYet(){
+  return "There's no " + providerLabel(store.settings.provider) +
+    " key saved on this device yet. Open Settings and paste it in - it's free from " +
+    "Google AI Studio, and it stays on the phone.";
+}
+
 function apiError(status, txt){
   var m = txt.match(/"message"\s*:\s*"([^"]+)"/);
   var detail = m ? m[1] : "";
@@ -2383,7 +2400,7 @@ function apiError(status, txt){
   if(isGemini()){
     if(status === 503) return "Google's servers are overloaded for this model.";
     if(status === 400 && /API key not valid|API_KEY_INVALID/i.test(txt))
-      return "That Gemini key was rejected. Check it in Settings.";
+      return apiKeyNow() ? "That Gemini key was rejected. Check it in Settings." : noKeyYet();
     if(status === 403) return "This key isn't allowed to use that model.";
     if(status === 404){
       var have = "";
@@ -2400,7 +2417,7 @@ function apiError(status, txt){
     if(status >= 500) return "Google's API is busy. Try again in a second.";
     return "Error " + status + (detail ? ": " + detail : "");
   }
-  if(status === 401) return "That API key was rejected. Check it in Settings.";
+  if(status === 401) return apiKeyNow() ? "That API key was rejected. Check it in Settings." : noKeyYet();
   if(status === 400 && /credit|balance/i.test(txt)) return "Your Anthropic account is out of credit.";
   if(status === 429) return "Rate limited - wait a moment and try again.";
   if(status === 529 || status >= 500) return "Anthropic's API is busy. Try again in a second.";
@@ -3495,6 +3512,63 @@ function teachFrom(m){
 }
 
 /* ---- move your teaching between devices ---- */
+/* Everything that would be painful to set up again - deliberately not the
+   chats, which are large and easy to live without. */
+function backupData(){
+  var s = store.settings;
+  return {
+    pedroBackup: 1,
+    saved: new Date().toISOString(),
+    settings: {
+      provider:s.provider, aiName:s.aiName, name:s.name, about:s.about,
+      apiKey:s.apiKey, geminiKey:s.geminiKey, groqKey:s.groqKey,
+      model:s.model, geminiModel:s.geminiModel, groqModel:s.groqModel,
+      imageModel:s.imageModel, localUrl:s.localUrl, localModel:s.localModel,
+      effort:s.effort, tts:s.tts, voiceName:s.voiceName, voiceTalk:s.voiceTalk,
+      background:s.background, voiceFirst:s.voiceFirst, enterSends:s.enterSends,
+      showThink:s.showThink, theme:s.theme, authEmail:s.authEmail
+    },
+    facts: facts(),
+    lessons: lessons(),
+    memories: memories()
+  };
+}
+
+$("btnBackup").addEventListener("click", function(){
+  var blob = new Blob([JSON.stringify(backupData(), null, 2)], { type:"application/json" });
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "pedro-backup.json";
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+  toast("Saved - keep it private");
+});
+$("btnRestore").addEventListener("click", function(){ $("backupFile").click(); });
+$("backupFile").addEventListener("change", function(){
+  var f = this.files && this.files[0];
+  this.value = "";
+  if(!f) return;
+  var r = new FileReader();
+  r.onload = function(){
+    var d;
+    try{ d = JSON.parse(String(r.result)); }
+    catch(e){ banner("bad", "<b>That file isn't a Pedro backup.</b>"); return; }
+    if(!d || !d.pedroBackup){ banner("bad", "<b>That file isn't a Pedro backup.</b>"); return; }
+    Object.keys(d.settings || {}).forEach(function(k){
+      if(d.settings[k] !== undefined && d.settings[k] !== null) store.settings[k] = d.settings[k];
+    });
+    if(d.facts) store.settings.facts = d.facts;
+    if(d.lessons) store.settings.lessons = d.lessons;
+    if(d.memories) store.settings.memories = d.memories;
+    save();
+    chosenVoice = null;
+    fillSettings(); renderAll(); syncProviderUI(); renderTeach();
+    banner("good", "<b>Restored.</b> Your key, teaching and memory are back.");
+    toast("Restored");
+  };
+  r.readAsText(f);
+});
+
 $("btnTeachExport").addEventListener("click", function(){
   var data = { facts:facts(), lessons:lessons(), exported:new Date().toISOString() };
   var blob = new Blob([JSON.stringify(data, null, 2)], { type:"application/json" });
@@ -3836,6 +3910,14 @@ function hfSpeak(text, done){
 function hfAsk(question){
   clearTimeout(hf.quiet);
   hfPause();
+  /* asking without a key wastes a turn and comes back as a confusing refusal */
+  if(!apiKeyNow() && !isDevice()){
+    hf.answering = false;
+    hfSet("wait", "No key yet");
+    hfSaid.textContent = noKeyYet();
+    hfSpeak("There's no key saved on this phone yet. Open settings and paste your Google key in.");
+    return;
+  }
   hf.answering = false;
   hfHeard.textContent = "“" + question + "”";
   hfSaid.textContent = "";
@@ -3928,7 +4010,7 @@ $("hfExit").addEventListener("click", hfClose);
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-20.33";
+var BUILD = "2026-08-20.34";
 
 function banner(kind, html){
   var b = $("banner");
