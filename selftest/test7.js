@@ -124,5 +124,33 @@ t("a cancelled draw stays silent", draw.includes('err.name === "AbortError"'), t
   t("talking back is on unless it is turned off", inSrc("voiceTalk:true"), true);
 }
 
+
+/* ---- reaching the native bridge, by whichever route exists ---- */
+function nativeFrom(cap, exp){
+  const fn = new Function("window",
+    "var nativeVia;" + grab("findNative") + "; return [findNative(), nativeVia];");
+  return fn({ Capacitor: cap, capacitorExports: exp });
+}
+{
+  const plugin = { ask(){} };
+  t("finds the plugin when Capacitor lists it",
+    nativeFrom({ Plugins: { PedroNative: plugin } })[0], plugin);
+  t("uses capacitor.js when the list is empty",
+    nativeFrom({ Plugins: {} }, { registerPlugin: n => ({ name: n }) })[0].name, "PedroNative");
+  t("falls back to the bridge's own registerPlugin",
+    nativeFrom({ Plugins: {}, registerPlugin: n => ({ name: n }) })[0].name, "PedroNative");
+  t("last resort: calls the raw bridge directly",
+    typeof nativeFrom({ nativePromise: () => Promise.resolve() })[0].startListening, "function");
+  t("the raw bridge covers all four methods",
+    ["available", "ask", "startListening", "stopListening"].every(m =>
+      typeof nativeFrom({ nativePromise: () => Promise.resolve() })[0][m] === "function"), true);
+  t("a plain browser gets nothing, and that is correct",
+    nativeFrom(undefined)[0], null);
+  t("an empty bridge is not mistaken for a working one",
+    nativeFrom({ Plugins: {} })[0], null);
+  t("it records which route worked, for the diagnostics",
+    nativeFrom({ Plugins: {} }, { registerPlugin: n => ({ name: n }) })[1], "registerPlugin");
+}
+
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " mic/image tests passed");
 process.exit(fail ? 1 : 0);

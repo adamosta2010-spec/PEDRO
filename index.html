@@ -2453,15 +2453,46 @@ function endStreamUI(){
 
    In a browser none of this exists, so everything here stays switched off. */
 
-var Native = (function(){
+/* The bridge iOS injects is only half the story: Plugins and registerPlugin
+   live in Capacitor's own JavaScript, which a page with no bundler never loads.
+   The app build copies capacitor.js in beside this file; these are the routes
+   to the plugin in the order they are worth trying. */
+var nativeVia = "nothing";
+function findNative(){
   var C = window.Capacitor;
   if(!C) return null;                       /* a plain browser - no bridge, and none expected */
-  if(C.Plugins && C.Plugins.PedroNative) return C.Plugins.PedroNative;
-  /* Plugins can still be filling in when this runs, so ask for it by name */
-  try{ if(typeof C.registerPlugin === "function") return C.registerPlugin("PedroNative"); }
-  catch(e){}
+
+  if(C.Plugins && C.Plugins.PedroNative){ nativeVia = "Capacitor.Plugins"; return C.Plugins.PedroNative; }
+
+  var reg = (window.capacitorExports && window.capacitorExports.registerPlugin) ||
+            (typeof C.registerPlugin === "function" ? C.registerPlugin.bind(C) : null);
+  if(reg){
+    try{
+      var p = reg("PedroNative");
+      if(p){ nativeVia = "registerPlugin"; return p; }
+    }catch(e){}
+  }
+
+  /* Last resort: the injected bridge can call a plugin directly, so wire the
+     four methods by hand rather than leaving the phone with no microphone. */
+  if(typeof C.nativePromise === "function"){
+    var call = function(m, o){ return C.nativePromise("PedroNative", m, o || {}); };
+    nativeVia = "the raw bridge";
+    return {
+      available:      function(o){ return call("available", o); },
+      ask:            function(o){ return call("ask", o); },
+      startListening: function(o){ return call("startListening", o); },
+      stopListening:  function(o){ return call("stopListening", o); },
+      addListener:    function(ev, fn){
+        if(typeof C.addListener === "function") return C.addListener("PedroNative", ev, fn);
+        return { remove: function(){} };
+      },
+      removeAllListeners: function(){}
+    };
+  }
   return null;
-})();
+}
+var Native = findNative();
 var deviceModel = { checked:false, available:false, reason:"" };
 
 function inApp(){ return !!Native; }
@@ -2924,6 +2955,11 @@ function testMic(){
     var names = [];
     try{ names = Object.keys(window.Capacitor.Plugins || {}); }catch(e){}
     lines.push("    native plugins: " + (names.length ? names.join(", ") : "none found"));
+    var heads = [];
+    try{ heads = (window.Capacitor.PluginHeaders || []).map(function(p){ return p.name; }); }catch(e){}
+    lines.push("    the phone offers: " + (heads.length ? heads.join(", ") : "nothing"));
+    lines.push("    bridge reached by: " + nativeVia);
+    lines.push("    capacitor.js loaded: " + (window.capacitorExports ? "yes" : "no"));
   }
   if(!nativeMicSupported())
     return done("Only the installed app can listen. Open that instead of the website.");
@@ -3230,7 +3266,7 @@ $("hfExit").addEventListener("click", hfClose);
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-20.20";
+var BUILD = "2026-08-20.21";
 
 function banner(kind, html){
   var b = $("banner");

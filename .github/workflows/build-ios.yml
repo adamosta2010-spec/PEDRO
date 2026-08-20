@@ -83,6 +83,8 @@ jobs:
           # a copied file is not a built file - register it with the Xcode project
           sudo gem install xcodeproj --no-document || gem install xcodeproj --no-document
           ruby native/add_source.rb
+          # the page has no bundler, so Capacitor's own JavaScript has to ride along
+          node native/add_capacitor_js.js
 
       - name: Microphone and speech permissions
         run: |
@@ -122,6 +124,10 @@ jobs:
             if strings "$BIN" | grep -q "$s"; then echo "  FOUND    $s"; else echo "  MISSING  $s"; fi
           done
           strings "$BIN" | grep -q PedroNative || { echo "native bridge did not compile in"; exit 1; }
+          APP=ios/App/build/Build/Products/Release-iphoneos/App.app
+          test -f "$APP/public/capacitor.js" || { echo "capacitor.js never made it into the app"; exit 1; }
+          grep -q 'src="capacitor.js"' "$APP/public/index.html" || { echo "the page does not load capacitor.js"; exit 1; }
+          echo "  the page loads Capacitor's JavaScript"
           # a permission the app never declares is a crash the moment it is used
           PL=ios/App/build/Build/Products/Release-iphoneos/App.app/Info.plist
           for k in NSMicrophoneUsageDescription NSSpeechRecognitionUsageDescription NSCameraUsageDescription NSPhotoLibraryUsageDescription; do
