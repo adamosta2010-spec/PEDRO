@@ -224,5 +224,49 @@ function nativeFrom(cap, exp){
     sv.indexOf("j >= ms.length - 2") > -1, true);
 }
 
+
+/* ---- doing things on the phone ---- */
+{
+  const APPS = (function(){
+    const i = src.indexOf("var APPS = {");
+    const j = src.indexOf("};", i) + 2;
+    const fn = new Function(src.slice(i, j) + "; return APPS;");
+    return fn();
+  })();
+  const actionUrl = new Function("APPS", grab("actionUrl") + "; return actionUrl;")(APPS);
+  const readActions = new Function("actionUrl", grab("readActions") + "; return readActions;")(actionUrl);
+
+  t("it pulls one instruction out of a reply",
+    readActions("Opening maps. [[maps:camden]]").actions.length, 1);
+  t("and leaves the words behind",
+    readActions("Opening maps. [[maps:camden]]").text, "Opening maps.");
+  t("it handles several",
+    readActions("[[maps:a]] and [[spotify:b]]").actions.length, 2);
+  t("a reply with none is untouched",
+    readActions("just talking").text, "just talking");
+  t("an unknown app is ignored rather than guessed at",
+    readActions("[[teleport:mars]]").actions.length, 0);
+  t("an unfinished bracket does not hang it",
+    readActions("[[maps:camden").actions.length, 0);
+
+  t("maps searches", actionUrl("maps", "camden town"), "maps://?q=camden%20town");
+  t("spotify searches", actionUrl("spotify", "blinding lights"), "spotify:search:blinding%20lights");
+  t("a shortcut runs by name",
+    actionUrl("shortcut", "Lights Off"), "shortcuts://run-shortcut?name=Lights%20Off");
+  t("a phone number keeps only what can be dialled",
+    actionUrl("phone", "+44 7700 900123"), "tel:+447700900123");
+  t("the web falls back to a search",
+    actionUrl("web", "tide times").indexOf("duckduckgo") > -1, true);
+  t("a real address is opened as it is",
+    actionUrl("web", "https://bbc.co.uk"), "https://bbc.co.uk");
+  t("something it cannot do returns nothing", actionUrl("launch", "rocket"), null);
+
+  const run = grab("runActions");
+  t("it goes through the native side", run.indexOf("Native.openURL") > -1, true);
+  t("and says so on a web page instead of failing quietly",
+    run.indexOf("only works in the installed app") > -1, true);
+  t("a missing app is explained", run.indexOf("may not be installed") > -1, true);
+}
+
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " mic/image tests passed");
 process.exit(fail ? 1 : 0);

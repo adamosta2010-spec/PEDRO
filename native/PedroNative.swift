@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import Capacitor
 import Speech
 import AVFoundation
@@ -26,7 +27,8 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "ask",           returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "startListening", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopListening",  returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "setBackground",  returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "setBackground",  returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "openURL",        returnType: CAPPluginReturnPromise)
     ]
 
     // MARK: - on-device model
@@ -125,6 +127,26 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin {
     /// Without the audio background mode in Info.plist iOS suspends us anyway,
     /// so this is only half the story - the build adds the other half.
     private var keepAlive = false
+
+    /// Hand a URL to iOS so it opens whatever app owns that scheme - maps,
+    /// music, a phone number, or one of their own Shortcuts. iOS decides what
+    /// happens next, and anything that sends still needs a tap in that app.
+    @objc func openURL(_ call: CAPPluginCall) {
+        guard let raw = call.getString("url"), let url = URL(string: raw) else {
+            call.reject("that is not a URL")
+            return
+        }
+        DispatchQueue.main.async {
+            guard UIApplication.shared.canOpenURL(url) else {
+                call.reject("nothing on this phone opens that")
+                return
+            }
+            UIApplication.shared.open(url, options: [:]) { ok in
+                if ok { call.resolve(["opened": true]) }
+                else { call.reject("iOS would not open it") }
+            }
+        }
+    }
 
     @objc func setBackground(_ call: CAPPluginCall) {
         let on = call.getBool("enabled") ?? false

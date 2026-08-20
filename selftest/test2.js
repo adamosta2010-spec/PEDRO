@@ -11,6 +11,8 @@ function grab(name){
     else if(src[k] === "}"){ d--; if(!d) return src.slice(i, k + 1); }
   }
 }
+/* the prompt names the apps Pedro can open; the list itself is not what these test */
+const appList = () => "maps, music, spotify, messages, phone, web";
 const names = ["memories","recallFor","isDevice","inApp","isGemini","isGroq","isLocal","isOpenAIStyle","allKeys","apiKeyNow","systemPrompt","taughtBlock","pickLessons","relevance","lessons","facts","claudeContent","geminiParts",
                "claudeRequest","geminiRequest","buildRequest","wantsPicture","esc","shots"];
 let store = { settings:{ provider:"gemini", aiName:"Pedro", apiKey:"sk-x", geminiKey:"AIzaTEST",

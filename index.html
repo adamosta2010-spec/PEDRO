@@ -18,6 +18,7 @@
     --bg:#0b0d12; --bg1:#12151c; --bg2:#181c25; --bg3:#222733;
     --line:#252b38;
     --tx:#e7e9ee; --tx2:#9aa1b0; --tx3:#6b7280;
+    --hud:#38e1f0;   /* the voice screen: cyan, like a readout */
     --danger:#f87171; --ok:#34d399;
     --safe-b: env(safe-area-inset-bottom, 0px);
     --safe-t: env(safe-area-inset-top, 0px);
@@ -353,19 +354,59 @@
     padding:28px 24px calc(var(--safe-b) + 28px)}
   #hf.on{display:flex}
   #hf::before{content:"";position:absolute;inset:0;pointer-events:none;
-    background:radial-gradient(60% 45% at 50% 40%, color-mix(in srgb,var(--a1) 20%,transparent),transparent 70%)}
-  #hfOrb{width:150px;height:150px;flex:none;position:relative;z-index:1}
-  #hfOrb svg{width:100%;height:100%;
-    filter:drop-shadow(0 0 26px color-mix(in srgb,var(--a1) 75%,transparent))}
-  #hfOrb.wait svg{animation:breathe 3.4s ease-in-out infinite}
-  #hfOrb.hear svg{animation:breathe 1.1s ease-in-out infinite}
-  #hfOrb.busy svg{animation:spin 2.4s linear infinite}
-  #hfOrb.talk svg{animation:breathe .8s ease-in-out infinite}
-  @keyframes breathe{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(1.07);opacity:1}}
+    background:
+      radial-gradient(52% 38% at 50% 42%, color-mix(in srgb,var(--hud) 14%,transparent), transparent 72%),
+      repeating-linear-gradient(0deg, color-mix(in srgb,var(--hud) 4%,transparent) 0 1px,
+                                transparent 1px 3px)}
+  /* the rings: three of them, turning at different speeds, so it reads as a
+     machine paying attention rather than a spinner */
+  #hfOrb{width:230px;height:230px;flex:none;position:relative;z-index:1}
+  #hfOrb .ring{position:absolute;border-radius:50%;border:1px solid transparent}
+  #hfOrb .r1{inset:0;
+    border-color:color-mix(in srgb,var(--hud) 22%,transparent);
+    border-top-color:var(--hud);
+    animation:hudSpin 7s linear infinite}
+  #hfOrb .r2{inset:20px;border-style:dashed;
+    border-color:color-mix(in srgb,var(--hud) 26%,transparent);
+    animation:hudSpin 19s linear infinite reverse}
+  #hfOrb .r3{inset:40px;
+    border-color:color-mix(in srgb,var(--hud) 16%,transparent);
+    border-bottom-color:var(--hud);border-left-color:var(--hud);
+    animation:hudSpin 4.2s linear infinite}
+  @keyframes hudSpin{to{transform:rotate(360deg)}}
+
+  /* the core - the bit that is actually him */
+  #hfOrb .core{position:absolute;inset:62px;display:grid;place-items:center;border-radius:50%;
+    background:radial-gradient(circle at 50% 45%,
+      color-mix(in srgb,var(--hud) 20%,transparent), transparent 70%)}
+  #hfOrb .core svg{width:100%;height:100%;color:var(--hud);fill:currentColor;
+    filter:drop-shadow(0 0 18px color-mix(in srgb,var(--hud) 70%,transparent))}
+
+  /* a ripple that only exists while it is hearing you */
+  #hfOrb .pulse{position:absolute;inset:30px;border-radius:50%;
+    border:1px solid color-mix(in srgb,var(--hud) 55%,transparent);opacity:0}
+  #hfOrb.hear .pulse{animation:hudPulse 1.6s ease-out infinite}
+  @keyframes hudPulse{
+    0%{transform:scale(.75);opacity:.85}
+    100%{transform:scale(1.5);opacity:0}}
+
+  /* what each state does */
+  #hfOrb.wait .core svg{animation:breathe 4s ease-in-out infinite}
+  #hfOrb.hear .core svg{animation:breathe 1.4s ease-in-out infinite}
+  #hfOrb.busy .r1{animation-duration:1.1s}
+  #hfOrb.busy .r3{animation-duration:.8s}
+  #hfOrb.talk .core svg{animation:hudTalk .42s ease-in-out infinite alternate}
+  #hfOrb.talk .r1{animation-duration:2.6s}
+  @keyframes breathe{0%,100%{transform:scale(1);opacity:.85}50%{transform:scale(1.06);opacity:1}}
+  @keyframes hudTalk{from{transform:scale(.94);opacity:.8}to{transform:scale(1.08);opacity:1}}
   @keyframes spin{to{transform:rotate(360deg)}}
-  #hfState{font-size:22px;font-weight:700;letter-spacing:-.02em;position:relative;z-index:1}
-  #hfHeard{color:var(--tx2);font-size:15px;min-height:44px;max-width:460px;line-height:1.45;z-index:1}
-  #hfSaid{color:var(--tx);font-size:16px;max-width:560px;line-height:1.55;min-height:24px;z-index:1}
+
+  /* HUD lettering: spaced, upright, quiet */
+  #hfState{font-size:13px;font-weight:700;letter-spacing:.26em;text-transform:uppercase;
+    color:var(--hud);position:relative;z-index:1}
+  #hfHeard{color:var(--tx);font-size:19px;min-height:52px;max-width:520px;line-height:1.4;
+    z-index:1;font-weight:500}
+  #hfSaid{color:var(--tx2);font-size:15.5px;max-width:560px;line-height:1.6;min-height:24px;z-index:1}
   #hf .exit{position:absolute;top:calc(var(--safe-t) + 14px);right:16px;z-index:2}
   #hfWarn{position:absolute;bottom:calc(var(--safe-b) + 14px);left:16px;right:16px;
     color:var(--tx3);font-size:11.5px;line-height:1.45}
@@ -701,6 +742,10 @@
       <div class="sw" id="swBackground"></div>
     </div>
     <div class="row">
+      <div class="lb">Open straight into voice<small>Talking is the point &mdash; the chat is one tap away</small></div>
+      <div class="sw" id="swVoiceFirst"></div>
+    </div>
+    <div class="row">
       <div class="lb">Talk, don&rsquo;t type<small>Using the microphone sends straight away and reads the answer back</small></div>
       <div class="sw" id="swVoiceTalk"></div>
     </div>
@@ -795,7 +840,13 @@
 
 <div id="hf">
   <button class="icobtn exit" id="hfExit" aria-label="Close"><svg><use href="#i-x"/></svg></button>
-  <div id="hfOrb" class="wait"><svg><use href="#bot"/></svg></div>
+  <div id="hfOrb" class="wait">
+    <span class="ring r1"></span>
+    <span class="ring r2"></span>
+    <span class="ring r3"></span>
+    <span class="pulse"></span>
+    <span class="core"><svg><use href="#bot"/></svg></span>
+  </div>
   <div id="hfState">Say &ldquo;Pedro&rdquo;</div>
   <div id="hfHeard"></div>
   <div id="hfSaid"></div>
@@ -836,6 +887,7 @@ var DEF = {
   voiceTalk:true,  /* talking sends straight away and the answer is read back */
   voiceName:"",    /* which of the phone's voices to speak with */
   background:false, /* keep listening while the app is not on screen */
+  voiceFirst:true,  /* open straight into the voice screen - talking is the point */
   lock:null,       /* when set: {salt, iv, ct} - your API keys, encrypted with your password */
   authEmail:"",    /* not a secret - just so you don't retype it every time */
 };
@@ -1364,6 +1416,7 @@ function fillSettings(){
   if(mh) mh.textContent = runningWhere().text;
   sw($("swVoiceTalk"), s.voiceTalk !== false);
   sw($("swBackground"), s.background);
+  sw($("swVoiceFirst"), s.voiceFirst !== false);
   fillVoices();
   sw($("swLock"), isLocked()); syncLockSub();
   syncProviderUI();
@@ -1698,6 +1751,7 @@ function bindSwitch(id, key, after){
 bindSwitch("swTts","tts", syncSpeakBtn);
 bindSwitch("swVoiceTalk","voiceTalk");
 bindSwitch("swBackground","background", applyBackground);
+bindSwitch("swVoiceFirst","voiceFirst");
 
 /* Every phone ships a different set, so build the list from what is actually
    installed - best-sounding first, since that is what people want. */
@@ -2139,6 +2193,18 @@ function systemPrompt(){
     "Don't leave TODOs or placeholder functions - write the actual thing. " +
     "Keep the explanation around it short; the code is the answer.\n" +
     "When they send a photo, look at it properly and answer about what's actually in it.";
+  /* what he can actually do on the phone, and exactly how to ask for it */
+  p += "\n\nYou can act on this phone, not only talk. To do something, put it in " +
+    "double square brackets at the very end of your reply, on its own line, like " +
+    "[[maps:camden town]] or [[spotify:blinding lights]] or [[shortcut:Lights Off]]. " +
+    "Say in words what you are doing, then add the brackets - they are removed " +
+    "before your answer is shown or spoken.\n" +
+    "What you can use: " + appList() + ", and shortcut: to run one of their own " +
+    "Apple Shortcuts by name.\n" +
+    "Only use it when they actually ask for something to happen. Never invent a " +
+    "shortcut name they have not mentioned. Anything that sends - a message, an " +
+    "email, a call - only opens that app with it ready, and they press send " +
+    "themselves, so say so rather than claiming you sent it.";
   p += taughtBlock(lastUserText);
   if(voiceMode){
     p += "\n\nRIGHT NOW you are being spoken out loud in a back-and-forth conversation, and " +
@@ -2635,8 +2701,13 @@ function stream(c, opts){
 
   function finish(aborted){
     var body = acc.trim();
+    /* anything he asked the phone to do is in the text - take it out first */
+    var did = readActions(body);
+    body = did.text;
+    if(!body && did.actions.length) body = "Done.";
     if(!body && !aborted) body = "(empty response)";
     if(!body){ el.remove(); endStreamUI(); return; }
+    if(!aborted) runActions(did.actions);
     bubEl.innerHTML = md(body);
     var m = { role:"assistant", content:body, t:Date.now() };
     if(think) m.thinking = think;
@@ -2819,6 +2890,86 @@ function nativeMicStop(){
   micHandlers.text = null;
   micHandlers.done = null;             /* nothing stale left waiting to fire */
   if(Native) Native.stopListening().catch(function(){});
+}
+
+/* ==================== doing things on the phone ====================
+   Pedro says what he wants to happen in double brackets at the end of a reply;
+   the app strips that out and hands the URL to iOS. Parsing is done with plain
+   string searching rather than a pattern, because the marker is fixed. */
+var APPS = {
+  maps:      function(q){ return q ? "maps://?q=" + encodeURIComponent(q) : "maps://"; },
+  directions:function(q){ return "maps://?daddr=" + encodeURIComponent(q || "") + "&dirflg=d"; },
+  music:     function(q){ return q ? "music://search?term=" + encodeURIComponent(q) : "music://"; },
+  spotify:   function(q){ return q ? "spotify:search:" + encodeURIComponent(q) : "spotify:"; },
+  youtube:   function(q){ return q ? "youtube://results?search_query=" + encodeURIComponent(q) : "youtube://"; },
+  messages:  function(q){ return "sms:" + encodeURIComponent(q || ""); },
+  phone:     function(q){ return "tel:" + String(q || "").replace(/[^0-9+]/g, ""); },
+  mail:      function(q){ return "mailto:" + encodeURIComponent(q || ""); },
+  camera:    function(){ return "camera://"; },
+  photos:    function(){ return "photos-redirect://"; },
+  notes:     function(){ return "mobilenotes://"; },
+  calendar:  function(){ return "calshow://"; },
+  reminders: function(){ return "x-apple-reminderkit://"; },
+  clock:     function(){ return "clock-alarm://"; },
+  settings:  function(){ return "App-Prefs:"; },
+  whatsapp:  function(q){ return q ? "whatsapp://send?text=" + encodeURIComponent(q) : "whatsapp://"; },
+  instagram: function(){ return "instagram://"; },
+  roblox:    function(){ return "roblox://"; },
+  web:       function(q){
+    q = String(q || "").trim();
+    if(!q) return "https://duckduckgo.com";
+    return /^https?:/i.test(q) ? q : "https://duckduckgo.com/?q=" + encodeURIComponent(q);
+  }
+};
+
+function appList(){ return Object.keys(APPS).join(', '); }
+
+/* turn one instruction into a URL iOS understands */
+function actionUrl(kind, arg){
+  kind = String(kind || '').trim().toLowerCase();
+  arg  = String(arg || '').trim();
+  if(kind === "shortcut")
+    return "shortcuts://run-shortcut?name=" + encodeURIComponent(arg);
+  if(APPS[kind]) return APPS[kind](arg);
+  return null;
+}
+
+/* Pull the instructions out of a reply and hand back the words without them. */
+function readActions(text){
+  var out = { text: String(text || ""), actions: [] };
+  var open = "[[", close = "]]";
+  var s = out.text, i;
+  while((i = s.indexOf(open)) > -1){
+    var j = s.indexOf(close, i);
+    if(j < 0) break;
+    var inner = s.slice(i + 2, j).trim();
+    var c = inner.indexOf(':');
+    if(c > 0){
+      var kind = inner.slice(0, c), arg = inner.slice(c + 1);
+      var url = actionUrl(kind, arg);
+      if(url) out.actions.push({ kind: kind.toLowerCase().trim(), arg: arg.trim(), url: url });
+    }
+    s = s.slice(0, i) + s.slice(j + 2);
+  }
+  out.text = s.replace(/[ \t]+\n/g, "\n").trim();
+  return out;
+}
+
+/* and carry them out */
+function runActions(list){
+  if(!list || !list.length) return;
+  list.forEach(function(a){
+    if(!Native || !Native.openURL){
+      toast("Opening apps only works in the installed app");
+      return;
+    }
+    Native.openURL({ url: a.url }).then(function(){
+      toast((a.kind === "shortcut" ? "Ran shortcut: " : "Opened ") + (a.arg || a.kind));
+    }).catch(function(e){
+      banner("warn", "<b>Couldn’t open " + esc(a.arg || a.kind) + ".</b> " +
+        esc(String(e && e.message || e)) + " The app may not be installed.");
+    });
+  });
 }
 
 /* ==================== photos in, pictures out ====================
@@ -3692,7 +3843,7 @@ $("hfExit").addEventListener("click", hfClose);
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-20.30";
+var BUILD = "2026-08-20.31";
 
 function banner(kind, html){
   var b = $("banner");
@@ -3734,6 +3885,12 @@ if(!store.activeId) store.activeId = store.chats[0].id;
 applyTheme();
 fixStrandedProvider();
 applyBackground();       /* restore whatever was chosen last time */
+
+/* Talking is what this is for, so start there. Only in the app - a web page
+   cannot listen - and never over the sign-in screen. */
+if(store.settings.voiceFirst !== false && inApp() && !isLocked() && apiKeyNow()){
+  setTimeout(function(){ if(!hf.on) hfOpen(); }, 350);
+}
 if(inApp()){
   checkDeviceModel().then(function(d){
     syncProviderUI();

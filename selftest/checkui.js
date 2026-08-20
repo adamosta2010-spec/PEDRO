@@ -30,7 +30,9 @@ const opens = (css.match(/{/g) || []).length, closes = (css.match(/}/g) || []).l
 t("css braces balance (" + opens + ")", opens === closes, opens + " { vs " + closes + " }");
 t("no leftover placeholder values", !/undefined|NaN/.test(css));
 /* every # colour must be 3, 4, 6 or 8 hex digits and nothing else */
-const values = (css.match(/:[^;{}]+/g) || []).join(" ");
+/* everything between } and { is a selector, so it cannot hold a colour */
+const decls = css.replace(/}[^{]*{/g, "{");
+const values = (decls.match(/:[^;{}]+/g) || []).join(" ");
 const badHex = (values.match(/#[0-9a-zA-Z]+/g) || [])
   .filter(c => !/^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(c));
 t("every colour is a real colour", badHex.length === 0, "not colours: " + badHex.join(", "));
