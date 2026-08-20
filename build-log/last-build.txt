@@ -1,0 +1,38 @@
+node   v20.20.2
+npm    10.8.2
+*** Terminating app due to uncaught exception 'NSFileHandleOperationException', reason: '*** -[_NSStdIOFileHandle writeData:]: Broken pipe'
+*** First throw call stack:
+(
+	0   CoreFoundation                      0x000000018dc8fa30 __exceptionPreprocess + 176
+	1   libobjc.A.dylib                     0x000000018d752b90 objc_exception_throw + 88
+	2   Foundation                          0x000000018fa07cb4 -[NSConcreteFileHandle readDataUpToLength:error:] + 0
+	3   Foundation                          0x000000018f1df3f8 -[NSConcreteFileHandle writeData:] + 300
+	4   xcodebuild                          0x0000000100a75b24 -[XcodebuildPreIDEHandler handleVersionWithArguments:] + 612
+	5   xcodebuild                          0x0000000100a755d8 -[XcodebuildPreIDEHandler runWithArguments:] + 116
+	6   xcodebuild                          0x0000000100a75198 main + 512
+	7   dyld                                0x000000018d792b98 start + 6076
+)
+libc++abi: terminating due to uncaught exception of type NSException
+xcode  Xcode 16.4
+ruby   ruby 3.3.12 (2026-07-16 revision 0581089df9) [arm64-darwin24]
+pod    1.17.0
+ios dir present: no
+1.17.0
+
+added 92 packages, and audited 93 packages in 4s
+
+11 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+--- capacitor packages ---
+pedro@1.0.0 /Users/runner/work/PEDRO/PEDRO
+├── @capacitor/cli@7.6.8
+├── @capacitor/core@7.6.8
+└─┬ @capacitor/ios@7.6.8
+  └── @capacitor/core@7.6.8 deduped
+
+var BUILD = "2026-08-20.14"
+error: unknown option '--verbose'
+
+=== finished: failure at Thu Aug 20 09:13:56 UTC 2026 ===
