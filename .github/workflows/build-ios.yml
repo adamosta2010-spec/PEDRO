@@ -141,10 +141,10 @@ jobs:
           strings -a "$BIN" | grep -q MainViewController || { echo "the plugin registration did not compile in"; exit 1; }
           strings -a "$BIN" | grep -q registerPluginInstance || { echo "nothing registers the plugin"; exit 1; }
           echo "  the plugin is registered with the bridge"
-          /usr/libexec/PlistBuddy -c "Print :UIBackgroundModes" "$PL" | grep -q audio || { echo "background audio is not declared"; exit 1; }
-          echo "  background listening is declared"
           # a permission the app never declares is a crash the moment it is used
           PL=ios/App/build/Build/Products/Release-iphoneos/App.app/Info.plist
+          /usr/libexec/PlistBuddy -c "Print :UIBackgroundModes" "$PL" | grep -q audio || { echo "background audio is not declared"; exit 1; }
+          echo "  background listening is declared"
           for k in NSMicrophoneUsageDescription NSSpeechRecognitionUsageDescription NSCameraUsageDescription NSPhotoLibraryUsageDescription; do
             if /usr/libexec/PlistBuddy -c "Print :$k" "$PL" >/dev/null 2>&1; then
               echo "  declared $k"
