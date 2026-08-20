@@ -418,5 +418,30 @@ function nativeFrom(cap, exp){
   t("stopping stops the app's voice too", inSrc("Native.stopSpeaking"), true);
 }
 
+
+/* ---- the camera needs a model that can see ---- */
+{
+  const vp = grab("visionProvider");
+  const wv = grab("withVision");
+  const inSrc = bit => src.indexOf(bit) > -1;
+
+  t("the camera needs a model with eyes", inSrc("function visionProvider"), true);
+  t("the phone's own model is not one of them",
+    vp.indexOf('p === "device"') === -1 && vp.indexOf('k.gemini') > -1, true);
+  t("it borrows one for the request", wv.indexOf("store.settings.provider = vp") > -1, true);
+  t("and puts the choice back afterwards", wv.indexOf("function restore()") > -1, true);
+  t("it restores even when the request fails",
+    wv.indexOf("function(e){ restore(); throw e; }") > -1, true);
+  t("with nothing that can see, it says so",
+    wv.indexOf("reads text only") > -1, true);
+  t("looking goes through it", grab("camAsk").indexOf("withVision(") > -1, true);
+  t("highlighting goes through it", grab("camHighlight").indexOf("withVision(") > -1, true);
+  t("a camera problem is spoken, not just printed",
+    grab("camAsk").indexOf("speak(why)") > -1, true);
+
+  t("counting is not a programming request",
+    inSrc("not writing a program that would say them"), true);
+}
+
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " mic/image tests passed");
 process.exit(fail ? 1 : 0);

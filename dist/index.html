@@ -2305,6 +2305,8 @@ function systemPrompt(){
     "and avoid heavy formatting unless asked for code. " +
     "Talk like a sharp friend who knows them: warm, direct, no filler. " +
     "If you don't know something, say so.\n\n" +
+    "Only write code when they have asked for code. Counting to a number means " +
+    "saying the numbers, not writing a program that would say them.\n" +
     "When they ask for code, brevity does not apply: give complete, runnable code in a " +
     "fenced block with the language tag, and say in one line what to do with it. " +
     "Don't leave TODOs or placeholder functions - write the actual thing. " +
@@ -3400,7 +3402,7 @@ function camHighlight(what){
     "left of the picture. If there are none, reply with []";
 
   var only = { messages: [{ role:"user", content: ask, images:[shot], t:Date.now() }] };
-  askOnce(only).then(function(answer){
+  withVision(function(){ return askOnce(only); }).then(function(answer){
     cam.busy = false;
     camEl.classList.remove("busy");
     var found = [];
@@ -3431,6 +3433,32 @@ function camHighlight(what){
   });
 }
 
+/* Not every model has eyes. The phone's own takes text only, and Groq's does
+   too, so a picture sent to either is simply dropped. */
+function visionProvider(){
+  var k = allKeys();
+  var p = store.settings.provider;
+  if((p === "gemini" && k.gemini) || (p === "claude" && k.claude)) return p;
+  if(k.gemini) return "gemini";
+  if(k.claude) return "claude";
+  return null;
+}
+
+/* Run one request through a model that can see, then put things back. */
+function withVision(run){
+  var vp = visionProvider();
+  if(!vp){
+    return Promise.reject(new Error(
+      "Nothing on this phone can look at pictures yet. The phone's own model " +
+      "reads text only - add your free Gemini key in Settings and the camera works."));
+  }
+  var was = store.settings.provider;
+  if(vp !== was) store.settings.provider = vp;
+  function restore(){ if(vp !== was){ store.settings.provider = was; } }
+  return run().then(function(r){ restore(); return r; },
+                    function(e){ restore(); throw e; });
+}
+
 function camAsk(question){
   if(cam.busy) return;
   var hl = String(question || "").trim().match(HIGHLIGHT_RE);
@@ -3457,7 +3485,7 @@ function camAsk(question){
   c.messages.push({ role:'user', content: question, images:[shot], t:Date.now() });
   save();
   voiceMode = true;
-  askOnce(only).then(function(answer){
+  withVision(function(){ return askOnce(only); }).then(function(answer){
     voiceMode = false;
     cam.busy = false;
     camEl.classList.remove('busy');
@@ -3471,7 +3499,9 @@ function camAsk(question){
     cam.busy = false;
     camEl.classList.remove('busy');
     camSet('That did not work');
-    $('camSaid').textContent = String(e && e.message || e);
+    var why = String(e && e.message || e);
+    $('camSaid').textContent = why;
+    speak(why);                       /* it is a camera - you are not reading it */
   });
 }
 
@@ -4500,7 +4530,7 @@ $("hfExit").addEventListener("click", hfClose);
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-20.41";
+var BUILD = "2026-08-20.42";
 
 function banner(kind, html){
   var b = $("banner");
