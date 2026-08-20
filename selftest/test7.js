@@ -115,5 +115,28 @@ t("iPhone advice is unaffected by protocol",
   t("closing stops the native microphone too", inIt(close, "nativeMicStop()"), true);
 }
 
+
+/* ---- the on-device option is never lost ---- */
+/* the phone is asked asynchronously, so the first run happens before the answer */
+{
+  const sync = grab("syncProviderUI");
+  const inIt = (src, bit) => src.indexOf(bit) > -1;
+  t("it holds on to the option after taking it out of the list", inIt(sync, "deviceOpt = od"), true);
+  t("it looks in its own pocket when the page no longer has it", inIt(sync, '$("optDevice") || deviceOpt'), true);
+  t("it puts the option back once the phone says yes", inIt(sync, "psel.insertBefore(od"), true);
+  t("the whole app source declares the holder", src.indexOf("var deviceOpt = null;") > -1, true);
+  t("opening settings asks the phone again", src.indexOf("checkDeviceModel().then(syncProviderUI)") > -1, true);
+}
+
+/* ---- asking out loud gets an answer out loud ---- */
+{
+  const inSrc = bit => src.indexOf(bit) > -1;
+  t("a spoken question is sent rather than left in the box", inSrc("speakNext = true;"), true);
+  t("the answer to a spoken question is read back", inSrc("(store.settings.tts || speakNext) && !aborted"), true);
+  t("the flag is cleared so later answers stay quiet", inSrc("speakNext = false;"), true);
+  t("it can be turned off", inSrc('bindSwitch("swVoiceTalk","voiceTalk")'), true);
+  t("talking back is on unless it is turned off", inSrc("voiceTalk:true"), true);
+}
+
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " mic/image tests passed");
 process.exit(fail ? 1 : 0);

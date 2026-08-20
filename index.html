@@ -649,6 +649,10 @@
       <div class="sw" id="swTts"></div>
     </div>
     <div class="row">
+      <div class="lb">Talk, don&rsquo;t type<small>Using the microphone sends straight away and reads the answer back</small></div>
+      <div class="sw" id="swVoiceTalk"></div>
+    </div>
+    <div class="row">
       <div class="lb">Show its thinking<small>Displays a summary of how it reasoned</small></div>
       <div class="sw" id="swThink"></div>
     </div>
@@ -776,6 +780,7 @@ var DEF = {
   modelsLoaded:0,   /* set once we've asked Google what this key can really use */
   name:"", about:"",
   tts:false, showThink:false, enterSends:true,
+  voiceTalk:true,  /* talking sends straight away and the answer is read back */
   lock:null,       /* when set: {salt, iv, ct} - your API keys, encrypted with your password */
   authEmail:"",    /* not a secret - just so you don't retype it every time */
 };
@@ -1315,9 +1320,15 @@ function fillSettings(){
   $("setName").value = s.name;
   $("setAbout").value = s.about;
   sw($("swTts"), s.tts); sw($("swThink"), s.showThink); sw($("swEnter"), s.enterSends);
+  sw($("swVoiceTalk"), s.voiceTalk !== false);
   sw($("swLock"), isLocked()); syncLockSub();
   syncProviderUI();
+  /* Apple Intelligence can still be downloading - ask again each time this opens */
+  if(inApp() && !deviceModel.available) checkDeviceModel().then(syncProviderUI);
 }
+/* held on to, because the option gets taken out of the list while the phone
+   is still being asked whether it can run the model at all */
+var deviceOpt = null;
 function syncProviderUI(){
   $("gemBlock").style.display    = isGemini() ? "" : "none";
   $("claudeBlock").style.display = (store.settings.provider === "claude") ? "" : "none";
@@ -1340,11 +1351,15 @@ function syncProviderUI(){
     ol.disabled = !canLocal;
     if(!canLocal && ol.parentNode) ol.parentNode.removeChild(ol);
   }
-  var od = $("optDevice");
+  var od = $("optDevice") || deviceOpt;
   if(od){
+    deviceOpt = od;                       /* survives being taken out of the page */
     var canDevice = inApp() && deviceModel.available;
     od.hidden = !canDevice;
     od.disabled = !canDevice;
+    var psel = $("setProvider");
+    /* the phone answers after this has already run once - put it back */
+    if(canDevice && !od.parentNode && psel) psel.insertBefore(od, psel.firstChild);
     /* Safari shows hidden options anyway, so take it out of the list entirely */
     if(!canDevice && od.parentNode){ od.parentNode.removeChild(od); }
   }
@@ -1603,6 +1618,7 @@ function bindSwitch(id, key, after){
   });
 }
 bindSwitch("swTts","tts", syncSpeakBtn);
+bindSwitch("swVoiceTalk","voiceTalk");
 bindSwitch("swThink","showThink", renderAll);
 bindSwitch("swEnter","enterSends");
 bindSwitch("swFail","autoFailover");
@@ -1841,8 +1857,12 @@ btnMic.addEventListener("click", function(){
       input.value = base + text; autosize(); syncSend();
     }, function(err){
       btnMic.classList.remove("rec");
-      if(err) toast("Voice input stopped: " + err.message);
-      input.focus();
+      if(err){ toast("Voice input stopped: " + err.message); input.focus(); return; }
+      /* asked out loud - so send it and answer out loud, no typing involved */
+      if(store.settings.voiceTalk !== false && input.value.trim()){
+        speakNext = true;
+        send();
+      } else input.focus();
     }).catch(function(e){
       btnMic.classList.remove("rec");
       banner("warn", "Microphone: " + esc(String(e && e.message || e)));
@@ -1883,7 +1903,12 @@ btnMic.addEventListener("click", function(){
     rec.onend = function(){
       var was = listening;
       stopListening();
-      if(was && !heard) toast("Didn't catch that");
+      if(was && !heard){ toast("Didn't catch that"); input.focus(); return; }
+      if(was && store.settings.voiceTalk !== false && input.value.trim()){
+        speakNext = true;
+        send();
+        return;
+      }
       input.focus();
     };
     rec.start();
@@ -1892,6 +1917,10 @@ btnMic.addEventListener("click", function(){
     banner("warn", "Couldn't start the microphone: " + esc(String(e && e.message || e)));
   }
 });
+
+/* set when the question was asked out loud, so the answer comes back the same
+   way even when "speak replies aloud" is off */
+var speakNext = false;
 
 /* ============================ voice out ============================ */
 function speak(text, onEnd){
@@ -2439,7 +2468,8 @@ function stream(c, opts){
     (el.querySelector(".wrap") || el).appendChild(acts);
     wireActs(el, m);
     decorateCode(el);
-    if(store.settings.tts && !aborted) speak(body);
+    if((store.settings.tts || speakNext) && !aborted) speak(body);
+    speakNext = false;
     endStreamUI();
     if(nearBottom()) jump(true);
     renderChatList();
@@ -3284,7 +3314,7 @@ $("hfExit").addEventListener("click", hfClose);
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-20.17";
+var BUILD = "2026-08-20.18";
 
 function banner(kind, html){
   var b = $("banner");
