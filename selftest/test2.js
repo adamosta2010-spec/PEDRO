@@ -82,5 +82,24 @@ const p = systemPrompt();
 t("prompt covers code", p.includes("runnable code") && p.includes("fenced block"), true);
 t("prompt covers photos", p.includes("photo"), true);
 
+
+/* ---- what actually gets read aloud ---- */
+/* Asking what two plus two is came back spoken as "maths, four", because
+   stripping a heading's hashes left the word behind. */
+{
+  const P = new Function(grab("plain") + "; return plain;")();
+  t("a heading is not read aloud", P("## Maths" + String.fromCharCode(10) + "4"), "4");
+  t("a bold line used as a heading is not either",
+    P("**Maths**" + String.fromCharCode(10) + "4"), "4");
+  t("a bold sentence is still read", P("**It is four.**"), "It is four.");
+  t("an ordinary answer is untouched", P("The answer is 4."), "The answer is 4.");
+  t("the answer under a heading survives",
+    P("### Answer" + String.fromCharCode(10) + "2 + 2 = 4"), "2 + 2 = 4");
+  t("code is not read out character by character",
+    P("Here is code:" + String.fromCharCode(10) + "```js" + String.fromCharCode(10) + "x" +
+      String.fromCharCode(10) + "```").indexOf("code block") > -1, true);
+  t("nothing at all is safe", P(""), "");
+}
+
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " media tests passed");
 process.exit(fail ? 1 : 0);

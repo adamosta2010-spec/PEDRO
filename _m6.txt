@@ -1,0 +1,9 @@
+It was reading headings out loud
+
+Asked what two plus two is, he answered "maths" and then "four". The reply had a
+heading above the answer, and preparing text for speech stripped the hashes off
+it but left the word behind - so a label meant for the eye was read out as if it
+were part of the answer. Headings are now dropped whole, including the short
+bold lines models use as headings, and he is told not to label answers at all.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>

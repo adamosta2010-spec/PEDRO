@@ -1196,8 +1196,19 @@ function md(src){
   return out;
 }
 function plain(s){
-  return String(s||"").replace(/```[\s\S]*?```/g," code block ")
-    .replace(/[*_`#>]/g,"").replace(/\[([^\]]+)\]\([^)]+\)/g,"$1").trim();
+  var t = String(s || "");
+  /* A heading is a label for the eye. Stripping only its hashes left the word
+     behind, so "## Maths" above the answer was read aloud as "maths". */
+  t = t.replace(/^[ \t]*#{1,6}[ \t]+[^\n]*/gm, "");
+  /* models also use a short bold line as a heading */
+  t = t.replace(/^[ \t]*\*\*([^\n*]{1,40})\*\*[ \t]*$/gm,
+    function(line, inner){ return /[.?!,:;]$/.test(inner.trim()) ? line : ""; });
+  return t.replace(/```[\s\S]*?```/g, " code block ")
+    .replace(/[*_`#>]/g, "")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/\n{2,}/g, ". ")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
 }
 
 /* ============================ rendering ============================ */
@@ -2328,6 +2339,8 @@ function systemPrompt(){
     "and avoid heavy formatting unless asked for code. " +
     "Talk like a sharp friend who knows them: warm, direct, no filler. " +
     "If you don't know something, say so.\n\n" +
+    "Answer the thing itself - no heading, no label, no category word before it. " +
+    "Asked what two plus two is, the answer is four, not the word Maths and then four.\n" +
     "Only write code when they have asked for code. Counting to a number means " +
     "saying the numbers, not writing a program that would say them.\n" +
     "When they ask for code, brevity does not apply: give complete, runnable code in a " +
@@ -4553,7 +4566,7 @@ $("hfExit").addEventListener("click", hfClose);
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-20.43";
+var BUILD = "2026-08-20.44";
 
 function banner(kind, html){
   var b = $("banner");
