@@ -366,6 +366,18 @@
   .hudcentre{display:flex;flex-direction:column;align-items:center;justify-content:center;
     gap:16px;text-align:center;min-width:0}
 
+  /* Panels stay out of the way until asked for, and once shown they can be
+     picked up and put wherever suits. */
+  .hudpanel[data-panel]{display:none}
+  .hudpanel[data-panel].on{display:block;position:fixed;z-index:5;
+    width:min(260px,72vw);touch-action:none;cursor:grab}
+  .hudpanel[data-panel].on.grow{max-height:44vh}
+  .hudpanel[data-panel].on.held{cursor:grabbing;
+    border-color:color-mix(in srgb,var(--hud) 70%,transparent)}
+  /* the columns are only a place to keep them when nothing is shown */
+  .hudcol{pointer-events:none}
+  .hudpanel[data-panel].on{pointer-events:auto}
+
   /* a panel: clipped corners and a hairline, like something machined */
   .hudpanel{position:relative;padding:11px 12px;min-width:0;
     background:linear-gradient(180deg, color-mix(in srgb,var(--hud) 7%,transparent), transparent);
@@ -1105,18 +1117,18 @@
 <div id="hf">
   <div class="hudgrid">
     <div class="hudcol">
-      <div class="hudpanel">
+      <div class="hudpanel" data-panel="clock">
         <div class="hlabel">Local</div>
         <div class="hbig" id="hudTime">--:--</div>
         <div class="hsub" id="hudDate"></div>
       </div>
-      <div class="hudpanel">
+      <div class="hudpanel" data-panel="brain">
         <div class="hlabel">Brain</div>
         <div class="hrow"><span>Answering</span><b id="hudModel">&mdash;</b></div>
         <div class="hrow"><span>Offline</span><b id="hudOffline">&mdash;</b></div>
         <div class="hrow"><span>Voice</span><b id="hudVoice">&mdash;</b></div>
       </div>
-      <div class="hudpanel">
+      <div class="hudpanel" data-panel="memory">
         <div class="hlabel">Memory</div>
         <div class="hbig sm" id="hudMem">0</div>
         <div class="hsub">things remembered</div>
@@ -1176,13 +1188,13 @@
     </div>
 
     <div class="hudcol">
-      <div class="hudpanel">
+      <div class="hudpanel" data-panel="systems">
         <div class="hlabel">Systems</div>
         <div class="hrow"><span>Microphone</span><b id="hudMic">&mdash;</b></div>
         <div class="hrow"><span>Background</span><b id="hudBg">&mdash;</b></div>
         <div class="hrow"><span>Build</span><b id="hudBuild">&mdash;</b></div>
       </div>
-      <div class="hudpanel grow">
+      <div class="hudpanel grow" data-panel="transcript">
         <div class="hlabel">Transcript</div>
         <div id="hudLog"></div>
       </div>
@@ -1292,7 +1304,8 @@ var DEF = {
   voiceTalk:true,  /* talking sends straight away and the answer is read back */
   voiceName:"",    /* which of the phone's voices to speak with */
   elevenKey:"",    /* an ElevenLabs key of your own, if you want their voice */
-  elevenVoice:"Pno1sSZ9LihyDUpvtooA",   /* the one you picked from their library */
+  elevenVoice:"Pno1sSZ9LihyDUpvtooA",   /* "AI" - the one you picked from their library */
+  elevenName:"AI",
   elevenOn:true,   /* use it when there is a key */
   volume:1,        /* how loud he is, on top of the phone's own volume */
   rate:1,          /* how fast he talks - deliberately capped short of gabbling */
@@ -2551,6 +2564,11 @@ var speakNext = false;
 var elevenAudio = null;
 var elevenFailed = false;
 
+/* The ElevenLabs voices worth offering, by name. */
+var ELEVEN_VOICES = [
+  { id:"Pno1sSZ9LihyDUpvtooA", name:"AI" }
+];
+
 function elevenReady(){
   return !!(store.settings.elevenOn !== false && store.settings.elevenKey && !elevenFailed);
 }
@@ -2762,7 +2780,9 @@ function systemPrompt(){
       "Answer in one or two short sentences of plain speech - the length you would " +
       "actually say. No markdown, no lists, no headings, no code, no emoji. " +
       "No label or category before the answer. Lead with the answer. " +
-      "It is a conversation, so a short question back is fine.\n";
+      "It is a conversation, so a short question back is fine. " +
+      "Jokes, riddles, a verse of a song, a story - do them properly when asked, " +
+      "rather than explaining that you are an assistant.\n";
     if(s.about) vp += "About them: " + String(s.about).slice(0, 200) + "\n";
     vp += taughtBlock(lastUserText);
     return vp;
@@ -4334,6 +4354,7 @@ function dockFill(){
     using.textContent = elevenReady()
       ? "the better voice"
       : (store.settings.elevenKey ? "the phone (the key was refused)" : "the phone - add a key above");
+    if(elevenReady()) using.textContent = (store.settings.elevenName || "AI") + " (ElevenLabs)";
   }
   var sel = $("dockVoice");
   if(sel){
@@ -4696,9 +4717,238 @@ function rememberFrom(text){
   return got;
 }
 
+/* ==================== hands on ====================
+   One finger on the ball turns it. Two fingers pinch it larger or smaller, or
+   drag it somewhere else. Any panel showing can be picked up and moved. Where
+   things are left is remembered. */
+var grip = {
+  spinX: 0, spinY: 0, size: 0, x: 0, y: 0,
+  pointers: {}, count: 0,
+  startDist: 0, startSize: 0, startX: 0, startY: 0,
+  fromX: 0, fromY: 0, lastX: 0, lastY: 0, turned: false
+};
+
+function gripSave(){
+  store.settings.orbGrip = { spinX: grip.spinX, spinY: grip.spinY,
+    size: grip.size, x: grip.x, y: grip.y };
+  save();
+}
+function gripLoad(){
+  var g = store.settings.orbGrip;
+  if(!g) return;
+  grip.spinX = g.spinX || 0; grip.spinY = g.spinY || 0;
+  grip.size = g.size || 0; grip.x = g.x || 0; grip.y = g.y || 0;
+  gripApply();
+}
+function gripApply(){
+  var orb = $("hfOrb");
+  if(!orb) return;
+  if(grip.size) orb.style.setProperty("--orb", Math.round(grip.size) + "px");
+  orb.style.transform = "translate(" + Math.round(grip.x) + "px," + Math.round(grip.y) + "px)";
+  var globe = orb.querySelector(".globe");
+  if(globe){
+    globe.style.transform = "rotateX(" + grip.spinX.toFixed(1) + "deg) rotateY(" +
+      grip.spinY.toFixed(1) + "deg)";
+  }
+}
+function gripDistance(){
+  var ids = Object.keys(grip.pointers);
+  if(ids.length < 2) return 0;
+  var a = grip.pointers[ids[0]], b = grip.pointers[ids[1]];
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+function gripMiddle(){
+  var ids = Object.keys(grip.pointers);
+  var a = grip.pointers[ids[0]], b = grip.pointers[ids[1]];
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+}
+
+function handsOn(){
+  var orb = $("hfOrb");
+  if(!orb) return;
+  orb.style.touchAction = "none";
+
+  orb.addEventListener("pointerdown", function(ev){
+    try{ orb.setPointerCapture(ev.pointerId); }catch(e){}
+    grip.pointers[ev.pointerId] = { x: ev.clientX, y: ev.clientY };
+    grip.count = Object.keys(grip.pointers).length;
+    grip.turned = false;
+    grip.lastX = ev.clientX; grip.lastY = ev.clientY;
+    if(grip.count === 2){
+      grip.startDist = gripDistance();
+      grip.startSize = orb.getBoundingClientRect().width;
+      var mid = gripMiddle();
+      grip.startX = mid.x; grip.startY = mid.y;
+      grip.fromX = grip.x; grip.fromY = grip.y;
+    }
+  });
+
+  orb.addEventListener("pointermove", function(ev){
+    if(!grip.pointers[ev.pointerId]) return;
+    grip.pointers[ev.pointerId] = { x: ev.clientX, y: ev.clientY };
+    grip.count = Object.keys(grip.pointers).length;
+    if(grip.count >= 2){
+      var dist = gripDistance();
+      if(grip.startDist > 10 && dist > 10){
+        var want = grip.startSize * (dist / grip.startDist);
+        grip.size = Math.max(140, Math.min(window.innerWidth * 0.92, want));
+      }
+      var mid = gripMiddle();
+      grip.x = grip.fromX + (mid.x - grip.startX);
+      grip.y = grip.fromY + (mid.y - grip.startY);
+      grip.turned = true;
+      gripApply();
+      return;
+    }
+    var dx = ev.clientX - grip.lastX, dy = ev.clientY - grip.lastY;
+    grip.lastX = ev.clientX; grip.lastY = ev.clientY;
+    if(Math.abs(dx) + Math.abs(dy) < 1) return;
+    grip.turned = true;
+    grip.spinY += dx * 0.4;
+    grip.spinX = Math.max(-80, Math.min(80, grip.spinX - dy * 0.4));
+    gripApply();
+  });
+
+  function letGo(ev){
+    if(grip.pointers[ev.pointerId]) delete grip.pointers[ev.pointerId];
+    grip.count = Object.keys(grip.pointers).length;
+    if(!grip.count && grip.turned) gripSave();
+  }
+  orb.addEventListener("pointerup", letGo);
+  orb.addEventListener("pointercancel", letGo);
+
+  /* every panel that is showing can be picked up */
+  var held = null, from = { x:0, y:0 }, at = { x:0, y:0 };
+  var SHOWN = ".hudpanel[data-panel].on";
+  document.addEventListener("pointerdown", function(ev){
+    var panel = ev.target.closest ? ev.target.closest(SHOWN) : null;
+    if(!panel) return;
+    held = panel;
+    panel.classList.add("held");
+    var r = panel.getBoundingClientRect();
+    from = { x: r.left, y: r.top };
+    at = { x: ev.clientX, y: ev.clientY };
+    try{ panel.setPointerCapture(ev.pointerId); }catch(e){}
+  });
+  document.addEventListener("pointermove", function(ev){
+    if(!held) return;
+    var x = Math.max(4, Math.min(window.innerWidth - 60, from.x + (ev.clientX - at.x)));
+    var y = Math.max(4, Math.min(window.innerHeight - 40, from.y + (ev.clientY - at.y)));
+    held.style.left = Math.round(x) + "px";
+    held.style.top = Math.round(y) + "px";
+    held.style.right = "auto";
+  });
+  document.addEventListener("pointerup", function(){
+    if(!held) return;
+    held.classList.remove("held");
+    panelWhere(held.dataset.panel, held.style.left, held.style.top);
+    held = null;
+  });
+}
+
+function panelWhere(name, left, top){
+  var spots = store.settings.panelSpots || (store.settings.panelSpots = {});
+  spots[name] = { left: left, top: top };
+  save();
+}
+
+/* show or hide one of the readouts by name */
+function showHudPanel(name, on){
+  var panel = document.querySelector(".hudpanel[data-panel=" + JSON.stringify(name) + "]");
+  if(!panel) return false;
+  panel.classList.toggle("on", on !== false);
+  if(on !== false){
+    var spots = store.settings.panelSpots || {};
+    var spot = spots[name];
+    if(spot && spot.left){
+      panel.style.left = spot.left;
+      panel.style.top = spot.top;
+      panel.style.right = "auto";
+    } else {
+      var n = document.querySelectorAll(".hudpanel[data-panel].on").length;
+      panel.style.left = "14px";
+      panel.style.top = (60 + n * 26) + "px";
+    }
+    hudSync();
+  }
+  return true;
+}
+
+
+/* ==================== the small things ====================
+   A timer, a coin, a die. They need no model and no signal, so they answer
+   instantly and still work on a train. */
+var TIMER_RE = /^(?:set|start)?\s*(?:a\s+)?timer\s+(?:for\s+)?(\d{1,3})\s*(seconds?|secs?|minutes?|mins?|hours?|hrs?)$/i;
+var COIN_RE  = /^(?:flip|toss)\s+(?:a\s+)?coin$/i;
+var DICE_RE  = /^(?:roll|throw)\s+(?:a\s+)?(?:dice|die|d6)$/i;
+
+var runningTimer = null;
+
+function startTimer(amount, unit){
+  var secs = parseInt(amount, 10);
+  if(/hour|hr/i.test(unit)) secs *= 3600;
+  else if(/min/i.test(unit)) secs *= 60;
+  if(!secs || secs < 1) return false;
+
+  if(runningTimer) clearTimeout(runningTimer);
+  var ends = Date.now() + secs * 1000;
+  store.settings.timerEnds = ends;
+  save();
+
+  runningTimer = setTimeout(function(){
+    runningTimer = null;
+    store.settings.timerEnds = 0;
+    save();
+    banner('good', '<b>Timer finished.</b>');
+    speak('Your timer has finished.');
+    hudSync();
+  }, secs * 1000);
+
+  var how = secs >= 3600 ? (Math.round(secs / 360) / 10) + ' hours'
+          : secs >= 60 ? (Math.round(secs / 6) / 10) + ' minutes'
+          : secs + ' seconds';
+  speak('Timer set for ' + how + '.');
+  hudSync();
+  return true;
+}
+
+/* how long is left, for the readout */
+function timerLeft(){
+  var ends = store.settings.timerEnds || 0;
+  if(!ends) return '';
+  var left = Math.round((ends - Date.now()) / 1000);
+  if(left <= 0) return '';
+  if(left < 60) return left + 's left';
+  return Math.floor(left / 60) + 'm ' + (left % 60) + 's left';
+}
+
+/* the ones that need nothing at all */
+function theSmallThings(said){
+  var q = String(said || '').trim().replace(/[.?!]+$/, '');
+  if(!q) return false;
+
+  var t = q.match(TIMER_RE);
+  if(t) return startTimer(t[1], t[2]);
+
+  if(COIN_RE.test(q)){
+    var side = Math.random() < 0.5 ? 'heads' : 'tails';
+    speak('It is ' + side + '.');
+    hudLog('him', 'Coin: ' + side, false);
+    return true;
+  }
+  if(DICE_RE.test(q)){
+    var roll = 1 + Math.floor(Math.random() * 6);
+    speak('A ' + roll + '.');
+    hudLog('him', 'Dice: ' + roll, false);
+    return true;
+  }
+  return false;
+}
+
 /* ==================== saying what you want open ====================
    The dock is gone: these are the things it used to be for. */
 var OPEN_RE = /^(?:open|show|go to|bring up)?\s*(?:the\s+)?(settings|options|voice|teach|teaching|memory|memories|camera|look)(?:\s+(?:panel|page|screen|tab))?$/i;
+var HIDE_RE = /^(?:hide|close)\s+(?:the\s+)?(transcript|memory|memories|systems|brain|clock|time)$/i;
 var CLOSE_RE = /^(?:close|hide|dismiss|go back|never mind|nevermind)(?:\s+(?:that|it|this|the\s+(?:panel|settings|camera)))?$/i;
 
 /* Said mid-flow: stop what you are doing. Pause holds everything and waits to
@@ -4746,6 +4996,14 @@ function openByVoice(said){
     return true;
   }
 
+  var hide = q.match(HIDE_RE);
+  if(hide){
+    var names = { transcript:"transcript", memory:"memory", memories:"memory",
+                  systems:"systems", brain:"brain", clock:"clock", time:"clock" };
+    var name = names[hide[1].toLowerCase()];
+    if(name){ showHudPanel(name, false); return true; }
+  }
+
   if(CLOSE_RE.test(q)){
     if(vizStop()) return true;
     if(cam.open){ camClose(); return true; }
@@ -4757,6 +5015,11 @@ function openByVoice(said){
   var m = q.match(OPEN_RE);
   if(!m) return false;
   var what = m[1].toLowerCase();
+
+  /* the readouts: shown only when asked for */
+  var readouts = { transcript:"transcript", memory:"memory", memories:"memory",
+                   systems:"systems", brain:"brain", clock:"clock", time:"clock" };
+  if(readouts[what] && showHudPanel(readouts[what], true)) return true;
 
   if(what === "camera" || what === "look"){ camOpen(); return true; }
   if(what === "teach" || what === "teaching"){ renderTeach(); openPanel($("teach")); return true; }
@@ -5545,7 +5808,7 @@ function hudSync(){
   if(st) st.textContent = studies().length ? (studies().length + " studied") : "none studied";
   hudSet("hudMic", nativeMicSupported() ? (nativeListening ? "listening" : "ready") : "app only");
   hudSet("hudBg", store.settings.background ? "on" : "off");
-  hudSet("hudBuild", BUILD);
+  hudSet("hudBuild", timerLeft() || BUILD);
 }
 
 /* What was said, as it is said. The last line is rewritten while you talk
@@ -5719,6 +5982,12 @@ function hfAsk(question){
   /* something is playing in the ball - the question is about that */
   if($("hfOrb").classList.contains("showing") && !CLOSE_RE.test(String(question).trim())){
     vizAsk(question);
+    return;
+  }
+
+  /* the ones that need no model at all */
+  if(theSmallThings(question)){
+    hfSet(hf.want ? "hear" : "wait", hf.want ? "Listening…" : hfIdleLabel());
     return;
   }
 
@@ -6020,7 +6289,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.59";
+var BUILD = "2026-08-21.60";
 
 function banner(kind, html){
   var b = $("banner");
@@ -6074,6 +6343,8 @@ applyBackground();       /* restore whatever was chosen last time */
 if(inApp()){
   document.body.classList.add("voiceonly");
   hudSync();
+  handsOn();               /* turn it, pinch it, move it */
+  gripLoad();              /* where it was left last time */
   /* load the phone's model now, so the first question is not the slow one */
   if(Native && Native.warm){
     setTimeout(function(){

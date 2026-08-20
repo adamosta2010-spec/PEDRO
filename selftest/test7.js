@@ -780,5 +780,41 @@ function nativeFrom(cap, exp){
   t("and a number when one was said", grab("intentFrom") ? true : true, true);
 }
 
+
+/* ---- hands on, readouts on demand, and the small things ---- */
+{
+  const inSrc = bit => src.indexOf(bit) > -1;
+  const page = require("fs").readFileSync("index.html", "utf8");
+  const v = n => src.slice(src.indexOf("var " + n), src.indexOf(";", src.indexOf("var " + n)) + 1);
+
+  t("the ball can be turned with a finger", grab("handsOn").indexOf("grip.spinY += dx") > -1, true);
+  t("two fingers pinch it", grab("handsOn").indexOf("grip.startDist") > -1, true);
+  t("and carry it somewhere else", grab("handsOn").indexOf("grip.x = grip.fromX") > -1, true);
+  t("it cannot be pinched to nothing", grab("handsOn").indexOf("Math.max(140") > -1, true);
+  t("where it was left is remembered", inSrc("function gripSave"), true);
+  t("and restored next time", inSrc("gripLoad();"), true);
+
+  t("the readouts are hidden until asked for", page.indexOf(".hudpanel[data-panel]{display:none}") > -1, true);
+  t("each has a name", page.indexOf('data-panel="transcript"') > -1, true);
+  t("they can be asked for", inSrc("function showHudPanel"), true);
+  t("and hidden again", inSrc("var HIDE_RE"), true);
+  t("they can be picked up and moved", grab("handsOn").indexOf("panelWhere(held.dataset.panel") > -1, true);
+  t("and stay where they were put", inSrc("function panelWhere"), true);
+
+  const small = new Function('store','save','speak','hudLog','hudSync','banner',
+    'var runningTimer=null;' + v("TIMER_RE") + v("COIN_RE") + v("DICE_RE") +
+    grab("startTimer") + grab("timerLeft") + grab("theSmallThings") +
+    '; return { go: theSmallThings, left: timerLeft };')
+    ({ settings:{} }, function(){}, function(){}, function(){}, function(){}, function(){});
+  t("a timer is set without asking anyone", small.go("set a timer for 5 minutes"), true);
+  t("seconds work too", small.go("timer for 30 seconds"), true);
+  t("a coin can be flipped", small.go("flip a coin"), true);
+  t("a die can be rolled", small.go("roll a dice"), true);
+  t("a joke still goes to the model", small.go("tell me a joke"), false);
+  t("and so does a question", small.go("what is the capital of france"), false);
+  t("he is told to be good company", inSrc("rather than explaining that you are an assistant"), true);
+  t("the voice has a name", inSrc('elevenName:"AI"'), true);
+}
+
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " mic/image tests passed");
 process.exit(fail ? 1 : 0);
