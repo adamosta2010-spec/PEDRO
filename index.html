@@ -393,8 +393,10 @@
     background:color-mix(in srgb,var(--hud) 8%,transparent);color:var(--hud)}
 
   /* the dock: always there, quiet until touched */
-  #dock{position:absolute;left:12px;right:12px;bottom:calc(var(--safe-b) + 10px);
-    display:flex;gap:8px;z-index:3}
+  /* The dock is gone - ask for what you want instead. It is kept in the page
+     so the panel it opens still works, and a double tap on the ball opens
+     settings if speaking is not an option. */
+  #dock{display:none}
   .dockbtn{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;
     padding:9px 4px;color:var(--hud);
     background:linear-gradient(180deg, color-mix(in srgb,var(--hud) 10%,transparent), transparent);
@@ -417,8 +419,7 @@
   .dockrow select,.dockrow input[type=range]{flex:1;min-width:0}
   .dockrow .btn{flex:1}
 
-  /* leave room for the dock */
-  .hudgrid{padding-bottom:78px}
+  #dockPanel{bottom:calc(var(--safe-b) + 14px)}
 
   /* on a phone the columns stack, and the readouts thin out */
   @media(max-width:820px){
@@ -593,6 +594,18 @@
   @keyframes breathe{0%,100%{transform:scale(1);opacity:.85}50%{transform:scale(1.06);opacity:1}}
   @keyframes hudTalk{from{transform:scale(.94);opacity:.8}to{transform:scale(1.08);opacity:1}}
   @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* a small card over the simulation, for questions about what is playing */
+  #orbInfo{position:absolute;left:50%;top:calc(50% + 4px);transform:translate(-50%,0) scale(.96);
+    width:min(300px,80vw);max-height:38vh;overflow-y:auto;z-index:4;
+    padding:11px 13px;opacity:0;pointer-events:none;transition:opacity .2s, transform .2s;
+    background:color-mix(in srgb,var(--bg1) 94%,transparent);
+    border:1px solid color-mix(in srgb,var(--hud) 34%,transparent);
+    clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px)}
+  #orbInfo.on{opacity:1;transform:translate(-50%,0) scale(1);pointer-events:auto}
+  #orbInfoTitle{display:block;font-size:9.5px;letter-spacing:.24em;text-transform:uppercase;
+    color:var(--hud);margin-bottom:5px}
+  #orbInfoText{font-size:13px;line-height:1.5;color:var(--tx)}
 
   /* HUD lettering: spaced, upright, quiet */
   #hfState{font-size:13px;font-weight:700;letter-spacing:.26em;text-transform:uppercase;
@@ -1156,6 +1169,7 @@
         <span class="wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
         <iframe id="orbViz" sandbox="allow-scripts" referrerpolicy="no-referrer" title="Explanation"></iframe>
       </div>
+      <div id="orbInfo"><b id="orbInfoTitle"></b><span id="orbInfoText"></span></div>
       <div id="hfState">Say &ldquo;Pedro&rdquo;</div>
       <div id="hfHeard"></div>
       <div id="hfSaid"></div>
@@ -2734,6 +2748,21 @@ var lastUserText = "";   /* what they just asked - used to pick relevant lessons
 function systemPrompt(){
   var s = store.settings;
   var now = new Date();
+
+  /* A spoken answer needs almost none of the written-answer instructions, and
+     every character of them is time before he starts talking. */
+  if(voiceMode){
+    var vp = "You are " + (s.aiName || "Pedro") + ", " +
+      (s.name ? s.name + "'s" : "their") +
+      " assistant, speaking out loud. Today is " + now.toDateString() + ".\n" +
+      "Answer in one or two short sentences of plain speech - the length you would " +
+      "actually say. No markdown, no lists, no headings, no code, no emoji. " +
+      "No label or category before the answer. Lead with the answer. " +
+      "It is a conversation, so a short question back is fine.\n";
+    if(s.about) vp += "About them: " + String(s.about).slice(0, 200) + "\n";
+    vp += taughtBlock(lastUserText);
+    return vp;
+  }
   var p = "You are " + (s.aiName || "Pedro") + ", " + (s.name ? s.name + "'s" : "the user's") +
     " personal assistant, running on their phone. You help with anything they ask: " +
     "questions, ideas, writing, planning, code, decisions, or just talking things through.\n\n" +
@@ -3856,9 +3885,61 @@ function vizWaiting(about){
     '<' + '/script>';
 }
 
+/* A short answer about whatever is on screen, shown over it. */
+function orbInfo(title, text){
+  var card = $("orbInfo");
+  if(!card) return;
+  $("orbInfoTitle").textContent = title || "";
+  $("orbInfoText").textContent = text || "";
+  card.classList.add("on");
+}
+function orbInfoHide(){
+  var card = $("orbInfo");
+  if(card) card.classList.remove("on");
+}
+
+/* Ask about the thing that is playing, without losing it. */
+function vizAsk(question){
+  if(viz.busy) return;
+  viz.busy = true;
+  hfSet("busy", "Looking at it");
+  orbInfo(viz.lastAsk, "…");
+
+  var ask = "They are watching a small animation you built of " + viz.lastAsk + ". " +
+    "They asked: " + question + ". Answer about that animation and the thing it shows, " +
+    "in two short sentences of plain speech. No markdown.";
+  var only = { messages: [{ role:"user", content: ask, t:Date.now() }] };
+  var wasVoice = voiceMode;
+  voiceMode = true;                 /* short, spoken, quick */
+  askStream(only, function(acc){ $("orbInfoText").textContent = acc; })
+    .then(function(answer){
+      voiceMode = wasVoice;
+      viz.busy = false;
+      orbInfo(viz.lastAsk, answer);
+      hudLog("him", answer, false);
+      hfSet("talk", viz.lastAsk);
+      hf.talking = true;
+      sayStop();
+      sayChunk(answer);
+      sayWhenDone(function(){
+        hf.talking = false;
+        if(!hf.want) return;
+        hfSet("hear", "Listening…");
+        hfQuietTimer();
+      });
+    }).catch(function(e){
+      voiceMode = wasVoice;
+      viz.busy = false;
+      var why = String(e && e.message || e);
+      orbInfo(viz.lastAsk, why);
+      hfSet("hear", "Listening…");
+    });
+}
+
 /* tap the ball to put the globe back */
 function vizStop(){
   var orb = $('hfOrb');
+  orbInfoHide();
   if(!orb.classList.contains('showing')) return false;
   orb.classList.remove('showing');
   $('orbViz').srcdoc = '';        /* stop whatever was running */
@@ -4533,6 +4614,43 @@ function rememberFrom(text){
     if(addMemory(line)) got.push(line);
   }
   return got;
+}
+
+/* ==================== saying what you want open ====================
+   The dock is gone: these are the things it used to be for. */
+var OPEN_RE = /^(?:open|show|go to|bring up)?\s*(?:the\s+)?(settings|options|voice|teach|teaching|memory|memories|camera|look)(?:\s+(?:panel|page|screen|tab))?$/i;
+var CLOSE_RE = /^(?:close|hide|dismiss|go back|never mind|nevermind)(?:\s+(?:that|it|this|the\s+(?:panel|settings|camera)))?$/i;
+
+/* returns true if the words were a request to open or close something */
+function openByVoice(said){
+  var q = String(said || "").trim().replace(/[.?!]+$/, "");
+  if(!q) return false;
+
+  if(CLOSE_RE.test(q)){
+    if(vizStop()) return true;
+    if(cam.open){ camClose(); return true; }
+    closePanels();
+    hfSet(hf.want ? "hear" : "wait", hf.want ? "Listening…" : hfIdleLabel());
+    return true;
+  }
+
+  var m = q.match(OPEN_RE);
+  if(!m) return false;
+  var what = m[1].toLowerCase();
+
+  if(what === "camera" || what === "look"){ camOpen(); return true; }
+  if(what === "teach" || what === "teaching"){ renderTeach(); openPanel($("teach")); return true; }
+  if(what === "memory" || what === "memories" || what === "what you remember"){
+    renderTeach(); openPanel($("teach"));
+    speak(memories().length
+      ? ("I remember " + memories().length + " things about you.")
+      : "I have not picked anything up about you yet.");
+    return true;
+  }
+  /* settings, options, voice */
+  fillSettings();
+  openPanel(settings);
+  return true;
 }
 
 /* ==================== studying a subject ====================
@@ -5307,6 +5425,18 @@ function hfAsk(question){
   /* If he is already looking, the question is usually about what he can see -
      but "count to a hundred" is not, and attaching a picture to it made him
      describe the room as well. */
+  /* something is playing in the ball - the question is about that */
+  if($("hfOrb").classList.contains("showing") && !CLOSE_RE.test(String(question).trim())){
+    vizAsk(question);
+    return;
+  }
+
+  /* a request to open or close something, rather than a question */
+  if(openByVoice(question)){
+    hfSet(hf.want ? "hear" : "wait", hf.want ? "Listening…" : hfIdleLabel());
+    return;
+  }
+
   /* told to go and learn something */
   var toLearn = String(question).trim().match(STUDY_RE);
   if(toLearn){ learnAbout(toLearn[1]); return; }
@@ -5560,6 +5690,10 @@ function askOnce(c){
 $("btnHF").addEventListener("click", hfOpen);
 
 /* tap the circle to cut it off mid-sentence and talk over it */
+hfOrb.addEventListener("dblclick", function(){
+  /* no buttons on screen, so this is the way in without speaking */
+  fillSettings(); openPanel(settings);
+});
 hfOrb.addEventListener("click", function(){
   if(vizStop()) return;              /* a simulation is running - put the globe back */
   if(!hf.on) return;
@@ -5588,7 +5722,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.54";
+var BUILD = "2026-08-21.55";
 
 function banner(kind, html){
   var b = $("banner");

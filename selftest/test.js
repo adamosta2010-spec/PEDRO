@@ -86,7 +86,11 @@ t("claude 401", apiError(401, "{}").includes("rejected"), true);
 /* ---- prompt ---- */
 const long = systemPrompt();
 voiceMode = true; const spoken = systemPrompt(); voiceMode = false;
-t("voice mode adds spoken-answer rule", spoken.includes("spoken out loud") && !long.includes("spoken out loud"), true);
+/* the spoken prompt is a different, much shorter one now - that is the point */
+t("speaking gets its own short prompt",
+  spoken.includes("speaking out loud") && !long.includes("speaking out loud"), true);
+t("and it is far shorter than the written one", spoken.length < long.length / 3, true);
+t("it still carries what he was taught", spoken.includes("Pedro"), true);
 t("persona is Pedro", long.startsWith("You are Pedro,"), true);
 t("prompt carries user context", long.includes("Adam") && long.includes("Roblox"), true);
 

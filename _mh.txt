@@ -1,0 +1,19 @@
+Ask for what you want open, talk to a simulation, and a much shorter prompt
+
+The dock is gone. Say open settings, teach, memory, camera, or close that, and
+it happens - checked against ordinary questions so that asking what the capital
+of France is does not open a panel, and open safari still opens Safari. A double
+tap on the ball opens settings if speaking is not an option.
+
+While a simulation is playing you can ask about it. The question goes to what is
+on screen rather than starting a new one, and the answer appears on a small card
+over the animation as well as being spoken, so you do not lose what you were
+watching.
+
+Speed: the instructions sent before every spoken word were 2374 characters of
+rules about writing code and formatting markdown - none of which matters when
+the answer is going to be said aloud. Speaking now sends 341. That is 86 per
+cent less to read before he can start talking, on top of the quick model and the
+thinking budget already set to zero.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>

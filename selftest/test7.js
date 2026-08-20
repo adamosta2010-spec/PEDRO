@@ -650,5 +650,38 @@ function nativeFrom(cap, exp){
   t("the first frame is drawn before anything else", inSrc("draw the first frame before anything else"), true);
 }
 
+
+/* ---- saying what you want open, and asking about what is playing ---- */
+{
+  const v = n => src.slice(src.indexOf("var " + n), src.indexOf(";", src.indexOf("var " + n)) + 1);
+  const re = new Function(v("OPEN_RE") + v("CLOSE_RE") +
+    "; return { O:OPEN_RE, C:CLOSE_RE };")();
+  const opens = q => { const m = q.match(re.O); return m ? m[1].toLowerCase() : null; };
+  const inSrc = bit => src.indexOf(bit) > -1;
+  const page = require("fs").readFileSync("index.html", "utf8");
+
+  t("asking for settings opens them", opens("open settings"), "settings");
+  t("just saying settings works", opens("settings"), "settings");
+  t("asking for teach opens it", opens("teach"), "teach");
+  t("asking for memory opens it", opens("open memory"), "memory");
+  t("asking for the camera opens it", opens("open the camera"), "camera");
+  t("close that is heard", re.C.test("close that"), true);
+  t("go back is heard", re.C.test("go back"), true);
+  t("a question is not a command", opens("what is the capital of france"), null);
+  t("opening an app is still an app", opens("open safari"), null);
+  t("the commands are heard before anything else", inSrc("if(openByVoice(question)){"), true);
+
+  t("the buttons are gone", page.indexOf("#dock{display:none}") > -1, true);
+  t("but there is still a way in without speaking", inSrc('hfOrb.addEventListener("dblclick"'), true);
+
+  t("you can ask about what is playing", inSrc("function vizAsk"), true);
+  t("questions go there while it plays",
+    inSrc('if($("hfOrb").classList.contains("showing") && !CLOSE_RE.test'), true);
+  t("the answer appears over it", inSrc("function orbInfo"), true);
+  t("and it knows what you are watching", grab("vizAsk").indexOf("viz.lastAsk") > -1, true);
+
+  t("speaking sends a much shorter prompt", inSrc("speaking out loud. Today is"), true);
+}
+
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " mic/image tests passed");
 process.exit(fail ? 1 : 0);
