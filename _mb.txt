@@ -1,0 +1,17 @@
+A wireframe globe, turning against itself
+
+The orb is a sphere now: twelve meridians turned about the vertical axis and
+seven latitude rings stacked up it, the two layers spinning in opposite
+directions at different speeds, with the lit core inside and the orbits and dial
+still going around the outside. Listening brightens the lines, thinking speeds
+the whole thing up.
+
+Sized from one value - the smaller of a comfortable size, most of the width, or
+a third of the height - so it fits a phone without crowding the panels.
+
+The latitude rings were written with percentage lengths, which translateZ does
+not accept: every one of them would have collapsed into the middle and the
+sphere would have been flat. They are driven off the orb's own size instead, and
+a check now fails the build if a percentage creeps back in.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>

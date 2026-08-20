@@ -567,7 +567,28 @@ function nativeFrom(cap, exp){
   t("the ball turns inside the glass", inPage("#hfOrb .swirl{"), true);
   t("the orbits are in the markup too", inPage('<i class="o1"><b></b></i>'), true);
   t("it stops spinning for anyone who dislikes motion",
-    inPage("#hfOrb .ticks, #hfOrb .orbits i, #hfOrb .spokes, #hfOrb .swirl{animation:none"), true);
+    inPage("#hfOrb .mer, #hfOrb .lat{animation:none"), true);
+}
+
+
+/* ---- the globe ---- */
+{
+  const page = require("fs").readFileSync("index.html", "utf8");
+  const css = page.match(/<style>([\s\S]*?)<\/style>/)[1];
+  const inPage = bit => page.indexOf(bit) > -1;
+  const count = (re) => (css.match(re) || []).length;
+
+  t("the globe is made of meridians", count(/#hfOrb .mer .m/g) >= 12, true);
+  t("and latitudes", count(/#hfOrb .lat .l/g) >= 7, true);
+  t("they are in the markup as well", inPage('<i class="m11"></i>'), true);
+  t("the two layers turn against each other",
+    inPage("#hfOrb .lat{animation:hudSpinY 26s linear infinite reverse}"), true);
+  t("the sphere is a real one, not a flat picture", inPage("transform-style:preserve-3d"), true);
+
+  /* translateZ takes a length; a percentage silently kills the whole rule */
+  t("no latitude uses a percentage length", (css.match(/translateZ" + String.fromCharCode(92) + "([^)]*%[^)]*" + String.fromCharCode(92) + ")/g) || []).length, 0);
+  t("they are sized from the orb itself", inPage("translateZ(calc(var(--orb)"), true);
+  t("the orb fits a phone screen", inPage("--orb:min(300px, 78vw, 34vh)"), true);
 }
 
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " mic/image tests passed");

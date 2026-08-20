@@ -271,7 +271,8 @@
     #voiceBar, #voiceBar *{animation:none !important}
     .vwave i{height:12px}
     /* the reactor still glows, it just stops spinning */
-    #hfOrb .ticks, #hfOrb .orbits i, #hfOrb .spokes, #hfOrb .swirl{animation:none !important}
+    #hfOrb .ticks, #hfOrb .orbits i, #hfOrb .spokes, #hfOrb .swirl,
+    #hfOrb .mer, #hfOrb .lat{animation:none !important}
   }
 
   /* ============ panels ============ */
@@ -433,7 +434,10 @@
                                 transparent 1px 3px)}
   /* the rings: three of them, turning at different speeds, so it reads as a
      machine paying attention rather than a spinner */
-  #hfOrb{width:min(230px,42vh);height:min(230px,42vh);flex:none;position:relative;z-index:1}
+  /* whichever is smaller: a comfortable size, most of the width, or a third of
+     the height - so it never crowds the panels or runs off a small screen */
+  #hfOrb{--orb:min(300px, 78vw, 34vh);
+    width:var(--orb);height:var(--orb);flex:none;position:relative;z-index:1}
   #hfOrb .ring{position:absolute;border-radius:50%;border:1px solid transparent}
   #hfOrb .r1{inset:0;
     border-color:color-mix(in srgb,var(--hud) 22%,transparent);
@@ -459,6 +463,39 @@
     -webkit-mask:radial-gradient(circle, transparent 88%, #000 89%, #000 96%, transparent 97%);
     mask:radial-gradient(circle, transparent 88%, #000 89%, #000 96%, transparent 97%);
     animation:hudSpin 40s linear infinite}
+
+  /* A wireframe globe: circles turned about the vertical axis make the
+     meridians, flat circles stacked up the axis make the latitudes. The two
+     layers turn against each other so it never reads as a flat picture. */
+  #hfOrb .globe{position:absolute;inset:9%;transform-style:preserve-3d;
+    perspective:700px;pointer-events:none}
+  #hfOrb .mer,#hfOrb .lat{position:absolute;inset:0;transform-style:preserve-3d}
+  #hfOrb .mer{animation:hudSpinY 16s linear infinite}
+  #hfOrb .lat{animation:hudSpinY 26s linear infinite reverse}
+  #hfOrb .mer i,#hfOrb .lat i{position:absolute;inset:0;border-radius:50%;
+    border:1px solid color-mix(in srgb,var(--hud) 34%,transparent);
+    box-shadow:0 0 6px color-mix(in srgb,var(--hud) 20%,transparent)}
+  #hfOrb .lat i{border-color:color-mix(in srgb,var(--hud) 26%,transparent)}
+  #hfOrb .mer .m0{transform:rotateY(0deg)}
+  #hfOrb .mer .m1{transform:rotateY(15deg)}
+  #hfOrb .mer .m2{transform:rotateY(30deg)}
+  #hfOrb .mer .m3{transform:rotateY(45deg)}
+  #hfOrb .mer .m4{transform:rotateY(60deg)}
+  #hfOrb .mer .m5{transform:rotateY(75deg)}
+  #hfOrb .mer .m6{transform:rotateY(90deg)}
+  #hfOrb .mer .m7{transform:rotateY(105deg)}
+  #hfOrb .mer .m8{transform:rotateY(120deg)}
+  #hfOrb .mer .m9{transform:rotateY(135deg)}
+  #hfOrb .mer .m10{transform:rotateY(150deg)}
+  #hfOrb .mer .m11{transform:rotateY(165deg)}
+  #hfOrb .lat .l0{transform:rotateX(90deg) translateZ(calc(var(--orb) * -0.3075)) scale(0.661)}
+  #hfOrb .lat .l1{transform:rotateX(90deg) translateZ(calc(var(--orb) * -0.2050)) scale(0.866)}
+  #hfOrb .lat .l2{transform:rotateX(90deg) translateZ(calc(var(--orb) * -0.1025)) scale(0.968)}
+  #hfOrb .lat .l3{transform:rotateX(90deg) translateZ(calc(var(--orb) * 0.0000)) scale(1.000)}
+  #hfOrb .lat .l4{transform:rotateX(90deg) translateZ(calc(var(--orb) * 0.1025)) scale(0.968)}
+  #hfOrb .lat .l5{transform:rotateX(90deg) translateZ(calc(var(--orb) * 0.2050)) scale(0.866)}
+  #hfOrb .lat .l6{transform:rotateX(90deg) translateZ(calc(var(--orb) * 0.3075)) scale(0.661)}
+  @keyframes hudSpinY{to{transform:rotateY(360deg)}}
 
   /* three orbits, tilted, each carrying a light around */
   #hfOrb .orbits{position:absolute;inset:-7%;pointer-events:none;perspective:600px}
@@ -529,6 +566,10 @@
   #hfOrb.busy .spokes{animation-duration:3s}
   #hfOrb.busy .swirl{animation-duration:1.6s}
   #hfOrb.hear .orbits i{border-color:color-mix(in srgb,var(--hud) 55%,transparent)}
+  #hfOrb.hear .mer i{border-color:color-mix(in srgb,var(--hud) 55%,transparent)}
+  #hfOrb.busy .mer{animation-duration:5s}
+  #hfOrb.busy .lat{animation-duration:8s}
+  #hfOrb.talk .mer i{border-color:color-mix(in srgb,var(--hud) 48%,transparent)}
   #hfOrb.busy .o1{animation-duration:2.4s}
   #hfOrb.busy .o2{animation-duration:3.6s}
   #hfOrb.busy .r1{animation-duration:1.1s}
@@ -1062,6 +1103,31 @@
         <span class="ring r3"></span>
         <span class="pulse"></span>
         <span class="ticks"></span>
+        <span class="globe">
+          <span class="mer">
+          <i class="m0"></i>
+          <i class="m1"></i>
+          <i class="m2"></i>
+          <i class="m3"></i>
+          <i class="m4"></i>
+          <i class="m5"></i>
+          <i class="m6"></i>
+          <i class="m7"></i>
+          <i class="m8"></i>
+          <i class="m9"></i>
+          <i class="m10"></i>
+          <i class="m11"></i>
+          </span>
+          <span class="lat">
+          <i class="l0"></i>
+          <i class="l1"></i>
+          <i class="l2"></i>
+          <i class="l3"></i>
+          <i class="l4"></i>
+          <i class="l5"></i>
+          <i class="l6"></i>
+          </span>
+        </span>
         <span class="orbits">
           <i class="o1"><b></b></i>
           <i class="o2"><b></b></i>
@@ -5152,7 +5218,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-20.48";
+var BUILD = "2026-08-20.49";
 
 function banner(kind, html){
   var b = $("banner");
