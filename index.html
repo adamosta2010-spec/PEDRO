@@ -52,7 +52,9 @@
   ::-webkit-scrollbar-thumb{background:var(--line); border-radius:8px}
 
   /* ============ shell ============ */
-  .app{display:flex; height:100dvh; position:relative; z-index:1}
+  /* no z-index here on purpose: it would trap the drawer in a stacking
+     context of its own and the menu would open under the scrim */
+  .app{display:flex; height:100dvh; position:relative}
   .side{
     width:250px; flex:none; display:flex; flex-direction:column; gap:4px;
     background:color-mix(in srgb, var(--bg1) 88%, transparent);
@@ -3242,7 +3244,7 @@ $("hfExit").addEventListener("click", hfClose);
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-20.15";
+var BUILD = "2026-08-20.16";
 
 function banner(kind, html){
   var b = $("banner");
