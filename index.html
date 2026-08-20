@@ -234,6 +234,7 @@
     padding-top:calc(var(--safe-t) + 11px);
     font-size:13px; line-height:1.5; display:none; align-items:flex-start; gap:10px}
   #banner.on{display:flex}
+  #banner.good{background:#0b2e1a; color:#bbf7d0; border-bottom:1px solid #14532d}
   #banner.warn{background:#3a2a08; color:#fde68a; border-bottom:1px solid #78500a}
   #banner.bad{background:#3a1212; color:#fecaca; border-bottom:1px solid #7f1d1d}
   #banner a{color:inherit; font-weight:700}
@@ -3279,7 +3280,7 @@ $("hfExit").addEventListener("click", hfClose);
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-20.23";
+var BUILD = "2026-08-20.24";
 
 function banner(kind, html){
   var b = $("banner");
@@ -3324,8 +3325,26 @@ if(inApp()){
   checkDeviceModel().then(function(d){
     syncProviderUI();
     if(!d.available && d.reason)
-      banner("warn", "<b>Offline answers aren't available.</b> " + esc(d.reason));
+      banner("warn", "<b>Offline answers aren't available yet.</b> " + esc(d.reason));
+    watchForDeviceModel();
   });
+}
+
+/* Apple downloads the model in the background and gives no notice when it
+   lands, so keep asking quietly instead of making him restart the app. */
+function watchForDeviceModel(){
+  if(!inApp() || deviceModel.available) return;
+  var tries = 0;
+  var timer = setInterval(function(){
+    if(++tries > 120){ clearInterval(timer); return; }   /* about two hours, then give up */
+    checkDeviceModel().then(function(d){
+      if(!d.available) return;
+      clearInterval(timer);
+      syncProviderUI();
+      banner("good", "<b>Your phone can answer on its own now.</b> " +
+        "Choose “On this iPhone” in Settings and it works with no internet.");
+    }).catch(function(){});
+  }, 60000);
 }
 syncProviderUI();   /* otherwise the sidebar keeps the placeholder labels */
 checkOrigin();
