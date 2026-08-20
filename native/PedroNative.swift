@@ -4,6 +4,7 @@ import Capacitor
 import Speech
 import AVFoundation
 import Vision
+import LocalAuthentication
 
 #if canImport(FoundationModels)
 import FoundationModels
@@ -34,7 +35,8 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
         CAPPluginMethod(name: "stopSpeaking",   returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "warm",           returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setWords",       returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "analyse",        returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "analyse",        returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "authenticate",   returnType: CAPPluginReturnPromise)
     ]
 
     // MARK: - on-device model
@@ -185,6 +187,28 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
     /// Hand a URL to iOS so it opens whatever app owns that scheme - maps,
     /// music, a phone number, or one of their own Shortcuts. iOS decides what
     /// happens next, and anything that sends still needs a tap in that app.
+    // MARK: - it is really you
+
+    /// Ask for a face or a fingerprint. Used before he is allowed to change
+    /// his own code - the one thing in here that can do real damage, since
+    /// whatever he writes then runs with everything the app can reach.
+    @objc func authenticate(_ call: CAPPluginCall) {
+        let reason = call.getString("reason") ?? "to let Pedro change his own code"
+        let ctx = LAContext()
+        ctx.localizedCancelTitle = "Not now"
+        var err: NSError?
+        guard ctx.canEvaluatePolicy(.deviceOwnerAuthentication, error: &err) else {
+            call.reject("this phone has no lock set up: \(err?.localizedDescription ?? "")")
+            return
+        }
+        ctx.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason) { ok, e in
+            DispatchQueue.main.async {
+                if ok { call.resolve(["ok": true]) }
+                else { call.reject("not authorised: \(e?.localizedDescription ?? "cancelled")") }
+            }
+        }
+    }
+
     // MARK: - looking, without the network
 
     /// What the phone itself can see: what it thinks the thing is, any words

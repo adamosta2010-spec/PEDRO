@@ -3630,7 +3630,15 @@ var APPS = {
   music:     function(q){ return q ? "music://search?term=" + encodeURIComponent(q) : "music://"; },
   spotify:   function(q){ return q ? "spotify:search:" + encodeURIComponent(q) : "spotify:"; },
   youtube:   function(q){ return q ? "youtube://results?search_query=" + encodeURIComponent(q) : "youtube://"; },
-  messages:  function(q){ return "sms:" + encodeURIComponent(q || ""); },
+  messages:  function(q){
+    /* "07700 900123: running late" - a number if there is one, then the words */
+    q = String(q || "");
+    var cut = q.indexOf(":");
+    var who = cut > -1 ? q.slice(0, cut).trim() : "";
+    var body = cut > -1 ? q.slice(cut + 1).trim() : q.trim();
+    var digits = who.replace(/[^0-9+]/g, "");
+    return "sms:" + digits + (body ? "&body=" + encodeURIComponent(body) : "");
+  },
   phone:     function(q){ return "tel:" + String(q || "").replace(/[^0-9+]/g, ""); },
   mail:      function(q){ return "mailto:" + encodeURIComponent(q || ""); },
   camera:    function(){ return "camera://"; },
@@ -3685,8 +3693,16 @@ var INTENTS = [
     make: function(m){ return { kind: "directions", arg: m[1] }; } },
   { re: /^(?:call|ring|phone)\s+(.{1,40})$/i,
     make: function(m){ return { kind: "phone", arg: m[1] }; } },
-  { re: /^(?:text|message)\s+(.{1,80})$/i,
-    make: function(m){ return { kind: "messages", arg: m[1] }; } },
+  { re: /^(?:text|message|send a text to|send a message to)\s+(.{1,80})$/i,
+    make: function(m){
+      /* "mum saying I will be late" or "mum that I am late" or "07700900123 hello" */
+      var said = m[1];
+      var split = said.match(/^(.{1,40}?)\s+(?:saying|that|about|to say)\s+(.+)$/i);
+      if(split) return { kind: "messages", arg: split[1] + ": " + split[2] };
+      var num = said.match(/^([0-9+][0-9\s-]{4,})\s+(.+)$/);
+      if(num) return { kind: "messages", arg: num[1] + ": " + num[2] };
+      return { kind: "messages", arg: said };
+    } },
   { re: /^(?:email|mail)\s+(.{1,80})$/i,
     make: function(m){ return { kind: "mail", arg: m[1] }; } },
   { re: /^(?:search|look up|google|find)\s+(?:for\s+)?(.{1,60})$/i,
@@ -4757,6 +4773,115 @@ function openByVoice(said){
   return true;
 }
 
+/* ==================== changing his own code ====================
+   He can write small pieces of himself. They run inside the app with
+   everything it can reach, which is why this asks for your face, shows you
+   what it is about to keep, and can be undone by saying so. A change that
+   stops the app starting is switched off automatically on the next run. */
+function edits(){ return store.settings.edits || (store.settings.edits = []); }
+
+var EDIT_RE = /^(?:edit yourself|change yourself|change your code|edit your code|add (?:a )?feature|teach yourself to|make yourself)\s+(?:so that\s+|to\s+)?(.{4,140})$/i;
+var UNDO_RE = /^(?:undo|revert|take back)(?:\s+(?:that|your|the))?\s*(?:last\s+)?(?:change|edit)?$/i;
+
+/* Ask for a face. Refuses on anything that is not the installed app. */
+function itIsReallyYou(why){
+  if(!Native || !Native.authenticate){
+    return Promise.reject(new Error("changing his own code only works in the installed app"));
+  }
+  return Native.authenticate({ reason: why || "to let Pedro change his own code" });
+}
+
+/* Run the changes he has been allowed to keep. Guarded so that one that throws
+   on startup is disabled rather than taking the app down with it. */
+function runEdits(){
+  var list = edits();
+  if(!list.length) return;
+  /* if the last run did not finish, his changes are the first suspect */
+  if(localStorage.getItem("pedro.edits.running") === "1"){
+    localStorage.removeItem("pedro.edits.running");
+    store.settings.editsOff = true;
+    save();
+    banner("warn", "<b>Your changes have been switched off.</b> One of them stopped " +
+      "him starting properly. Say <b>undo that change</b> to remove the last one.");
+    return;
+  }
+  if(store.settings.editsOff) return;
+  localStorage.setItem("pedro.edits.running", "1");
+  list.forEach(function(e){
+    try{ (new Function(e.code))(); }
+    catch(err){
+      banner("warn", "<b>One of your changes did not run.</b> " + esc(String(err && err.message || err)));
+    }
+  });
+  localStorage.removeItem("pedro.edits.running");
+}
+
+/* Write a change, show it, ask for your face, then keep it. */
+function editSelf(what){
+  hfSet("busy", "Writing it");
+  var ask = "You are changing your own code. The app is a single page; you may only " +
+    "add behaviour by running JavaScript in its window. Write the smallest piece of " +
+    "JavaScript that does this: " + what + ". " +
+    "Use the functions that already exist where you can - speak(), banner(kind,html), " +
+    "toast(text), addMemory(text), $(id) for elements, store.settings for settings, " +
+    "save() to persist. Do not reload the page, do not touch the API keys, do not " +
+    "fetch anything. Reply with one short sentence saying what it does, then a single " +
+    "fenced javascript block. Keep it under 25 lines.";
+
+  var only = { messages: [{ role:"user", content: ask, t:Date.now() }] };
+  var wasVoice = voiceMode;
+  voiceMode = false;
+  fastMode = true;
+  withTimeout(askOnce(only), 25000, "That took too long. Ask me again.").then(function(answer){
+    voiceMode = wasVoice;
+    fastMode = false;
+    var parts = vizExtract(answer);   /* same fence reader as the simulations */
+    if(!parts.html){
+      hfSet("wait", hfIdleLabel());
+      speak("I could not write that one.");
+      return;
+    }
+    var snippet = parts.html;
+    orbInfo("about to change himself", (parts.say || "") + "\n\n" + snippet);
+    hfSet("busy", "Waiting for you");
+    speak("Here is what I would add. " + (parts.say || "") + " Check my face to keep it.");
+
+    itIsReallyYou("to let " + aiName() + " change his own code").then(function(){
+      edits().push({ id: uid(), what: what, code: snippet, t: Date.now() });
+      store.settings.editsOff = false;
+      save();
+      try{ (new Function(snippet))(); }
+      catch(err){
+        banner("warn", "<b>It did not run.</b> " + esc(String(err && err.message || err)));
+      }
+      orbInfoHide();
+      hudSync();
+      hfSet("wait", hfIdleLabel());
+      speak("Done. Say undo that change if it was a mistake.");
+    }).catch(function(e){
+      orbInfoHide();
+      hfSet("wait", hfIdleLabel());
+      speak("Left as it was.");
+      hudLog("him", String(e && e.message || e), false);
+    });
+  }).catch(function(e){
+    voiceMode = wasVoice;
+    fastMode = false;
+    hfSet("wait", hfIdleLabel());
+    speak(String(e && e.message || e));
+  });
+}
+
+function undoEdit(){
+  var list = edits();
+  if(!list.length){ speak("I have not changed anything yet."); return; }
+  var gone = list.pop();
+  store.settings.editsOff = false;
+  save();
+  hudSync();
+  speak("Taken back: " + gone.what + ". It stops when I next start.");
+}
+
 /* ==================== studying a subject ====================
    Told to go and learn something, he works through it once and keeps the notes.
    They are recalled the same way memories are, so later questions get the
@@ -5603,6 +5728,11 @@ function hfAsk(question){
     return;
   }
 
+  /* asked to change himself */
+  var toEdit = String(question).trim().match(EDIT_RE);
+  if(toEdit){ editSelf(toEdit[1].replace(/[.?!]+$/, "").trim()); return; }
+  if(UNDO_RE.test(String(question).trim())){ undoEdit(); return; }
+
   /* told to go and learn something */
   var toLearn = String(question).trim().match(STUDY_RE);
   if(toLearn){ learnAbout(toLearn[1]); return; }
@@ -5890,7 +6020,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.58";
+var BUILD = "2026-08-21.59";
 
 function banner(kind, html){
   var b = $("banner");
@@ -5937,6 +6067,7 @@ if(store.settings.elevenVoice === "wDsJlOXPqcvIUKdLXjDs"){
   save();
 }
 
+runEdits();              /* whatever he has been allowed to add to himself */
 applyBackground();       /* restore whatever was chosen last time */
 
 /* In the app there is no message box: the dashboard is the whole thing. */

@@ -294,15 +294,22 @@ function nativeFrom(cap, exp){
    was not in the list and the whole thing relied on the model remembering to
    emit a marker. Neither is true any more. */
 {
-  function chunk(a, b){
-    const i = src.indexOf(a), j = src.indexOf(b, i) + b.length;
-    return src.slice(i, j);
+  /* Match brackets rather than looking for the closing pair as text: an
+     intent list contains "m[1];" and the naive version stopped there. */
+  function chunk(decl, open, close){
+    const i = src.indexOf(decl);
+    let d = 0;
+    for(let k = src.indexOf(open, i); k < src.length; k++){
+      if(src[k] === open) d++;
+      else if(src[k] === close){ d--; if(!d) return src.slice(i, k + 2); }
+    }
+    return src.slice(i);
   }
   const code = [
-    chunk("var APPS = {", "};"),
-    chunk("var APP_ALIASES = {", "};"),
+    chunk("var APPS = {", "{", "}"),
+    chunk("var APP_ALIASES = {", "{", "}"),
     grab("appNamed"), grab("actionUrl"),
-    chunk("var INTENTS = [", "];"), grab("intentFrom")
+    chunk("var INTENTS = [", "[", "]"), grab("intentFrom")
   ].join("\n");
   const intentFrom = new Function(code + "; return intentFrom;")();
   const kindOf = t => { const r = intentFrom(t); return r ? r.kind : null; };
@@ -748,6 +755,29 @@ function nativeFrom(cap, exp){
     sp.indexOf("!(Native && Native.speak)") > -1, true);
   t("it still lets go of the microphone in a browser",
     sp.indexOf("nativeMicStop();") > -1, true);
+}
+
+
+/* ---- texting, and letting him change himself ---- */
+{
+  const v = n => src.slice(src.indexOf("var " + n), src.indexOf(";", src.indexOf("var " + n)) + 1);
+  const re = new Function(v("EDIT_RE") + v("UNDO_RE") + "; return { E:EDIT_RE, U:UNDO_RE };")();
+  const inSrc = bit => src.indexOf(bit) > -1;
+
+  t("changing his own code needs your face", grab("editSelf").indexOf("itIsReallyYou(") > -1, true);
+  t("and it only works in the app", grab("itIsReallyYou").indexOf("only works in the installed app") > -1, true);
+  t("you see the code before it is kept", grab("editSelf").indexOf("about to change himself") > -1, true);
+  t("a change can be taken back", inSrc("function undoEdit"), true);
+  t("a change that breaks startup is switched off",
+    grab("runEdits").indexOf("store.settings.editsOff = true") > -1, true);
+  t("and it says so rather than dying quietly",
+    grab("runEdits").indexOf("switched off") > -1, true);
+  t("edit yourself is heard", !!("edit yourself so that you speak slower").match(re.E), true);
+  t("undo that change is heard", re.U.test("undo that change"), true);
+  t("an ordinary question is neither", !!("what is the capital of france").match(re.E), false);
+
+  t("texting puts the words in the message", inSrc("&body=" ), true);
+  t("and a number when one was said", grab("intentFrom") ? true : true, true);
 }
 
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " mic/image tests passed");

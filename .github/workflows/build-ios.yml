@@ -99,6 +99,8 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'Pedro uses the camera when you take a photo to send it.'" "$PLIST" || true
           /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 'Pedro opens your photos when you attach one.'" "$PLIST" || true
           /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryAddUsageDescription string 'Pedro saves pictures it makes for you.'" "$PLIST" || true
+          # asked for before he is allowed to change his own code
+          /usr/libexec/PlistBuddy -c "Add :NSFaceIDUsageDescription string 'Pedro asks for your face before changing his own code.'" "$PLIST" || true
           # listening while the app is behind something else needs this declared
           plutil -replace UIBackgroundModes -json '["audio"]' "$PLIST"
           echo "--- background modes in the source plist ---"
