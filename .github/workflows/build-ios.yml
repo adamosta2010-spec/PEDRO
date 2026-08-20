@@ -26,6 +26,13 @@ jobs:
         with:
           node-version: 20
 
+      - name: Pick the newest Xcode
+        run: |
+          ls /Applications | grep -i "^Xcode" || true
+          NEWEST=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
+          echo "using $NEWEST"
+          sudo xcode-select -s "$NEWEST/Contents/Developer" || true
+
       - name: Toolchain
         run: |
           exec > >(tee -a build.log) 2>&1
@@ -61,7 +68,7 @@ jobs:
       - name: Create the iOS project
         run: |
           exec > >(tee -a build.log) 2>&1
-          npx cap add ios --verbose
+          npx cap add ios
 
       - name: Sync the web app into it
         run: |
