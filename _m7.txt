@@ -1,0 +1,25 @@
+A dashboard instead of a chat app, a better voice, and a model that stays loaded
+
+The app is now a readout: the reactor in the middle, panels either side for the
+time, what is answering, whether it can answer offline, what it remembers and
+what the microphone is doing, and a transcript that writes your words while you
+are still speaking rather than after you stop. There is no message box in the
+app at all - the same file is still served as a website, where voice cannot
+work, so the chat shell stays there.
+
+Talking has an animation of its own: bars around the core that move only while
+he is speaking, so it is obvious who is talking.
+
+The ElevenLabs voice is wired up with the voice from the library link. It needs
+a key of your own - Settings has a field for it - and anything that goes wrong,
+including no key and no signal, drops back to the phone's own voice rather than
+leaving silence.
+
+Speed: the on-device session was being rebuilt for every single question, which
+is the pause before each answer. It is kept now, warmed up at startup, and only
+rebuilt if the instructions change. The model on the PC is told to put itself on
+the graphics card and stay loaded for half an hour. And a spoken conversation no
+longer sends the whole history every turn - the recent exchanges are enough,
+since the memory system carries anything that matters.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>

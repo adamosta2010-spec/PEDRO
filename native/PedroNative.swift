@@ -30,7 +30,8 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
         CAPPluginMethod(name: "setBackground",  returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "openURL",        returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "speak",          returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "stopSpeaking",   returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "stopSpeaking",   returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "warm",           returnType: CAPPluginReturnPromise)
     ]
 
     // MARK: - on-device model
@@ -69,6 +70,38 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
     #endif
 
     /// Answer a question entirely on the device.
+    /// The session was built from scratch for every question, and building it is
+    /// the slow part. Keep it, and start again only if the instructions change.
+    private var keptSession: Any?
+    private var keptFor: String = ""
+
+    #if canImport(FoundationModels)
+    @available(iOS 26.0, *)
+    private func session(for instructions: String) -> LanguageModelSession {
+        if keptFor == instructions, let s = keptSession as? LanguageModelSession {
+            return s
+        }
+        let s = LanguageModelSession(instructions: instructions)
+        s.prewarm()          // load it now rather than on the first question
+        keptSession = s
+        keptFor = instructions
+        return s
+    }
+    #endif
+
+    /// Load the model before it is needed, so the first question is not the slow one.
+    @objc func warm(_ call: CAPPluginCall) {
+        #if canImport(FoundationModels)
+        if #available(iOS 26.0, *) {
+            let instructions = call.getString("system") ?? "You are a helpful assistant."
+            _ = session(for: instructions)
+            call.resolve(["warm": true])
+            return
+        }
+        #endif
+        call.resolve(["warm": false])
+    }
+
     @objc func ask(_ call: CAPPluginCall) {
         let prompt = call.getString("prompt") ?? ""
         let instructions = call.getString("system") ?? "You are Pedro, a helpful personal assistant. Answer briefly."
@@ -78,11 +111,14 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
         if #available(iOS 26.0, *) {
             Task {
                 do {
-                    let session = LanguageModelSession(instructions: instructions)
-                    let result = try await session.respond(to: prompt)
+                    let s = self.session(for: instructions)
+                    let result = try await s.respond(to: prompt)
                     call.resolve(["reply": result.content])
                 } catch {
-                    call.reject("on-device model failed: \(error.localizedDescription)")
+                    // a session can be left in a bad state - start fresh next time
+                    self.keptSession = nil
+                    self.keptFor = ""
+                    call.reject("on-device model failed: (error.localizedDescription)")
                 }
             }
             return

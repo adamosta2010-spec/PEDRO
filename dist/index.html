@@ -48,9 +48,11 @@
   ::-webkit-scrollbar-thumb{background:var(--line); border-radius:8px}
 
   /* ============ shell ============ */
-  /* no z-index here on purpose: it would trap the drawer in a stacking
-     context of its own and the menu would open under the scrim */
+  /* In the app, talking is the whole thing and the chat shell is never shown.
+     The same file is also served as a website, where voice cannot work - so the
+     shell stays there, or the page would be empty. */
   .app{display:flex; height:100dvh; position:relative}
+  body.voiceonly .app{display:none}
   .side{
     width:250px; flex:none; display:flex; flex-direction:column; gap:4px;
     background:color-mix(in srgb, var(--bg1) 88%, transparent);
@@ -349,10 +351,51 @@
   .tool .tx small{color:var(--tx2);font-size:12px}
 
   /* ============ hands-free ============ */
-  #hf{position:fixed;inset:0;z-index:70;background:var(--bg);display:none;flex-direction:column;
-    align-items:center;justify-content:center;gap:22px;text-align:center;
-    padding:28px 24px calc(var(--safe-b) + 28px)}
-  #hf.on{display:flex}
+  /* ============ the dashboard ============ */
+  #hf{position:fixed;inset:0;z-index:70;background:var(--bg);display:none;
+    padding:calc(var(--safe-t) + 14px) 14px calc(var(--safe-b) + 14px)}
+  #hf.on{display:block}
+  .hudgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr) minmax(0,1fr);
+    gap:12px;height:100%;position:relative;z-index:1}
+  .hudcol{display:flex;flex-direction:column;gap:10px;min-width:0}
+  .hudcentre{display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:16px;text-align:center;min-width:0}
+
+  /* a panel: clipped corners and a hairline, like something machined */
+  .hudpanel{position:relative;padding:11px 12px;min-width:0;
+    background:linear-gradient(180deg, color-mix(in srgb,var(--hud) 7%,transparent), transparent);
+    border:1px solid color-mix(in srgb,var(--hud) 26%,transparent);
+    clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px)}
+  .hudpanel.grow{flex:1;overflow:hidden;display:flex;flex-direction:column}
+  .hlabel{font-size:9.5px;letter-spacing:.28em;text-transform:uppercase;
+    color:color-mix(in srgb,var(--hud) 75%,var(--tx2));margin-bottom:6px}
+  .hbig{font-size:26px;font-weight:200;letter-spacing:.04em;color:var(--hud);line-height:1.1}
+  .hbig.sm{font-size:21px}
+  .hsub{font-size:10.5px;color:var(--tx3);margin-top:2px;letter-spacing:.06em}
+  .hrow{display:flex;justify-content:space-between;gap:8px;font-size:11px;
+    padding:2px 0;color:var(--tx2);min-width:0}
+  .hrow b{color:var(--hud);font-weight:500;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis;max-width:60%}
+
+  #hudLog{flex:1;overflow-y:auto;font-size:11px;line-height:1.5;color:var(--tx2);
+    display:flex;flex-direction:column;gap:6px}
+  #hudLog .you{color:var(--tx)}
+  #hudLog .him{color:color-mix(in srgb,var(--hud) 85%,var(--tx))}
+  #hudLog .who{font-size:8.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--tx3)}
+
+  .hudbtns{display:flex;gap:8px;justify-content:flex-end}
+  .hudbtns .icobtn{border:1px solid color-mix(in srgb,var(--hud) 30%,transparent);
+    background:color-mix(in srgb,var(--hud) 8%,transparent);color:var(--hud)}
+
+  /* on a phone the columns stack, and the readouts thin out */
+  @media(max-width:820px){
+    .hudgrid{grid-template-columns:1fr;grid-template-rows:auto 1fr auto;gap:8px}
+    .hudcol{flex-direction:row;gap:8px;overflow-x:auto}
+    .hudcol .hudpanel{flex:1;min-width:132px}
+    .hudpanel.grow{min-width:180px}
+    .hbig{font-size:20px}
+    .hudbtns{position:absolute;right:0;bottom:0}
+  }
   #hf::before{content:"";position:absolute;inset:0;pointer-events:none;
     background:
       radial-gradient(52% 38% at 50% 42%, color-mix(in srgb,var(--hud) 14%,transparent), transparent 72%),
@@ -360,7 +403,7 @@
                                 transparent 1px 3px)}
   /* the rings: three of them, turning at different speeds, so it reads as a
      machine paying attention rather than a spinner */
-  #hfOrb{width:230px;height:230px;flex:none;position:relative;z-index:1}
+  #hfOrb{width:min(230px,42vh);height:min(230px,42vh);flex:none;position:relative;z-index:1}
   #hfOrb .ring{position:absolute;border-radius:50%;border:1px solid transparent}
   #hfOrb .r1{inset:0;
     border-color:color-mix(in srgb,var(--hud) 22%,transparent);
@@ -381,6 +424,23 @@
       color-mix(in srgb,var(--hud) 20%,transparent), transparent 70%)}
   #hfOrb .core svg{width:100%;height:100%;color:var(--hud);fill:currentColor;
     filter:drop-shadow(0 0 18px color-mix(in srgb,var(--hud) 70%,transparent))}
+
+  /* the bars only move while he is actually talking, so you can see it is him */
+  #hfOrb .wave{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+    gap:4px;pointer-events:none}
+  #hfOrb.talk .wave{display:flex}
+  #hfOrb .wave i{width:3px;height:8px;border-radius:2px;background:var(--hud);
+    opacity:.85;animation:hudWave .5s ease-in-out infinite alternate}
+  #hfOrb .wave i:nth-child(2){animation-delay:.06s}
+  #hfOrb .wave i:nth-child(3){animation-delay:.12s}
+  #hfOrb .wave i:nth-child(4){animation-delay:.18s}
+  #hfOrb .wave i:nth-child(5){animation-delay:.24s}
+  #hfOrb .wave i:nth-child(6){animation-delay:.18s}
+  #hfOrb .wave i:nth-child(7){animation-delay:.12s}
+  #hfOrb .wave i:nth-child(8){animation-delay:.06s}
+  @keyframes hudWave{from{height:7px;opacity:.5}to{height:52px;opacity:1}}
+  /* while he talks the core steps back so the bars read clearly */
+  #hfOrb.talk .core{opacity:.35}
 
   /* a ripple that only exists while it is hearing you */
   #hfOrb .pulse{position:absolute;inset:30px;border-radius:50%;
@@ -756,7 +816,12 @@
       <div class="sw" id="swTts"></div>
     </div>
     <div class="field">
-      <label for="setVoice">Voice</label>
+      <label for="setEleven">ElevenLabs key <small style="color:var(--tx3);font-weight:400">optional</small></label>
+      <input type="password" id="setEleven" placeholder="sk_..." autocomplete="off" spellcheck="false">
+      <div class="hint">Their voices sound far better than the phone's. Free tier at
+        elevenlabs.io &mdash; the key stays on this device. Without one, or with no signal,
+        he uses the phone's own voice.</div>
+      <label for="setVoice" style="margin-top:12px;display:block">Phone voice</label>
       <select id="setVoice"></select>
       <label for="setVolume" style="margin-top:10px;display:block">Volume <span id="volNum" style="color:var(--tx2);font-weight:400"></span></label>
       <input type="range" id="setVolume" min="0" max="100" step="5" style="width:100%">
@@ -878,17 +943,58 @@
 <div id="shade"><img alt=""></div>
 
 <div id="hf">
-  <button class="icobtn exit" id="hfExit" aria-label="Close"><svg><use href="#i-x"/></svg></button>
-  <div id="hfOrb" class="wait">
-    <span class="ring r1"></span>
-    <span class="ring r2"></span>
-    <span class="ring r3"></span>
-    <span class="pulse"></span>
-    <span class="core"><svg><use href="#bot"/></svg></span>
+  <div class="hudgrid">
+    <div class="hudcol">
+      <div class="hudpanel">
+        <div class="hlabel">Local</div>
+        <div class="hbig" id="hudTime">--:--</div>
+        <div class="hsub" id="hudDate"></div>
+      </div>
+      <div class="hudpanel">
+        <div class="hlabel">Brain</div>
+        <div class="hrow"><span>Answering</span><b id="hudModel">&mdash;</b></div>
+        <div class="hrow"><span>Offline</span><b id="hudOffline">&mdash;</b></div>
+        <div class="hrow"><span>Voice</span><b id="hudVoice">&mdash;</b></div>
+      </div>
+      <div class="hudpanel">
+        <div class="hlabel">Memory</div>
+        <div class="hbig sm" id="hudMem">0</div>
+        <div class="hsub">things remembered</div>
+      </div>
+    </div>
+
+    <div class="hudcentre">
+      <div id="hfOrb" class="wait">
+        <span class="ring r1"></span>
+        <span class="ring r2"></span>
+        <span class="ring r3"></span>
+        <span class="pulse"></span>
+        <span class="core"><svg><use href="#bot"/></svg></span>
+        <span class="wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+      </div>
+      <div id="hfState">Say &ldquo;Pedro&rdquo;</div>
+      <div id="hfHeard"></div>
+      <div id="hfSaid"></div>
+    </div>
+
+    <div class="hudcol">
+      <div class="hudpanel">
+        <div class="hlabel">Systems</div>
+        <div class="hrow"><span>Microphone</span><b id="hudMic">&mdash;</b></div>
+        <div class="hrow"><span>Background</span><b id="hudBg">&mdash;</b></div>
+        <div class="hrow"><span>Build</span><b id="hudBuild">&mdash;</b></div>
+      </div>
+      <div class="hudpanel grow">
+        <div class="hlabel">Transcript</div>
+        <div id="hudLog"></div>
+      </div>
+      <div class="hudbtns">
+        <button class="icobtn" id="hudCam" aria-label="Camera"><svg><use href="#i-cam"/></svg></button>
+        <button class="icobtn" id="hudTeach" aria-label="Teach"><svg><use href="#i-bulb"/></svg></button>
+        <button class="icobtn" id="hudSettings" aria-label="Settings"><svg><use href="#i-gear"/></svg></button>
+      </div>
+    </div>
   </div>
-  <div id="hfState">Say &ldquo;Pedro&rdquo;</div>
-  <div id="hfHeard"></div>
-  <div id="hfSaid"></div>
   <div id="hfWarn"></div>
 </div>
 
@@ -940,6 +1046,9 @@ var DEF = {
   tts:false, showThink:false, enterSends:true,
   voiceTalk:true,  /* talking sends straight away and the answer is read back */
   voiceName:"",    /* which of the phone's voices to speak with */
+  elevenKey:"",    /* an ElevenLabs key of your own, if you want their voice */
+  elevenVoice:"wDsJlOXPqcvIUKdLXjDs",   /* the one you picked from their library */
+  elevenOn:true,   /* use it when there is a key */
   volume:1,        /* how loud he is, on top of the phone's own volume */
   rate:1,          /* how fast he talks - deliberately capped short of gabbling */
   background:false, /* keep listening while the app is not on screen */
@@ -1472,6 +1581,7 @@ function fillSettings(){
     $("setLocalModel").appendChild(o);
   }
   $("setLocalModel").value = s.localModel;
+  $("setEleven").value = s.elevenKey || "";
   sw($("swFail"), s.autoFailover !== false);
   $("setImgModel").value = s.imageModel;
   $("setEffort").value = s.effort;
@@ -1767,6 +1877,7 @@ bindInput("setModel","model", syncProviderUI);
 bindInput("setGemModel","geminiModel", syncProviderUI);
 bindInput("setGroqModel","groqModel", syncProviderUI);
 bindInput("setLocalModel","localModel", syncProviderUI);
+bindInput("setEleven","elevenKey", function(){ elevenFailed = false; });
 bindInput("setLocalUrl","localUrl");
 $("setGroqKey").addEventListener("input", function(){
   var v = this.value.trim();
@@ -2189,6 +2300,63 @@ btnMic.addEventListener("click", function(){
    way even when "speak replies aloud" is off */
 var speakNext = false;
 
+/* ---- the ElevenLabs voice ----
+   Their audio is fetched and played here. It is better, and it costs a request,
+   so anything that goes wrong falls back to the phone rather than failing. */
+var elevenAudio = null;
+var elevenFailed = false;
+
+function elevenReady(){
+  return !!(store.settings.elevenOn !== false && store.settings.elevenKey && !elevenFailed);
+}
+
+function elevenSpeak(text, onEnd){
+  var key = store.settings.elevenKey;
+  var voice = store.settings.elevenVoice || "wDsJlOXPqcvIUKdLXjDs";
+  var url = "https://api.elevenlabs.io/v1/text-to-speech/" + encodeURIComponent(voice) +
+            "?output_format=mp3_44100_128";
+  return fetch(url, {
+    method: "POST",
+    headers: { "xi-api-key": key, "content-type": "application/json" },
+    body: JSON.stringify({
+      text: text,
+      model_id: "eleven_flash_v2_5",     /* the quick one - this is a conversation */
+      voice_settings: { stability: 0.4, similarity_boost: 0.75, speed: 1 }
+    })
+  }).then(function(res){
+    if(!res.ok){
+      return res.text().then(function(t){
+        var why = res.status === 401 ? "that ElevenLabs key was refused"
+                : res.status === 429 ? "ElevenLabs is rate limiting"
+                : ("ElevenLabs error " + res.status);
+        throw new Error(why + (t ? ": " + t.slice(0, 120) : ""));
+      });
+    }
+    return res.blob();
+  }).then(function(blob){
+    return new Promise(function(resolve){
+      if(elevenAudio){ try{ elevenAudio.pause(); }catch(e){} }
+      var a = new Audio(URL.createObjectURL(blob));
+      elevenAudio = a;
+      var vol = parseFloat(store.settings.volume);
+      a.volume = isNaN(vol) ? 1 : Math.max(0, Math.min(1, vol));
+      var r = parseFloat(store.settings.rate);
+      a.playbackRate = isNaN(r) ? 1 : Math.max(0.7, Math.min(1.3, r));
+      var done = false;
+      function fin(){
+        if(done) return;
+        done = true;
+        try{ URL.revokeObjectURL(a.src); }catch(e){}
+        if(onEnd) onEnd();
+        resolve();
+      }
+      a.onended = fin;
+      a.onerror = fin;
+      a.play().catch(fin);
+    });
+  });
+}
+
 /* The app's own voice reports when it stops. One listener, registered once,
    pointed at whoever is waiting - the same mistake as the microphone is not
    worth making twice. */
@@ -2256,6 +2424,23 @@ function speak(text, onEnd){
   /* A live recording session makes playback almost inaudible, and he would
      hear himself anyway - so let go of the microphone first. */
   if(nativeListening) nativeMicStop();
+
+  /* The better voice first, if there is a key for it. Anything that goes wrong
+     drops through to the phone's own voice rather than leaving silence. */
+  if(elevenReady()){
+    var line = plain(text).slice(0, 2500);
+    if(!hf.on) voiceUI("speak", line.slice(0, 90));
+    elevenSpeak(line, function(){
+      if(!hf.on) voiceUI("off");
+      if(onEnd) onEnd();
+    }).catch(function(e){
+      elevenFailed = true;               /* stop trying until the key changes */
+      banner("warn", "<b>" + esc(String(e && e.message || e)) + ".</b> " +
+        "Using the phone's own voice instead.");
+      speak(text, onEnd);                /* straight to the fallback */
+    });
+    return;
+  }
 
   /* The web view's speech engine is suspended while the app is off screen, so
      answers would queue until it was opened. The app's own voice is not. */
@@ -2462,7 +2647,15 @@ function localRequest(msgs){
                           : guessLocalUrl()).replace(/\/+$/, "") +
          "/v1/chat/completions",
     headers: { "content-type": "application/json" },
-    body: { model: store.settings.localModel, messages: out, stream: true }
+    body: {
+      model: store.settings.localModel,
+      messages: out,
+      stream: true,
+      /* stay loaded rather than being read off disk for every question, and
+         put the whole thing on the graphics card if it fits */
+      keep_alive: "30m",
+      options: { num_gpu: 99, num_ctx: 4096 }
+    }
   };
 }
 
@@ -2489,8 +2682,16 @@ function trimImages(msgs, keep){
   return out;
 }
 
+/* A conversation you are having out loud does not need the whole history sent
+   with every turn - it makes each answer slower and costs more. Keep the recent
+   exchanges; the memory system carries anything that actually matters. */
+function shortContext(msgs, turns){
+  var keep = turns || 8;
+  return msgs.length > keep ? msgs.slice(msgs.length - keep) : msgs;
+}
+
 function buildRequest(msgs){
-  msgs = trimImages(msgs, 2);
+  msgs = shortContext(trimImages(msgs, 2), voiceMode ? 6 : 12);
   for(var i = msgs.length - 1; i >= 0; i--)
     if(msgs[i].role === "user"){ lastUserText = msgs[i].content || ""; break; }
   /* falling through to Claude for a provider that is not Claude produced a key
@@ -3542,6 +3743,9 @@ function camAsk(question){
 }
 
 $('btnCam').addEventListener('click', camOpen);
+$('hudCam').addEventListener('click', camOpen);
+$('hudSettings').addEventListener('click', function(){ fillSettings(); openPanel(settings); });
+$('hudTeach').addEventListener('click', function(){ renderTeach(); openPanel($('teach')); });
 $('camFlip').addEventListener('click', camFlip);
 $('camClose').addEventListener('click', camClose);
 $('camAsk').addEventListener('click', function(){
@@ -4024,7 +4228,7 @@ function backupData(){
       model:s.model, geminiModel:s.geminiModel, groqModel:s.groqModel,
       imageModel:s.imageModel, localUrl:s.localUrl, localModel:s.localModel,
       effort:s.effort, tts:s.tts, voiceName:s.voiceName, voiceTalk:s.voiceTalk,
-      volume:s.volume, rate:s.rate,
+      volume:s.volume, rate:s.rate, elevenKey:s.elevenKey, elevenVoice:s.elevenVoice,
       background:s.background, voiceFirst:s.voiceFirst, enterSends:s.enterSends,
       showThink:s.showThink, theme:s.theme, authEmail:s.authEmail
     },
@@ -4183,6 +4387,7 @@ $("btnMicTest").addEventListener("click", testMic);
 
 /* one button, whichever thing is happening */
 $("vbStop").addEventListener("click", function(){
+  if(elevenAudio){ try{ elevenAudio.pause(); }catch(e){} }
   if(Native && Native.stopSpeaking) Native.stopSpeaking().catch(function(){});
   if(window.speechSynthesis && speechSynthesis.speaking){ speechSynthesis.cancel(); }
   if(nativeListening) stopListening();
@@ -4216,6 +4421,7 @@ function wakeRe(){
 }
 
 function hfSet(phase, label){
+  setTimeout(hudSync, 0);
   hf.phase = phase;
   hfOrb.className = ({ wait:"wait", hear:"hear", busy:"busy", talk:"talk" })[phase] || "wait";
   hfState.textContent = label;
@@ -4304,6 +4510,59 @@ function applyBackground(){
   }
 }
 
+/* ==================== the dashboard ====================
+   Readouts that answer the questions you would otherwise have to open Settings
+   to answer: what is answering, can it answer offline, is it listening. */
+function hudSet(id, text){ var el = $(id); if(el) el.textContent = text; }
+
+function hudTick(){
+  var now = new Date();
+  hudSet("hudTime", now.toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" }));
+  hudSet("hudDate", now.toLocaleDateString([], { weekday:"long", day:"numeric", month:"long" }));
+}
+
+function hudSync(){
+  hudTick();
+  hudSet("hudModel", providerLabel(store.settings.provider));
+  hudSet("hudOffline", inApp()
+    ? (deviceModel.available ? "ready" : (deviceModel.checked ? (deviceModel.reason || "no") : "checking…"))
+    : "app only");
+  var v = pickVoice();
+  hudSet("hudVoice", (store.settings.voiceName || (v && v.name) || "default").slice(0, 22));
+  hudSet("hudMem", String(memories().length));
+  hudSet("hudMic", nativeMicSupported() ? (nativeListening ? "listening" : "ready") : "app only");
+  hudSet("hudBg", store.settings.background ? "on" : "off");
+  hudSet("hudBuild", BUILD);
+}
+
+/* What was said, as it is said. The last line is rewritten while you talk
+   rather than waiting for you to finish. */
+var hudLive = null;
+function hudLog(who, text, live){
+  var box = $("hudLog");
+  if(!box) return;
+  text = String(text || "").trim();
+  if(!text) return;
+  if(live && hudLive && hudLive.dataset.who === who){
+    hudLive.querySelector(".tx").textContent = text;
+    box.scrollTop = box.scrollHeight;
+    return;
+  }
+  var line = document.createElement("div");
+  line.className = who === "you" ? "you" : "him";
+  line.dataset.who = who;
+  line.innerHTML = '<div class="who">' + (who === "you" ? "You" : esc(aiName())) + '</div>' +
+                   '<div class="tx"></div>';
+  line.querySelector(".tx").textContent = text;
+  box.appendChild(line);
+  while(box.children.length > 40) box.removeChild(box.firstChild);
+  box.scrollTop = box.scrollHeight;
+  hudLive = live ? line : null;
+}
+function hudLogDone(){ hudLive = null; }
+
+setInterval(hudTick, 20000);
+
 /* --- keep the screen awake so it can keep listening --- */
 var wakeLock = null;
 function keepAwake(want){
@@ -4376,7 +4635,10 @@ function hfSettle(text){
 
 function hfHeardText(live, finalTxt){
     finalTxt = finalTxt || "";
-    if(live) hfHeard.textContent = live;
+    if(live){
+      hfHeard.textContent = live;
+      hudLog("you", live, true);        /* written while you are still talking */
+    }
 
     if(hf.phase === "wait"){
       if(hf.answering) return;
@@ -4476,6 +4738,8 @@ function hfAsk(question){
   askOnce(c).then(function(answer){
     voiceMode = false;
     hfSaid.textContent = answer;
+    hudLogDone();
+    hudLog("him", answer, false);
     hfSet("talk", "Speaking");
     hf.talking = true;
     hf.turns++;
@@ -4561,12 +4825,12 @@ hfOrb.addEventListener("click", function(){
     hfQuietTimer();
   }
 });
-$("hfExit").addEventListener("click", hfClose);
+/* no close button any more - in the app the dashboard is the app */
 
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-20.44";
+var BUILD = "2026-08-20.45";
 
 function banner(kind, html){
   var b = $("banner");
@@ -4609,10 +4873,22 @@ applyTheme();
 fixStrandedProvider();
 applyBackground();       /* restore whatever was chosen last time */
 
+/* In the app there is no message box: the dashboard is the whole thing. */
+if(inApp()){
+  document.body.classList.add("voiceonly");
+  hudSync();
+  /* load the phone's model now, so the first question is not the slow one */
+  if(Native && Native.warm){
+    setTimeout(function(){
+      Native.warm({ system: systemPrompt() }).catch(function(){});
+    }, 1200);
+  }
+}
+
 /* Talking is what this is for, so start there. Only in the app - a web page
    cannot listen - and never over the sign-in screen. */
-if(store.settings.voiceFirst !== false && inApp() && !isLocked() && apiKeyNow()){
-  setTimeout(function(){ if(!hf.on) hfOpen(); }, 350);
+if(inApp() && !isLocked()){
+  setTimeout(function(){ if(!hf.on) hfOpen(); }, 300);
 }
 if(inApp()){
   checkDeviceModel().then(function(d){

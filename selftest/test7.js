@@ -457,5 +457,37 @@ function nativeFrom(cap, exp){
   t("and never removed out from under itself", wire.indexOf("removeAllListeners") === -1, true);
 }
 
+
+/* ---- the dashboard, the better voice, and not reloading the model ---- */
+{
+  const inSrc = bit => src.indexOf(bit) > -1;
+  const page = require("fs").readFileSync("index.html", "utf8");
+
+  t("the dashboard is the app", page.indexOf('class="hudgrid"') > -1, true);
+  t("there is no message box in the app", page.indexOf("body.voiceonly .app{display:none}") > -1, true);
+  t("but the website keeps one", page.indexOf(".app{display:flex; height:100dvh; position:relative}") > -1, true);
+  t("it opens straight into the dashboard", inSrc("if(!hf.on) hfOpen();"), true);
+  t("the readouts are wired", inSrc("function hudSync"), true);
+  t("the words are written while you talk", inSrc('hudLog("you", live, true)'), true);
+  t("his answers are written too", inSrc('hudLog("him", answer, false)'), true);
+  t("there is an animation while he talks", page.indexOf('class="wave"') > -1, true);
+
+  const el = grab("elevenSpeak");
+  t("the better voice is used when there is a key", grab("speak").indexOf("elevenReady()") > -1, true);
+  t("it asks for that particular voice", inSrc("wDsJlOXPqcvIUKdLXjDs"), true);
+  t("a refused key falls back rather than going silent",
+    grab("speak").indexOf("speak(text, onEnd);") > -1, true);
+  t("it stops trying after a failure", inSrc("elevenFailed = true"), true);
+  t("volume and speed apply to it too", el.indexOf("a.playbackRate") > -1, true);
+  t("the key travels in the backup", inSrc("elevenKey:s.elevenKey"), true);
+
+  const sc = grab("shortContext");
+  t("the context is kept short", sc.indexOf("msgs.slice(msgs.length - keep)") > -1, true);
+  t("and shorter still when talking", inSrc("voiceMode ? 6 : 12"), true);
+  t("the model on the PC uses the graphics card", inSrc("num_gpu: 99"), true);
+  t("and stays loaded between questions", inSrc('keep_alive: "30m"'), true);
+  t("the phone's model is warmed up at startup", inSrc("Native.warm({"), true);
+}
+
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " mic/image tests passed");
 process.exit(fail ? 1 : 0);
