@@ -630,6 +630,10 @@
   #hfHeard{color:var(--tx);font-size:19px;min-height:52px;max-width:520px;line-height:1.4;
     z-index:1;font-weight:500}
   #hfSaid{color:var(--tx2);font-size:15.5px;max-width:560px;line-height:1.6;min-height:24px;z-index:1}
+  /* Scaled back by however much the ball was scaled up, so the words keep their
+     own size - and moved on their own when you drag them. */
+  #hfWords{display:flex;flex-direction:column;align-items:center;gap:inherit;
+    transform-origin:top center;touch-action:none;position:relative;z-index:2}
   #hf .exit{position:absolute;top:calc(var(--safe-t) + 14px);right:16px;z-index:2}
   #hfWarn{position:absolute;bottom:calc(var(--safe-b) + 14px);left:16px;right:16px;
     color:var(--tx3);font-size:11.5px;line-height:1.45}
@@ -1235,9 +1239,11 @@
         <iframe id="orbViz" sandbox="allow-scripts" referrerpolicy="no-referrer" title="Explanation"></iframe>
       </div>
       <div id="orbInfo"><b id="orbInfoTitle"></b><span id="orbInfoText"></span></div>
-      <div id="hfState">Say &ldquo;Pedro&rdquo;</div>
-      <div id="hfHeard"></div>
-      <div id="hfSaid"></div>
+      <div id="hfWords">
+        <div id="hfState">Say &ldquo;Pedro&rdquo;</div>
+        <div id="hfHeard"></div>
+        <div id="hfSaid"></div>
+      </div>
     </div>
 
     <div class="hudcol">
@@ -2848,7 +2854,12 @@ function systemPrompt(){
       "No label or category before the answer. Lead with the answer. " +
       "It is a conversation, so a short question back is fine. " +
       "Jokes, riddles, a verse of a song, a story - do them properly when asked, " +
-      "rather than explaining that you are an assistant.\n";
+      "rather than explaining that you are an assistant.\n" +
+      "This is speech that has been transcribed, so it is sometimes half-heard " +
+      "or picked up by accident. If what you get does not make sense as something " +
+      "said to you, say you did not catch that and stop. Never invent a situation, " +
+      "a problem, a story or a character to explain it, and never answer a question " +
+      "that was not asked.\n";
     if(s.about) vp += "About them: " + String(s.about).slice(0, 200) + "\n";
     vp += taughtBlock(lastUserText);
     return vp;
@@ -4011,44 +4022,233 @@ function vizBuild(about){
   voiceMode = false;
   fastMode = true;
 
-  var seen = '', enough = false, lines = 0;
-  function done(text){
+  var seen = '', enough = false, lines = 0, tries = 0;
+
+  /* drawn here rather than by the model - offline, or the model would not */
+  function fallBack(){
     voiceMode = wasVoice;
     fastMode = false;
     viz.busy = false;
+    var html = vizLocal(about);
+    simKeep(about, html, '');
+    vizShow(about, html, '');
+    carryOn("Here's " + about + ". Drawn it myself - ask again for a better one.");
+  }
+
+  function done(text){
     var parts = vizExtract(text);
     if(!parts.html){
-      vizStop();
-      carryOn(parts.say || 'I could not draw that one.');
+      /* "Sure, here's the code" with no code. Ask once more, plainly, and
+         never read that promise out as though it were the answer. */
+      if(tries === 0 && apiKeyNow() && !isDevice()){
+        tries = 1;
+        enough = false;
+        seen = '';
+        hfSet('busy', 'Trying that again');
+        run('Reply with nothing but one fenced html block that draws ' + about +
+            ' as a small self-contained animation on a canvas, cyan #38e1f0 on' +
+            ' #0b0d12, starts by itself and loops, under 40 lines. No words' +
+            ' before or after the block.');
+        return;
+      }
+      fallBack();
       return;
     }
+    voiceMode = wasVoice;
+    fastMode = false;
+    viz.busy = false;
     simKeep(about, parts.html, parts.say);
     vizShow(about, parts.html, parts.say);
   }
 
-  askStream(only, function(acc){
-    seen = acc;
-    var n = (acc.match(/\n/g) || []).length;
-    if(n !== lines){ lines = n; hfSet('busy', 'Writing it - ' + n + ' lines'); }
-    /* the code block has closed: everything after it is chatter we do not need */
-    var first = acc.indexOf('```');
-    if(first > -1 && acc.indexOf('```', first + 3) > -1 && !enough){
-      enough = true;
-      try{ if(abortCtl) abortCtl.abort(); }catch(e){}
-    }
-  }).then(done, function(err){
-    if(enough && seen){ done(seen); return; }   /* we stopped it on purpose */
-    voiceMode = wasVoice;
-    fastMode = false;
-    viz.busy = false;
-    vizStop();
-    var why = String(err && err.message || err);
-    carryOn(why);
-  });
+  /* one runner, used for the first ask and for the plainer second one */
+  function run(prompt){
+    var one = { messages: [{ role:'user', content: prompt, t:Date.now() }] };
+    askStream(one, function(acc){
+      seen = acc;
+      var n = (acc.match(/\n/g) || []).length;
+      if(n !== lines){ lines = n; hfSet('busy', 'Writing it - ' + n + ' lines'); }
+      /* the code block has closed: everything after it is chatter we do not
+         need. An empty block does not count - stopping on one of those is how
+         you end up showing a blank page. */
+      var first = acc.indexOf('```');
+      if(first > -1 && !enough){
+        var close = acc.indexOf('```', first + 3);
+        if(close > -1 && close - first > 60){
+          enough = true;
+          try{ if(abortCtl) abortCtl.abort(); }catch(e){}
+        }
+      }
+    }).then(done, function(err){
+      if(enough && seen){ done(seen); return; }   /* we stopped it on purpose */
+      fallBack();      /* no signal, no key, or it fell over - draw it here */
+    });
+  }
+  run(ask);
 }
 
 /* Something to look at while he writes it - drawn here, not by him, so it
    appears the instant you ask. */
+
+/* ============ simulations he can draw himself ============
+   The model writes a better one when it can, but it is not always there: no
+   signal, no key, or the phone's own model, which cannot write a page. These
+   run instantly and offline, and one of them always matches. */
+var VIZ_HEAD = '<canvas id="c"></canvas><script>' +
+  'var c=document.getElementById("c"),g=c.getContext("2d");' +
+  'function fit(){var r=c.getBoundingClientRect();c.width=r.width||300;c.height=r.height||300;}' +
+  'addEventListener("resize",fit);fit();' +
+  'var W=function(){return c.width},H=function(){return c.height};' +
+  'var CY="#38e1f0",DIM="rgba(56,225,240,.35)",t=0;' +
+  'var drag=null;addEventListener("pointerdown",function(e){drag={x:e.clientX,y:e.clientY};});' +
+  'addEventListener("pointerup",function(){drag=null;});' +
+  'function ring(x,y,r,w,s){g.beginPath();g.arc(x,y,r,0,6.284);g.lineWidth=w||2;g.strokeStyle=s||CY;g.stroke();}' +
+  'function line(a,b,x,y,w,s){g.beginPath();g.moveTo(a,b);g.lineTo(x,y);g.lineWidth=w||2;g.strokeStyle=s||CY;g.stroke();}' +
+  'function dot(x,y,r,s){g.beginPath();g.arc(x,y,r,0,6.284);g.fillStyle=s||CY;g.fill();}';
+var VIZ_TAIL = '<' + '/script>';
+
+/* every one of these is the body of the frame: it may use g, c, W(), H(), t */
+var VIZ_KINDS = [
+  {名:0, name:"engine", words:["engine","piston","motor","cylinder","crank","combustion","pump"],
+    body:
+      'var cx=W()/2,cy=H()/2,R=Math.min(W(),H())*0.17,rod=R*2.4;' +
+      'g.clearRect(0,0,W(),H());t+=0.06;' +
+      'for(var k=0;k<2;k++){' +
+      ' var a=t+k*3.1416,px=cx+(k?70:-70)*Math.min(1,W()/380),py=cy+40;' +
+      ' var crx=px+Math.cos(a)*R,cry=py+Math.sin(a)*R;' +
+      ' var top=py-Math.sqrt(Math.max(0,rod*rod-(crx-px)*(crx-px)))+ (cry-py);' +
+      ' g.strokeStyle=DIM;g.lineWidth=2;g.strokeRect(px-26,cy-96,52,120);' +
+      ' line(px,top,crx,cry,3,CY);' +
+      ' g.fillStyle="rgba(56,225,240,.25)";g.fillRect(px-22,top-16,44,26);' +
+      ' g.strokeStyle=CY;g.lineWidth=2;g.strokeRect(px-22,top-16,44,26);' +
+      ' dot(crx,cry,4);' +
+      '}' +
+      'ring(cx,cy+40,R,2,DIM);dot(cx,cy+40,3);' +
+      'g.fillStyle=DIM;g.font="11px sans-serif";g.textAlign="center";' +
+      'g.fillText("engine",cx,H()-14);'
+  },
+  { name:"orbit", words:["orbit","planet","solar","moon","earth","sun","space","galaxy","satellite","gravity"],
+    body:
+      'g.clearRect(0,0,W(),H());t+=0.02;var cx=W()/2,cy=H()/2,u=Math.min(W(),H())/2.6;' +
+      'dot(cx,cy,7,"#ffd76a");' +
+      'for(var i=1;i<=3;i++){var r=u*(i/3.2);ring(cx,cy,r,1,DIM);' +
+      ' var a=t*(4-i)*1.2,x=cx+Math.cos(a)*r,y=cy+Math.sin(a)*r;dot(x,y,4+i);' +
+      ' if(i===2){var mr=13,ma=t*7;dot(x+Math.cos(ma)*mr,y+Math.sin(ma)*mr,2);}}' +
+      'g.fillStyle=DIM;g.font="11px sans-serif";g.textAlign="center";g.fillText("orbits",cx,H()-14);'
+  },
+  { name:"wave", words:["wave","sound","light","signal","radio","frequency","vibration","oscillat","sine"],
+    body:
+      'g.clearRect(0,0,W(),H());t+=0.07;var cy=H()/2;' +
+      'for(var k=0;k<3;k++){g.beginPath();' +
+      ' for(var x=0;x<=W();x+=3){var y=cy+Math.sin((x/38)-t*(1+k*0.5))*(28-k*7)*(k?0.7:1);' +
+      '  x?g.lineTo(x,y):g.moveTo(x,y);}' +
+      ' g.lineWidth=k?1:2.5;g.strokeStyle=k?DIM:CY;g.stroke();}' +
+      'g.fillStyle=DIM;g.font="11px sans-serif";g.textAlign="center";g.fillText("waves",W()/2,H()-14);'
+  },
+  { name:"gears", words:["gear","gears","cog","clock","watch","transmission","ratio","machine","mechanism"],
+    body:
+      'g.clearRect(0,0,W(),H());t+=0.03;var cx=W()/2,cy=H()/2,u=Math.min(W(),H())/2.7;' +
+      'function gear(x,y,r,n,a,s){ring(x,y,r*0.62,2,s);' +
+      ' for(var i=0;i<n;i++){var th=a+i*6.284/n;' +
+      '  line(x+Math.cos(th)*r*0.62,y+Math.sin(th)*r*0.62,x+Math.cos(th)*r,y+Math.sin(th)*r,3,s);}' +
+      ' dot(x,y,3,s);}' +
+      'gear(cx-u*0.42,cy,u*0.44,10,t,CY);' +
+      'gear(cx+u*0.36,cy-u*0.12,u*0.30,7,-t*1.42+0.3,CY);' +
+      'gear(cx+u*0.30,cy+u*0.55,u*0.22,5,t*1.9,DIM);' +
+      'g.fillStyle=DIM;g.font="11px sans-serif";g.textAlign="center";g.fillText("gears",cx,H()-14);'
+  },
+  { name:"pendulum", words:["pendulum","swing","gravity swing","metronome","clock swing"],
+    body:
+      'g.clearRect(0,0,W(),H());t+=0.04;var cx=W()/2,top=H()*0.22,L=Math.min(W(),H())*0.30;' +
+      'for(var k=0;k<3;k++){var a=Math.sin(t*(1+k*0.13))*0.9,x=cx+(k-1)*34+Math.sin(a)*L,y=top+Math.cos(a)*L;' +
+      ' line(cx+(k-1)*34,top,x,y,1.5,DIM);dot(x,y,9-k,k===1?CY:DIM);}' +
+      'line(cx-70,top,cx+70,top,2,CY);' +
+      'g.fillStyle=DIM;g.font="11px sans-serif";g.textAlign="center";g.fillText("pendulum",cx,H()-14);'
+  },
+  { name:"atom", words:["atom","electron","molecule","nucleus","chemistry","particle","quantum"],
+    body:
+      'g.clearRect(0,0,W(),H());t+=0.05;var cx=W()/2,cy=H()/2,u=Math.min(W(),H())/2.8;' +
+      'dot(cx,cy,8,"#ffd76a");' +
+      'for(var i=0;i<3;i++){g.save();g.translate(cx,cy);g.rotate(i*2.094);' +
+      ' g.beginPath();g.ellipse(0,0,u*0.85,u*0.32,0,0,6.284);g.lineWidth=1;g.strokeStyle=DIM;g.stroke();' +
+      ' var a=t*(1.6+i*0.4);dot(Math.cos(a)*u*0.85,Math.sin(a)*u*0.32,4.5);g.restore();}' +
+      'g.fillStyle=DIM;g.font="11px sans-serif";g.textAlign="center";g.fillText("atom",cx,H()-14);'
+  },
+  { name:"heart", words:["heart","pump","blood","circulation","lung","breath","beat"],
+    body:
+      'g.clearRect(0,0,W(),H());t+=0.045;var cx=W()/2,cy=H()/2;' +
+      'var beat=Math.pow(Math.max(0,Math.sin(t)),8),s=Math.min(W(),H())*0.0022*(1+beat*0.18);' +
+      'g.save();g.translate(cx,cy-10);g.scale(s*46,s*46);g.beginPath();' +
+      'g.moveTo(0,1);g.bezierCurveTo(-1.6,-0.4,-0.8,-1.5,0,-0.7);' +
+      'g.bezierCurveTo(0.8,-1.5,1.6,-0.4,0,1);g.closePath();g.restore();' +
+      'g.fillStyle="rgba(255,90,90,"+(0.35+beat*0.45).toFixed(2)+")";g.fill();' +
+      'g.lineWidth=2;g.strokeStyle="#ff6b6b";g.stroke();' +
+      'g.beginPath();for(var x=0;x<=W();x+=2){var p=((x/W())*6.5-t)%6.5;' +
+      ' var y=cy+H()*0.30-(p>0&&p<0.5?Math.sin(p*6.284)*26:0);x?g.lineTo(x,y):g.moveTo(x,y);}' +
+      'g.lineWidth=1.5;g.strokeStyle=DIM;g.stroke();' +
+      'g.fillStyle=DIM;g.font="11px sans-serif";g.textAlign="center";g.fillText("heartbeat",cx,H()-14);'
+  },
+  { name:"bounce", words:["bounce","ball","spring","ball drop","collision","physics","friction","momentum"],
+    body:
+      'g.clearRect(0,0,W(),H());t+=1;' +
+      'if(!window.B){window.B=[];for(var i=0;i<7;i++)B.push({x:Math.random()*W(),y:Math.random()*H()*0.4,' +
+      ' vx:(Math.random()-0.5)*4,vy:0,r:6+Math.random()*10});}' +
+      'var floor=H()-18;' +
+      'for(var i=0;i<B.length;i++){var b=B[i];b.vy+=0.35;b.x+=b.vx;b.y+=b.vy;' +
+      ' if(b.y>floor-b.r){b.y=floor-b.r;b.vy*=-0.72;b.vx*=0.99;}' +
+      ' if(b.x<b.r||b.x>W()-b.r)b.vx*=-1;' +
+      ' dot(b.x,b.y,b.r,i%2?CY:DIM);}' +
+      'line(0,floor,W(),floor,2,DIM);' +
+      'g.fillStyle=DIM;g.font="11px sans-serif";g.textAlign="center";g.fillText("bouncing",W()/2,H()-4);'
+  },
+  { name:"flow", words:["water","flow","river","pipe","fluid","current","wind","air","weather","cloud"],
+    body:
+      'g.clearRect(0,0,W(),H());t+=0.02;' +
+      'if(!window.P){window.P=[];for(var i=0;i<90;i++)P.push({x:Math.random()*W(),y:Math.random()*H()});}' +
+      'for(var i=0;i<P.length;i++){var p=P[i];' +
+      ' var a=Math.sin(p.y/40+t)*1.4+Math.cos(p.x/60-t)*0.6;' +
+      ' p.x+=Math.cos(a)*1.6+0.7;p.y+=Math.sin(a)*1.6;' +
+      ' if(p.x>W())p.x=0;if(p.x<0)p.x=W();if(p.y>H())p.y=0;if(p.y<0)p.y=H();' +
+      ' dot(p.x,p.y,1.7,i%3?DIM:CY);}' +
+      'g.fillStyle=DIM;g.font="11px sans-serif";g.textAlign="center";g.fillText("flow",W()/2,H()-14);'
+  }
+];
+
+/* anything at all: a swarm that settles into the shape of the word */
+var VIZ_ANY =
+  'g.clearRect(0,0,W(),H());t+=0.03;var cx=W()/2,cy=H()/2,u=Math.min(W(),H())/2.6;' +
+  'if(!window.N){window.N=[];for(var i=0;i<52;i++){var a=i/52*6.284;' +
+  ' N.push({a:a,r:u*(0.35+0.6*((i%5)/5)),s:0.4+((i%7)/7)});}}' +
+  'for(var i=0;i<N.length;i++){var n=N[i],a=n.a+t*n.s;' +
+  ' var x=cx+Math.cos(a)*n.r,y=cy+Math.sin(a)*n.r*0.62;' +
+  ' dot(x,y,2.4,i%4?DIM:CY);' +
+  ' if(i%6===0){var m=N[(i+6)%N.length],ma=m.a+t*m.s;' +
+  '  line(x,y,cx+Math.cos(ma)*m.r,cy+Math.sin(ma)*m.r*0.62,0.6,"rgba(56,225,240,.16)");}}' +
+  'ring(cx,cy,u*0.98,1,DIM);';
+
+function vizLocalKind(about){
+  var s = String(about || "").toLowerCase();
+  for(var i = 0; i < VIZ_KINDS.length; i++){
+    var k = VIZ_KINDS[i];
+    for(var j = 0; j < k.words.length; j++){
+      if(s.indexOf(k.words[j]) > -1) return k;
+    }
+  }
+  return null;
+}
+/* always returns a page - there is no "cannot draw that" */
+function vizLocal(about){
+  var kind = vizLocalKind(about);
+  var body = kind ? kind.body : VIZ_ANY;
+  var label = String(about || "it").replace(/[<>&"]/g, "").slice(0, 28);
+  var caption = kind ? "" :
+    'g.fillStyle=DIM;g.font="11px sans-serif";g.textAlign="center";' +
+    'g.fillText(' + JSON.stringify(label) + ',W()/2,H()-14);';
+  return VIZ_HEAD +
+    'function frame(){' + body + caption + 'requestAnimationFrame(frame);}frame();' +
+    VIZ_TAIL;
+}
+
 function vizWaiting(about){
   return '<canvas id="w"></canvas>' +
     '<script>' +
@@ -5430,7 +5630,8 @@ var grip = {
 };
 
 function gripSave(){
-  store.settings.orbGrip = { spinX: grip.spinX, spinY: grip.spinY,
+  store.settings.orbGrip = { spin: grip.spin, wx: grip.wx, wy: grip.wy,
+    spinX: grip.spinX, spinY: grip.spinY,
     scale: grip.scale, x: grip.x, y: grip.y };
   save();
 }
@@ -5440,6 +5641,8 @@ function gripLoad(){
   /* it used to be saved as a width in pixels; that no longer means anything */
   if(g.size && !g.scale){ delete g.size; g.scale = 1; }
   grip.spinX = g.spinX || 0; grip.spinY = g.spinY || 0;
+  grip.spin = g.spin || 1;
+  grip.wx = g.wx || 0; grip.wy = g.wy || 0;
   grip.scale = g.scale || 1; grip.x = g.x || 0; grip.y = g.y || 0;
   gripApply();
 }
@@ -5462,8 +5665,65 @@ function gripApply(){
       globe.style.transform = 'rotateX(' + grip.spinX.toFixed(1) + 'deg) rotateY(' +
         grip.spinY.toFixed(1) + 'deg)';
     }
+    /* The words sit inside the group being scaled, so scaling them back by the
+       same amount leaves them the size they started. Their own offset is in
+       that scaled space, hence the divide. */
+    var words = document.getElementById('hfWords');
+    if(words){
+      words.style.transform =
+        'translate(' + Math.round(grip.wx || 0) + 'px,' + Math.round(grip.wy || 0) + 'px) ' +
+        'scale(' + (1 / s).toFixed(3) + ')';
+    }
+    gripSpinApply();
   });
 }
+/* How fast everything turns. Each ring keeps its own pace - they are meant to
+   be going at different speeds - so the drag scales all of them together. */
+function gripSpinApply(){
+  var turning = document.querySelectorAll('#hfOrb .ring, #hfOrb .ticks, #hfOrb .globe, #hfOrb .pulse');
+  var rate = grip.spin || 1;
+  for(var i = 0; i < turning.length; i++){
+    var el = turning[i];
+    if(!el.dataset.pace){
+      var d = parseFloat(getComputedStyle(el).animationDuration) || 0;
+      if(!d) continue;
+      el.dataset.pace = d;
+    }
+    var pace = parseFloat(el.dataset.pace);
+    if(pace > 0) el.style.animationDuration = (pace / rate).toFixed(3) + 's';
+  }
+}
+
+/* Dragging the words. They live inside the scaled group, so a finger moving a
+   hundred points across the glass is fewer points in there - hence the divide. */
+function wordsOn(){
+  var words = document.getElementById('hfWords');
+  if(!words || words.dataset.on) return;
+  words.dataset.on = "1";
+  var from = null;
+  words.addEventListener('pointerdown', function(ev){
+    from = { x: ev.clientX, y: ev.clientY, wx: grip.wx || 0, wy: grip.wy || 0 };
+    try{ words.setPointerCapture(ev.pointerId); }catch(e){}
+    ev.stopPropagation();
+  });
+  words.addEventListener('pointermove', function(ev){
+    if(!from) return;
+    var s = grip.scale || 1;
+    grip.wx = from.wx + (ev.clientX - from.x) / s;
+    grip.wy = from.wy + (ev.clientY - from.y) / s;
+    gripApply();
+    ev.stopPropagation();
+  });
+  function drop(ev){
+    if(!from) return;
+    from = null;
+    gripSave();
+    ev.stopPropagation();
+  }
+  words.addEventListener('pointerup', drop);
+  words.addEventListener('pointercancel', drop);
+}
+
 function gripDistance(){
   var ids = Object.keys(grip.pointers);
   if(ids.length < 2) return 0;
@@ -5517,8 +5777,11 @@ function handsOn(){
     grip.lastX = ev.clientX; grip.lastY = ev.clientY;
     if(Math.abs(dx) + Math.abs(dy) < 1) return;
     grip.turned = true;
-    grip.spinY += dx * 0.4;
-    grip.spinX = Math.max(-80, Math.min(80, grip.spinX - dy * 0.4));
+    /* One finger no longer drags it about or leaves it tilted - it stays where
+       it is, and the drag is how fast it goes. Right and up wind it up, left
+       and down wind it down. */
+    var push = (dx - dy) * 0.006;
+    grip.spin = Math.max(0.15, Math.min(8, (grip.spin || 1) * (1 + push)));
     gripApply();
   });
 
@@ -5675,32 +5938,8 @@ function openByVoice(said){
   var q = String(said || "").trim().replace(/[.?!]+$/, "");
   if(!q) return false;
 
-  if(STOP_RE.test(q)){
-    /* everything he is in the middle of */
-    sayStop();
-    if(elevenAudio){ try{ elevenAudio.pause(); }catch(e){} }
-    if(Native && Native.stopSpeaking) Native.stopSpeaking().catch(function(){});
-    if(window.speechSynthesis) speechSynthesis.cancel();
-    if(abortCtl){ try{ abortCtl.abort(); }catch(e){} }
-    hfDropDraft();
-    viz.busy = false;
-    hf.talking = false;
-    hfSaid.textContent = "";
-    hfSet("hear", "Listening…");
-    hfListen();
-    return true;
-  }
-
-  if(PAUSE_RE.test(q)){
-    sayStop();
-    if(elevenAudio){ try{ elevenAudio.pause(); }catch(e){} }
-    if(Native && Native.stopSpeaking) Native.stopSpeaking().catch(function(){});
-    if(window.speechSynthesis) speechSynthesis.cancel();
-    hf.talking = false;
-    hf.paused = true;
-    hfSet("wait", "Paused - say carry on");
-    return true;
-  }
+  if(STOP_RE.test(q)){ hfStopIt(); return true; }
+  if(PAUSE_RE.test(q)){ hfPauseIt(); return true; }
 
   if(RESUME_RE.test(q) && hf.paused){
     hf.paused = false;
@@ -6393,10 +6632,14 @@ function wakeRe(){
   return new RegExp("\\b(" + alts.join("|") + ")\\b", "i");
 }
 
+var HF_PHASES = ["wait", "hear", "busy", "talk"];
 function hfSet(phase, label){
   setTimeout(hudSync, 0);
   hf.phase = phase;
-  hfOrb.className = ({ wait:"wait", hear:"hear", busy:"busy", talk:"talk" })[phase] || "wait";
+  /* Only the phase. Assigning className outright took "showing" with it, which
+     wiped every simulation off the screen the moment it was put up. */
+  for(var i = 0; i < HF_PHASES.length; i++) hfOrb.classList.remove(HF_PHASES[i]);
+  hfOrb.classList.add(HF_PHASES.indexOf(phase) > -1 ? phase : "wait");
   hfState.textContent = label;
 }
 function hfIdleLabel(){ return "Say “" + aiName() + "”"; }
@@ -6608,17 +6851,67 @@ function hfListenNative(){
 /* what a heard phrase means - shared, so both recognisers behave the same */
 /* Wait for a gap, then treat what was heard as the finished question. Anything
    new resets it, so it only fires once they have actually stopped. */
+/* Words picked up by accident should not become a question. Two or fewer words
+   only count when they are plainly asking something - "why", "how come", "again" -
+   and a mouthful of ums counts as nothing at all. */
+var HF_FILLER = ("uh um erm er hmm hm mm mmm ah oh eh yeah yea yep yup nah ok okay " +
+  "right so like well hi hey yo the a an and but of to it is").split(" ");
+var HF_SHORT_ASK = new RegExp("^(?:why|how|what|whats|who|whos|when|where|which|really|" +
+  "again|more|go on|carry on|and you|how come|says who|like what|such as|for example|" +
+  "yes|no|stop|pause|wait|louder|slower|repeat|sorry)" + String.fromCharCode(92) + "b", "i");
+function worthAnswering(text){
+  var s = String(text || "").toLowerCase()
+    .replace(/[^a-z0-9' ]+/g, " ").replace(/\s+/g, " ").trim();
+  if(!s) return false;
+  var words = s.split(" ").filter(Boolean);
+  var real = words.filter(function(w){ return HF_FILLER.indexOf(w) === -1; });
+  if(!real.length) return false;              /* nothing but ums and ahs */
+  if(words.length >= 3) return true;
+  return HF_SHORT_ASK.test(s);
+}
+
+/* A sentence that ends on one of these is not finished - someone is thinking
+   mid-question, and answering there cuts them off. */
+var HF_HANGING = ("and but so or if the a an to of for with because that which " +
+  "is are was were do does did can could would should i you it my your um uh like").split(" ");
+function stillGoing(text){
+  var w = String(text || "").toLowerCase().replace(/[^a-z' ]+/g, " ").trim().split(/\s+/);
+  var last = w[w.length - 1] || "";
+  return HF_HANGING.indexOf(last) > -1;
+}
+
 function hfSettle(text){
   clearTimeout(hf.settle);
   hf.settle = setTimeout(function(){
     var q = String(text || "").trim();
     if(!q || !hf.want || hf.phase !== "hear") return;
+    if(!worthAnswering(q)){          /* caught in passing - let it go quietly */
+      hfHeard.textContent = "";
+      hfDropDraft();
+      hfQuietTimer();
+      return;
+    }
     hfAsk(q);
-  }, 900);      /* long enough to be a pause, short enough not to be a wait */
+    /* Straight in when you have clearly finished. He has usually started on the
+       answer already, so this pause is the only thing left before he speaks. */
+  }, stillGoing(text) ? 900 : 380);
 }
 
 function hfHeardText(live, finalTxt){
     finalTxt = finalTxt || "";
+
+    /* While he is talking or thinking, the only words that mean anything are
+       the ones that call him off. Everything else heard then is either the tail
+       of what you already asked or his own voice coming back, and acting on it
+       would be worse than ignoring it. */
+    if(hf.phase === "talk" || hf.phase === "busy"){
+      var over = String(live || finalTxt || "").trim().replace(/[.!?]+$/, "");
+      if(!over) return;
+      if(STOP_RE.test(over)){ hfHeard.textContent = ""; hfStopIt(); return; }
+      if(PAUSE_RE.test(over)){ hfHeard.textContent = ""; hfPauseIt(); return; }
+      return;                      /* not for us - and not logged as something you said */
+    }
+
     if(live){
       hfHeard.textContent = live;
       hudLog("you", live, true);        /* written while you are still talking */
@@ -6648,7 +6941,17 @@ function hfHeardText(live, finalTxt){
     }
 
     if(hf.phase === "hear"){
-      if(finalTxt.trim()){ clearTimeout(hf.settle); hfAsk(finalTxt.trim()); return; }
+      if(finalTxt.trim()){
+        clearTimeout(hf.settle);
+        if(!worthAnswering(finalTxt)){
+          hfHeard.textContent = "";
+          hfDropDraft();
+          hfQuietTimer();
+          return;
+        }
+        hfAsk(finalTxt.trim());
+        return;
+      }
       if(live){
         hfSettle(live);
         hfDraftHint(live);   /* start thinking about it before they have finished */
@@ -6724,6 +7027,7 @@ function draftKey(s){
 function draftable(text){
   var s = String(text || "").trim();
   if(!s) return false;
+  if(!worthAnswering(s)) return false;
   if(draftKey(s).split(" ").length < DRAFT_WORDS) return false;
   if(isDevice() || !isGemini() || !apiKeyNow()) return false;
   if(hf.answering || hf.talking) return false;
@@ -6803,10 +7107,38 @@ function hfSpeak(text, done){
   });
 }
 
+/* Cutting him off, wherever the word came from - said as a command, or heard
+   over the top of him while he is still going. */
+function hfQuiet(){
+  sayStop();
+  if(elevenAudio){ try{ elevenAudio.pause(); }catch(e){} }
+  if(Native && Native.stopSpeaking) Native.stopSpeaking().catch(function(){});
+  if(window.speechSynthesis) speechSynthesis.cancel();
+}
+function hfStopIt(){
+  hfQuiet();
+  if(abortCtl){ try{ abortCtl.abort(); }catch(e){} }   /* stop writing it too */
+  hfDropDraft();
+  viz.busy = false;
+  hf.talking = false;
+  hfSaid.textContent = "";
+  hfSet("hear", "Listening…");
+  hfListen();
+}
+function hfPauseIt(){
+  hfQuiet();
+  hf.talking = false;
+  hf.paused = true;
+  hfSet("wait", "Paused - say carry on");
+}
+
 /* --- ask, then answer out loud --- */
 function hfAsk(question){
   clearTimeout(hf.quiet);
-  hfPause();
+  /* the timers, not the microphone: it has to stay open to hear "stop" while
+     he is thinking. Anything heard now that is not stop or pause is ignored. */
+  clearTimeout(hf.restart);
+  clearTimeout(hf.settle);
   /* If he is already looking, the question is usually about what he can see -
      but "count to a hundred" is not, and attaching a picture to it made him
      describe the room as well. */
@@ -7141,7 +7473,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.65";
+var BUILD = "2026-08-21.66";
 
 function banner(kind, html){
   var b = $("banner");
@@ -7196,6 +7528,7 @@ if(inApp()){
   document.body.classList.add("voiceonly");
   hudSync();
   handsOn();               /* turn it, pinch it, move it */
+  wordsOn();               /* and the words move on their own */
   gripLoad();              /* where it was left last time */
   /* load the phone's model now, so the first question is not the slow one */
   if(Native && Native.warm){

@@ -276,8 +276,13 @@ function nativeFrom(cap, exp){
   const inIt = (src, bit) => src.indexOf(bit) > -1;
 
   t("a pause is what sends the question", inIt(heard, "hfSettle(live)"), true);
+  /* this used to pin the exact one-liner; the branch now has the noise guard
+     in it, so check what it does rather than how it is laid out */
   t("it no longer waits for a final marker that never comes",
-    inIt(heard, "if(finalTxt.trim()){ clearTimeout(hf.settle); hfAsk(finalTxt.trim()); return; }"), true);
+    inIt(heard, "if(finalTxt.trim()){") && inIt(heard, "clearTimeout(hf.settle);") &&
+    inIt(heard, "hfAsk(finalTxt.trim());"), true);
+  t("but a noise picked up in passing is not asked",
+    inIt(heard, "worthAnswering(finalTxt)"), true);
   t("a question in one breath is sent too", inIt(heard, "hfSettle(after)"), true);
   t("the wake word alone still just answers", inIt(heard, "Yeah?"), true);
 
@@ -821,7 +826,10 @@ function nativeFrom(cap, exp){
   const page = require("fs").readFileSync("index.html", "utf8");
   const v = n => src.slice(src.indexOf("var " + n), src.indexOf(";", src.indexOf("var " + n)) + 1);
 
-  t("the ball can be turned with a finger", grab("handsOn").indexOf("grip.spinY += dx") > -1, true);
+  /* one finger used to tilt it and leave it tilted - it now stays where it is
+     and the drag decides how fast it spins */
+  t("one finger sets how fast it spins", grab("handsOn").indexOf("grip.spin = Math.max(0.15") > -1, true);
+  t("and no longer leaves it tilted", grab("handsOn").indexOf("grip.spinY += dx") === -1, true);
   t("two fingers pinch it", grab("handsOn").indexOf("grip.startDist") > -1, true);
   t("and carry it somewhere else", grab("handsOn").indexOf("grip.x = grip.fromX") > -1, true);
   t("it cannot be pinched to nothing", grab("handsOn").indexOf("Math.max(0.55") > -1, true);

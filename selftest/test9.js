@@ -19,6 +19,22 @@ const t = (n, g, w) => {
   else { pass++; console.log("ok   " + n); }
 };
 
+/* long declarations full of semicolons - scan with the quotes in mind */
+function declOf(name){
+  const i = src.indexOf("var " + name + " =");
+  if(i < 0) throw new Error("no declaration: " + name);
+  let q = null, depth = 0;
+  for(let k = i; k < src.length; k++){
+    const ch = src[k];
+    if(q){ if(ch === String.fromCharCode(92)) k++; else if(ch === q) q = null; continue; }
+    if(ch === "'" || ch === '"'){ q = ch; continue; }
+    if(ch === "(" || ch === "[" || ch === "{") depth++;
+    else if(ch === ")" || ch === "]" || ch === "}") depth--;
+    else if(ch === ";" && depth === 0) return src.slice(i, k + 1);
+  }
+  throw new Error("unterminated: " + name);
+}
+
 const keyOf = new Function(grab("draftKey") + " return draftKey;")();
 const fits  = new Function(grab("draftKey") + grab("draftFits") + " return draftFits;")();
 
@@ -53,7 +69,9 @@ function canDraft(text, world){
     "VIZ_RE", "VIZ_HINT_RE", "BUILD_MODE_RE", "STUDY_RE", "UNSTUDY_RE", "EDIT_RE", "UNDO_RE",
     "OPEN_RE", "CLOSE_RE", "HIDE_RE", "STOP_RE", "PAUSE_RE", "RESUME_RE", "TIMER_RE",
     "COIN_RE", "DICE_RE", "CAM_RE", "DRAW_RE", "REMEMBER_RE", "FORGET_RE", "HIGHLIGHT_RE",
-    grab("draftKey") + grab("draftable") + " return draftable;");
+    declOf("HF_FILLER") + "\n" + declOf("HF_SHORT_ASK") + "\n" +
+    grab("worthAnswering") + "\n" + grab("draftKey") + grab("draftable") +
+    " return draftable;");
   const pat = n => new Function(src.match(new RegExp("var " + n + "\\s*=[\\s\\S]*?;\\s*(?:\\r?\\n)"))[0] +
     " return " + n + ";")();
   return fn(
@@ -73,6 +91,7 @@ t("an ordinary question gets a head start",
 t("so does a longer one",
   canDraft("explain how a petrol engine works to me"), true);
 t("two words is not a question yet", canDraft("the weather"), false);
+t("and neither is a noise picked up in passing", canDraft("um yeah ok"), false);
 t("nothing at all is not either", canDraft(""), false);
 
 /* the important half: things that DO something must never run twice */
