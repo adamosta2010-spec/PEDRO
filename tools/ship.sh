@@ -55,6 +55,11 @@ IPA=$(find builds/_x -name "*.ipa" | head -1)
 mv "$IPA" "builds/Pedro-$STAMP.ipa"
 rm -rf builds/_a.zip builds/_x
 
+# A zip entry carries the clock of the machine that made it, and the runner is
+# on UTC - so on a machine that is not, every fresh build looks hours old and
+# you cannot tell a new one from a stale one at a glance. Stamp it with now.
+touch "builds/Pedro-$STAMP.ipa"
+
 # the check that was missing: is this actually the app that was edited?
 GOT=$(unzip -p "builds/Pedro-$STAMP.ipa" "Payload/App.app/public/index.html" \
       | grep -o 'var BUILD = "[^"]*"' | head -1 | sed 's/.*"\(.*\)"/\1/')
@@ -64,4 +69,5 @@ FEATURES=$(unzip -p "builds/Pedro-$STAMP.ipa" "Payload/App.app/public/index.html
            | grep -c "function wbSolve\|BUILD_MODE_RE\|function hfDraftStart\|function carryOn")
 echo "new code present in $FEATURES places"
 ls -la "builds/Pedro-$STAMP.ipa"
+echo "built just now - $(date '+%H:%M %Z')"
 echo "READY builds/Pedro-$STAMP.ipa"
