@@ -199,7 +199,10 @@ const has = s => src.indexOf(s) > -1;
   t("only once for each", watch.indexOf("diarySaid[mark]") > -1, true);
   t("never over the top of himself", watch.indexOf("hf.talking") > -1, true);
   t("it can be turned off entirely", watch.indexOf("if(early <= 0) return") > -1, true);
-  t("and outside the app it says nothing at all", watch.indexOf(".catch(function(){})") > -1, true);
+  t("outside the app it stops asking rather than asking forever",
+    watch.indexOf("diaryRefused = true") > -1, true);
+  t("and it does not ask again once refused",
+    watch.indexOf("if(diaryRefused) return;") > -1, true);
   t("what it remembers is thrown away after a day", watch.indexOf("24 * 3600 * 1000") > -1, true);
   t("it runs on a timer", has("watchDiary();") && has("setInterval(function(){"), true);
   t("and shares it with the battery, rather than each having one",
@@ -423,6 +426,27 @@ const has = s => src.indexOf(s) > -1;
   t("but only when it was actually relevant", recall.indexOf("if(x.score > 0)") > -1, true);
   t("and counting it does not write to storage on every question",
     recall.indexOf("save()") === -1, true);
+}
+
+
+/* ---------- the app restarting by itself ---------- */
+{
+  /* An app that restarts leaves nothing behind to look at, so it writes down
+     every start and every error. Guessing at the cause was the alternative. */
+  t("every start is written down", has("function noteStart"), true);
+  t("and every error", has('window.addEventListener("error"'), true);
+  t("including the ones inside a promise", has('"unhandledrejection"'), true);
+  t("the list is capped", grab("noteStart").indexOf("TROUBLE_KEEP") > -1, true);
+  t("the same error forty times is one error",
+    grab("noteTrouble").indexOf("last.n = (last.n || 1) + 1") > -1, true);
+  const diag = grab("runDiagnostics");
+  t("too many restarts is reported as a problem",
+    diag.indexOf("times in the last hour") > -1, true);
+  t("and so is the last thing that went wrong",
+    diag.indexOf("last thing to go wrong") > -1, true);
+  t("but only if it was recent", diag.indexOf("ago < 120") > -1, true);
+  t("writing it down changes nothing else",
+    has("it only writes down what did"), true);
 }
 
 

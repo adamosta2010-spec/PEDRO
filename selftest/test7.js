@@ -589,13 +589,19 @@ function nativeFrom(cap, exp){
      blue running into white, with some movement. */
   t("there is a circle", inPage('<span class="disc">'), true);
   t("it is round", inPage("#hfOrb .disc{") && inPage("border-radius:50%"), true);
-  t("blue running into white", inPage("radial-gradient(circle at 34% 28%"), true);
+  t("blue running into white", inPage("radial-gradient(circle at 34% 26%"), true);
   t("white at the top left", inPage("#ffffff 0%"), true);
-  t("and deep blue at the far edge", inPage("#142a72 100%"), true);
+  t("and deep blue at the far edge", inPage("#0e1f52 100%"), true);
   t("it breathes", inPage("discBreathe"), true);
-  t("and a sheen turns across it", inPage("discTurn"), true);
+  t("and light turns inside it", inPage("discTurn"), true);
+  t("two bands, opposite ways, so where they cross never repeats",
+    inPage("#hfOrb .disc .sheen.a{") && inPage("#hfOrb .disc .sheen.b{") &&
+    inPage("linear infinite reverse"), true);
+  t("and the lit side drifts", inPage("discDrift"), true);
   t("which is what stops it looking painted on", inPage("conic-gradient(from 0deg"), true);
-  t("it quickens while he speaks", inPage("#hfOrb.talk .disc{ animation-duration:2.1s }"), true);
+  t("it quickens while he speaks", inPage("#hfOrb.talk .disc{ animation-duration:2.1s"), true);
+  t("and again while he is listening", inPage("#hfOrb.hear .disc{ animation-duration:3.4s }"), true);
+  t("and again while he is thinking", inPage("#hfOrb.busy .disc{ animation-duration:1.8s }"), true);
   t("and gets out of the way for a simulation", inPage("#hfOrb.showing .disc{display:none}"), true);
 
   /* the globe really is gone, not merely hidden */
@@ -603,14 +609,16 @@ function nativeFrom(cap, exp){
   t("no latitudes either", inPage('<i class="l6"></i>'), false);
   t("and nothing is drawn in 3D any more", inPage("transform-style:preserve-3d"), false);
 
-  /* one ring is left, and it turns slowly */
-  t("there is still a ring", inPage("#hfOrb .ring{"), true);
-  t("turning slowly", inPage("#hfOrb .r2{ animation-duration:26s }"), true);
-  /* the circle he asked to be animated was landing inside a blanket
-     animation:none, so it never moved once */
-  t("and the circle is not switched off with them",
-    inPage("#hfOrb .disc, #hfOrb .disc .sheen{ animation:none !important }"), false);
-  t("the middle ring carries the reticle", inPage("#hfOrb .r3{inset:13%"), true);
+  /* "Remove the floating stuff around the circle." Nine elements of
+     scaffolding around the one thing meant to be looked at. */
+  t("no rings around it", inPage("#hfOrb .ring{"), false);
+  t("no dial either", inPage("#hfOrb .ticks{"), false);
+  t("and no ripple", inPage("#hfOrb .pulse{"), false);
+  t("nothing is left that spins on its own", inPage("@keyframes hudSpin"), false);
+  t("the circle is what moves now",
+    inPage("#hfOrb .disc{") && inPage("animation: discBreathe 6s ease-in-out infinite;"), true);
+  t("and everything it does is a transform, which costs a phone nothing",
+    inPage("@keyframes discTurn{ to{ transform:rotate(360deg) } }"), true);
   /* what costs a phone is animating layout, not the number of things moving */
   t("nothing animates a height any more",
     inPage("to{height:52px") || inPage("to{height:19px"), false);

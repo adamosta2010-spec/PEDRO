@@ -63,8 +63,8 @@ const t = (n, g, w) => {
   const pace = grab("gripSpinApply");
   t("each ring keeps its own pace", pace.indexOf("dataset.pace") > -1, true);
   t("and they are all scaled by the one rate", pace.indexOf("pace / rate") > -1, true);
-  t("the rings, the ticks and the circle all follow",
-    ["ring", "ticks", "disc", "sheen", "pulse"].every(c => pace.indexOf(c) > -1), true);
+  t("only the circle is sped up by a drag, since it is all that moves",
+    ["disc", "sheen", "glow"].every(c => pace.indexOf(c) > -1), true);
   /* the pace of each ring is set by the state - listening turns faster - so a
      pace read once and kept meant that after one drag he never changed again */
   t("a pace read once is not kept forever", pace.indexOf("paceState") > -1, true);
@@ -89,15 +89,16 @@ const t = (n, g, w) => {
      to scale the words back by. They can still be picked up and moved. */
   t("nothing is scaled, so nothing is scaled back",
     apply.indexOf("(1 / s).toFixed(3)") > -1, false);
-  t("so a pinch does not change the words", apply.indexOf("hfWords") > -1, true);
+  /* The words used to be draggable, and a place saved by an older build was
+     then applied to a layout that had changed underneath it - which is how
+     "Listening" ended up off the side of his screen. */
+  t("nothing writes a position onto the words", apply.indexOf("hfWords") > -1, false);
   const on = grab("wordsOn");
-  t("the words can be picked up", on.indexOf("pointerdown") > -1, true);
-  t("dragging them moves them", on.indexOf("grip.wx = from.wx") > -1, true);
-  t("a finger moves them the distance the finger moved",
-    on.indexOf("/ s;") > -1, true);
-  t("dragging them does not disturb the ball", on.indexOf("stopPropagation") > -1, true);
-  t("where they were left is remembered", on.indexOf("gripSave()") > -1, true);
-  t("and restored next time", src.indexOf("grip.wx = g.wx || 0") > -1, true);
+  t("they cannot be picked up any more", grab("wordsOn").indexOf("pointerdown") > -1, false);
+  t("nor is their place remembered", src.indexOf("wx: grip.wx") > -1, false);
+  t("and one saved by an older build is thrown away",
+    grab("gripLoad").indexOf("grip.wx = 0; grip.wy = 0;") > -1, true);
+  t("not restored next time either", src.indexOf("grip.wx = g.wx || 0") > -1, false);
   t("they are turned on with everything else", src.indexOf("wordsOn();") > -1, true);
 }
 
