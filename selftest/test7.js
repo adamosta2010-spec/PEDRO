@@ -626,9 +626,15 @@ function nativeFrom(cap, exp){
      sentence rather than being cut off at 320 tokens */
   t("spoken answers are still kept short", inSrc("maxOutputTokens: 700"), true);
   t("but he is allowed to check himself first",
-    inSrc("thinkingBudget: 512"), true);
+    inSrc("thinkingBudget: store.settings.quickVoice ? 512 : 1024"), true);
   t("and the quick paths think a little too", inSrc("thinkingBudget: 256"), true);
-  t("talking uses the quick model", inSrc("(voiceMode || fastMode) ? fastGeminiModel()"), true);
+  /* Adam picked Pro and I was overriding it to Flash for every spoken answer.
+     Speech uses what he picked now; the mechanical paths still use the quick
+     one, and there is a switch if he wants speed back. */
+  t("speech uses the model he picked", inSrc("if(voiceMode && store.settings.quickVoice)"), true);
+  t("the mechanical paths stay quick", inSrc("if(fastMode) return fastGeminiModel()"), true);
+  t("and there is a switch for it", inSrc("swQuickVoice"), true);
+  t("which is off, so accuracy is the default", inSrc("quickVoice:false"), true);
   t("it gives up rather than hanging", inSrc("No answer came back in time"), true);
   t("a half answer says so", inSrc("That answer stopped halfway"), true);
   t("the first word stops the clock", inSrc("clearTimeout(firstWord)"), true);

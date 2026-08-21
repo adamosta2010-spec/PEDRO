@@ -1103,6 +1103,10 @@
       <div class="lb">Speak replies aloud<small>Reads answers using your phone&rsquo;s voice</small></div>
       <div class="sw" id="swTts"></div>
     </div>
+    <div class="row">
+      <div class="lb">Quick answers when speaking<small>Uses the faster model out loud. Off is slower and more likely to be right.</small></div>
+      <div class="sw" id="swQuickVoice"></div>
+    </div>
     <div class="field">
       <label for="setEleven">ElevenLabs key <small style="color:var(--tx3);font-weight:400">optional</small></label>
       <input type="password" id="setEleven" placeholder="sk_..." autocomplete="off" spellcheck="false">
@@ -1434,6 +1438,7 @@ var KEY = "pocketai.v1";
 var DEF = {
   provider:"gemini", aiName:"Pedro", theme:"dark", accent:"blue",                 /* "gemini" (free) or "claude" (paid) */
   apiKey:"", model:"claude-opus-5", effort:"low",
+  quickVoice:false,   /* speech uses the model you picked, not the quick one */
   geminiKey:"", geminiModel:"gemini-2.5-pro", imageModel:"gemini-2.5-flash-image",
   smarterPicked:false,   /* the old default chose the fastest model, not the best one */
   groqKey:"", groqModel:"llama-3.3-70b-versatile",
@@ -1997,6 +2002,7 @@ function fillSettings(){
   $("setName").value = s.name;
   $("setAbout").value = s.about;
   sw($("swTts"), s.tts); sw($("swThink"), s.showThink); sw($("swEnter"), s.enterSends);
+  sw($("swQuickVoice"), s.quickVoice);
   var mh = $("micHint");
   if(mh) mh.textContent = runningWhere().text;
   sw($("swVoiceTalk"), s.voiceTalk !== false);
@@ -2341,6 +2347,7 @@ function bindSwitch(id, key, after){
   });
 }
 bindSwitch("swTts","tts", syncSpeakBtn);
+bindSwitch("swQuickVoice","quickVoice");
 bindSwitch("swVoiceTalk","voiceTalk");
 bindSwitch("swBackground","background", applyBackground);
 bindSwitch("swVoiceFirst","voiceFirst");
@@ -3164,7 +3171,12 @@ var fastMode = false;
 
 /* thinking out loud is for the written answers */
 function activeGeminiModel(){
-  return (voiceMode || fastMode) ? fastGeminiModel() : store.settings.geminiModel;
+  /* fastMode is the mechanical work - describing a thing in parts, reading up
+     on a topic - and the quick model is right for that. Speech is a judgement
+     call, so it uses whichever model you picked, unless you ask for quick. */
+  if(fastMode) return fastGeminiModel();
+  if(voiceMode && store.settings.quickVoice) return fastGeminiModel();
+  return store.settings.geminiModel;
 }
 
 function geminiRequest(msgs){
@@ -3187,7 +3199,8 @@ function geminiRequest(msgs){
          answer and a guess. And 320 tokens could cut an answer off partway,
          which reads as wrong even when it was right. */
       generationConfig: voiceMode
-        ? { maxOutputTokens: 700, thinkingConfig: { thinkingBudget: 512 } }
+        ? { maxOutputTokens: 700,
+            thinkingConfig: { thinkingBudget: store.settings.quickVoice ? 512 : 1024 } }
         : (fastMode
             ? { maxOutputTokens: 1600, thinkingConfig: { thinkingBudget: 256 } }
             : { maxOutputTokens: 8000 })
@@ -9401,7 +9414,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.80";
+var BUILD = "2026-08-21.81";
 
 function banner(kind, html){
   var b = $("banner");
