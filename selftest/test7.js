@@ -833,7 +833,13 @@ function nativeFrom(cap, exp){
   t("where it was left is remembered", inSrc("function gripSave"), true);
   t("and restored next time", inSrc("gripLoad();"), true);
 
-  t("the readouts are hidden until asked for", page.indexOf(".hudpanel[data-panel]{display:none}") > -1, true);
+  /* checking for the plain selector is what let the transcript sit there in
+     plain sight: .hudpanel.grow is declared later with the same weight and won.
+     The rule has to outrank it, so :not(.on) is the thing to look for. */
+  t("the readouts are hidden until asked for",
+    page.indexOf(".hudpanel[data-panel]:not(.on){display:none}") > -1, true);
+  t("and the hide rule outranks the one that grows the transcript",
+    page.indexOf(".hudpanel[data-panel]:not(.on)") < page.indexOf(".hudpanel.grow{"), true);
   t("each has a name", page.indexOf('data-panel="transcript"') > -1, true);
   t("they can be asked for", inSrc("function showHudPanel"), true);
   t("and hidden again", inSrc("var HIDE_RE"), true);

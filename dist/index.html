@@ -370,7 +370,10 @@
 
   /* Panels stay out of the way until asked for, and once shown they can be
      picked up and put wherever suits. */
-  .hudpanel[data-panel]{display:none}
+  /* .hudpanel.grow is defined further down with the same weight and would
+     win, which is why the transcript sat there on its own. :not(.on)
+     outranks it, so a panel stays away until it is asked for. */
+  .hudpanel[data-panel]:not(.on){display:none}
   .hudpanel[data-panel].on{display:block;position:fixed;z-index:5;
     width:min(260px,72vw);touch-action:none;cursor:grab}
   .hudpanel[data-panel].on.grow{max-height:44vh}
@@ -7138,7 +7141,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.64";
+var BUILD = "2026-08-21.65";
 
 function banner(kind, html){
   var b = $("banner");
