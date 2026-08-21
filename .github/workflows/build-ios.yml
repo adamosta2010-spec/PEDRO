@@ -59,11 +59,17 @@ jobs:
           echo "--- capacitor packages ---"
           npm ls @capacitor/core @capacitor/ios @capacitor/cli || true
 
-      - name: Check the web app is there
+      - name: Put the web app where Capacitor will find it
         run: |
           exec > >(tee -a build.log steps.log) 2>&1
+          # dist/ is what gets packaged. Copying it here rather than trusting a
+          # committed copy is what stops a build shipping the previous app.
+          test -f index.html || { echo "index.html missing"; exit 1; }
+          cp index.html dist/index.html
           test -f dist/index.html || { echo "dist/index.html missing"; exit 1; }
+          echo "packaging:"
           grep -o 'var BUILD = "[^"]*"' dist/index.html | head -1
+          cmp -s index.html dist/index.html || { echo "the copy did not take"; exit 1; }
 
       - name: Create the iOS project
         run: |
