@@ -779,10 +779,10 @@ const TOOLSRC = decl("TOOLS");
   /* not a generated picture - a real photograph, treated until it reads as
      light. He is a voice assistant; making pictures went. */
   t("there is somewhere to put one", inPage('id="holo"'), true);
-  t("it is a real photograph, found on the web",
-    grab("holoShow").indexOf("webLook(what, 3)") > -1, true);
+  t("a photograph of it is a real one, found on the web",
+    grab("holoPhoto").indexOf("webLook(what, 3)") > -1, true);
   t("and one with a picture is the one used",
-    grab("holoShow").indexOf("f.image") > -1, true);
+    grab("holoPhoto").indexOf("f.image") > -1, true);
   t("nothing is generated", has("function drawPicture"), false);
   t("it is turned to light rather than shown as a photo",
     inPage("hue-rotate(150deg)") && inPage("drop-shadow(0 0 14px"), true);
@@ -793,9 +793,9 @@ const TOOLSRC = decl("TOOLS");
     /@keyframes holoFloat\{[^@]*transform:/.test(page), true);
   t("the ball gets out of the way", inPage("#hfOrb.holo .disc{display:none}"), true);
   t("no picture found is said, not left blank",
-    grab("holoShow").indexOf("I could not find a picture of") > -1, true);
+    grab("holoPhoto").indexOf("I could not find a picture of") > -1, true);
   t("a picture that will not load is said too",
-    grab("holoShow").indexOf("the picture would not load") > -1, true);
+    grab("holoPhoto").indexOf("the picture would not load") > -1, true);
   t("tapping it puts it away", grab("holoHide").indexOf("classList.remove(\"holo\")") > -1, true);
 
   const holoOf = new Function("HOLO_NOT", "HOLO_RE",
@@ -860,16 +860,66 @@ const TOOLSRC = decl("TOOLS");
   t("and quickens", inPage("#hfOrb.party .disc{"), true);
   t("the words go with it", inPage("#hf.party #hfState{"), true);
   t("and there is a wash behind it all", inPage("#hf.party::after{"), true);
-  /* the one filter animation in the app - on one element, only while this is
-     on, and the entire point of the feature */
-  t("it is the only filter animation, and it says why",
-    inPage("The one filter animation in the app"), true);
+  /* four full-height beams that blur or blend would repaint everything
+     underneath on every frame, which is what makes a phone hot */
+  t("the beams do not blur or blend, and it says why",
+    inPage("Nothing here blurs or blends") &&
+    !/#partyLights i\{[^}]*(?:blur|mix-blend)/.test(page), true);
   t("the voice goes with it", grab("partySet").indexOf('"excited"') > -1, true);
   t("and comes back afterwards", grab("partySet").indexOf('"composed"') > -1, true);
   t("it is remembered", grab("partySet").indexOf("store.settings.party") > -1, true);
   t("and still on when he opens it again",
     grab("hfOpen").indexOf("if(store.settings.party) partySet(true)") > -1, true);
   t("and carried to a new install", has("party:s.party"), true);
+}
+
+
+/* ---------- the hologram is a 3D thing you can handle ---------- */
+{
+  const page = fs.readFileSync("index.html", "utf8");
+  const inPage = s => page.indexOf(s) > -1;
+  /* the renderer is kept as a string, so read it out and check the real code */
+  const code = new Function(decl("VIZ3D_RENDER") + " return VIZ3D_RENDER;")();
+  t("the renderer parses on its own", (() => { try { new Function(code); return true; }
+    catch(e){ return false; } })(), true);
+
+  t("one finger turns it on both axes",
+    code.indexOf("view.ry += (e.clientX - touch.x)") > -1 &&
+    code.indexOf("view.rx += (e.clientY - touch.y)") > -1, true);
+  t("and cannot be turned upside down", code.indexOf("Math.max(-1.4, Math.min(1.4, view.rx))") > -1, true);
+  t("two fingers move it", code.indexOf("view.px = pinch.px + (mid.x - pinch.mid.x)") > -1, true);
+  t("and pinch it bigger or smaller", code.indexOf("pinch.zoom * (spread / pinch.spread)") > -1, true);
+  t("within reason", code.indexOf("Math.max(0.35, Math.min(4,") > -1, true);
+  /* it is very easy to push a thing off the side of a phone and not know how
+     to get it back */
+  t("a double tap puts it back where it started", code.indexOf("HOME.ry") > -1, true);
+  t("moving it is in screen pixels, scaled for the canvas",
+    code.indexOf("view.px * dpr") > -1, true);
+  t("and it stops turning by itself while you are holding it",
+    code.indexOf("if(!touch && !pinch) view.ry += 0.004") > -1, true);
+  t("a second finger is not read as a turn", code.indexOf("touch = null;                      /* it stopped being a turn */") > -1, true);
+  t("and letting go of one of two does not start a turn either",
+    code.indexOf("if(fingerCount() === 0)") > -1, true);
+
+  /* it fills the screen behind the words rather than sitting in a porthole */
+  t("there is a background mode", inPage("#hf.bg #hfOrb#hfOrb{position:fixed"), true);
+  t("which fills the screen", inPage("width:100vw;height:100vh"), true);
+  t("with no corners, since it is not in a porthole any more",
+    inPage("border-radius:0;border:0;opacity:1"), true);
+  /* #hfOrb.showing #orbViz is declared later with the same weight and would win */
+  t("and it outranks the porthole rules rather than merely following them",
+    inPage("#orbViz#orbViz{"), true);
+  t("the words sit over it", inPage("#hf.bg #hfWords#hfWords{"), true);
+  t("and stay readable against whatever it is showing",
+    /#hf\.bg #hfWords#hfWords\{[^}]*text-shadow/.test(page), true);
+
+  t("asking for a hologram builds one", grab("holoShow").indexOf("vizBuild(what)") > -1, true);
+  t("in the background", grab("holoShow").indexOf('classList.add("bg")') > -1, true);
+  t("and leaving it puts the screen back", grab("holoHide").indexOf('classList.remove("bg")') > -1, true);
+  /* a photograph is still the right answer for the things a model made of
+     boxes and cylinders cannot be */
+  t("a real photograph is still there for what a model cannot be",
+    has("function holoPhoto"), true);
 }
 
 
