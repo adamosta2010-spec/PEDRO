@@ -609,7 +609,9 @@ function nativeFrom(cap, exp){
   const whole = new Function(grab("wholeSentences") + "; return wholeSentences;")();
 
   t("it speaks each sentence as it arrives", inSrc("function askStream"), true);
-  t("the voice path uses it", inSrc("askStream(c, function(acc){"), true);
+  t("the voice path uses it", inSrc("run = askStream(c, outLoud)"), true);
+  t("and speaks it sentence by sentence as it is written",
+    inSrc("function outLoud(acc){") && inSrc("sayChunk(chunk)"), true);
   t("a finished sentence is found", whole("Hello there. And then"), "Hello there.");
   t("an unfinished one is not spoken yet", whole("Hello there and then"), "");
   t("two sentences come back together", whole("One. Two. Three"), "One. Two.");
@@ -638,7 +640,9 @@ function nativeFrom(cap, exp){
   t("the answer is not spoken twice", ask.indexOf("hfSpeak(answer,") === -1, true);
   t("it waits for the last sentence instead", ask.indexOf("sayWhenDone(") > -1, true);
   t("a failure says the real reason", ask.indexOf("why.slice(0, 120)") > -1, true);
-  t("and goes back to listening", ask.indexOf('hfSet(hf.want ? "hear" : "wait"') > -1, true);
+  t("and goes back to listening", ask.indexOf("carryOn(") > -1, true);
+  t("a failed answer does not cost you the conversation",
+    ask.indexOf("carryOn(navigator.onLine") > -1, true);
   t("a failure clears anything queued", ask.indexOf("sayStop();") > -1, true);
   t("stopping forgets the callback too", grab("sayStop").indexOf("sayDone = null") > -1, true);
 }
@@ -741,7 +745,33 @@ function nativeFrom(cap, exp){
   t("stopping the microphone clears the marker that blocks starting it",
     grab("nativeMicStop").indexOf("hf.rec = null") > -1, true);
   t("and listening is actually started again after speaking",
-    grab("hfAsk").indexOf("hfListen();") > -1, true);
+    grab("carryOn").indexOf("hfListen();") > -1, true);
+  t("saying the words is not mistaken for opening the microphone",
+    grab("carryOn").indexOf("hfQuietTimer();") > -1, true);
+  t("it waits until he has stopped talking first",
+    grab("carryOn").indexOf("speak(String(line), back)") > -1, true);
+  t("with hands-free off it just goes quiet",
+    grab("carryOn").indexOf("if(!hf.want)") > -1, true);
+  t("a reply counts as a turn, so the window is the long one",
+    grab("carryOn").indexOf("hf.turns++") > -1, true);
+
+  /* the actual complaint: having to say his name before every question */
+  {
+    const routes = ["theSmallThings(question)", "openByVoice(question)"];
+    routes.forEach(function(r){
+      const at = grab("hfAsk").indexOf(r);
+      const after = grab("hfAsk").slice(at, at + 90);
+      t(r.replace("(question)", "") + " hands the microphone back",
+        after.indexOf("carryOn()") > -1, true);
+    });
+    const finishers = ["learnAbout", "vizBuild", "editSelf", "vizAsk"];
+    finishers.forEach(function(n){
+      t(n + " ends by handing the microphone back",
+        grab(n).indexOf("carryOn(") > -1, true);
+    });
+    t("after learning you can ask straight away",
+      src.indexOf("carryOn(" + '"' + "Right, I've read up on") > -1, true);
+  }
 
   /* the phone can look at a picture by itself */
   t("the phone can look at a picture itself", inSrc("function lookOnDevice"), true);
@@ -834,6 +864,47 @@ function nativeFrom(cap, exp){
   t("a new build wins over answering about the old one", buildAt > -1 && buildAt < showingAt, true);
   t("and a question about what is showing still lands there", showingAt > -1, true);
 }
+
+/* ---- carrying on without saying his name again ---- */
+function quietRun(turns, elapsed){
+  const seen = { phase: "hear", label: "", textContent: "x" };
+  const timers = [];
+  const make = new Function("hf", "hfSet", "aiName", "hfIdleLabel", "hfHeard",
+                            "setTimeout", "clearTimeout",
+                            grab("hfQuietTimer") + "; return hfQuietTimer;");
+  const hf = { turns: turns, phase: "hear", quiet: null };
+  const run = make(hf,
+    function(p, l){ seen.phase = p; seen.label = l; hf.phase = p; },
+    function(){ return "Pedro"; },
+    function(){ return "Tap to talk"; },
+    seen,
+    function(fn, ms){ timers.push({ fn: fn, ms: ms }); return timers.length; },
+    function(){});
+  run();
+  timers.forEach(function(tm){ if(tm.ms <= elapsed) tm.fn(); });
+  return { phase: seen.phase, label: seen.label, wait: timers[0].ms };
+}
+
+t("mid-conversation it stays open for a good while",
+  quietRun(2, 0).wait >= 60000, true);
+t("half a minute of thinking does not lose your turn",
+  quietRun(2, 30000).phase, "hear");
+t("a full minute of thinking does not either",
+  quietRun(2, 60000).phase, "hear");
+t("nor does a minute and a half",
+  quietRun(2, 90000).phase, "hear");
+t("but it does eventually go quiet again",
+  quietRun(2, 600000).phase, "wait");
+t("and then it tells you how to carry on",
+  /carry on/.test(quietRun(2, 600000).label), true);
+t("before the first question the window is shorter",
+  quietRun(0, 0).wait < quietRun(3, 0).wait, true);
+t("though still long enough to start speaking",
+  quietRun(0, 0).wait >= 20000, true);
+t("and that first timeout goes back to the idle words",
+  quietRun(0, 600000).label, "Tap to talk");
+t("going quiet clears the half-heard line",
+  quietRun(2, 600000) && true, true);
 
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " mic/image tests passed");
 process.exit(fail ? 1 : 0);

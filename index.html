@@ -645,6 +645,54 @@
   #vizSaid{margin-top:10px;font-size:13px;line-height:1.5;color:var(--tx2);max-height:22vh;overflow-y:auto}
   #viz.busy #vizFrame{opacity:.5}
 
+  /* ============ the workbench ============ */
+  #wb{position:fixed;inset:0;z-index:74;background:var(--bg);display:none;
+    flex-direction:column;padding:calc(var(--safe-t) + 8px) 8px calc(var(--safe-b) + 8px)}
+  #wb.on{display:flex}
+  #wbTop{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+  #wbTitle{flex:1;font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--hud);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #wbTop .icobtn{border:1px solid color-mix(in srgb,var(--hud) 30%,transparent);color:var(--hud)}
+  .wbtxt{flex:0 0 auto;border:1px solid color-mix(in srgb,var(--hud) 30%,transparent);
+    color:var(--hud);border-radius:9px;padding:6px 10px;font-size:11px;letter-spacing:.06em}
+  .wbtxt[disabled]{opacity:.35}
+  #wbBoard{flex:1;width:100%;border:1px solid color-mix(in srgb,var(--hud) 26%,transparent);
+    border-radius:12px;touch-action:none;overflow:hidden;display:block;
+    background:radial-gradient(circle at 1px 1px,
+      color-mix(in srgb,var(--hud) 16%,transparent) 1px, transparent 0) 0 0/22px 22px, #080a0f}
+  #wbRead{margin-top:6px;font-size:12.5px;line-height:1.45;color:var(--tx2);
+    min-height:2.8em;max-height:17vh;overflow-y:auto}
+  #wbRead b{color:var(--hud);font-weight:600}
+  #wbTray{display:flex;gap:6px;overflow-x:auto;padding-top:7px;scrollbar-width:none}
+  #wbTray::-webkit-scrollbar{display:none}
+  .wbadd{flex:0 0 auto;border:1px solid var(--line);background:var(--bg2);border-radius:10px;
+    padding:8px 12px;font-size:12px;color:var(--tx);white-space:nowrap}
+  .wbadd:active{background:var(--bg3)}
+  /* the parts themselves */
+  .wbbody{fill:var(--bg2);stroke:color-mix(in srgb,var(--hud) 45%,transparent);stroke-width:1.5}
+  .wbpart.sel .wbbody{stroke:var(--hud);stroke-width:2.5}
+  .wbmark{stroke:var(--tx2);stroke-width:1.6;fill:none;stroke-linecap:round}
+  .wblabel{fill:var(--tx3);font:600 9px -apple-system,BlinkMacSystemFont,sans-serif;
+    text-anchor:middle;pointer-events:none;letter-spacing:.04em}
+  .wbpin{fill:#0b0d12;stroke:var(--hud);stroke-width:1.5}
+  .wbpin.hot{fill:var(--hud)}
+  .wbwire{stroke:#78859e;stroke-width:3;fill:none;stroke-linecap:round}
+  .wbwire.live{stroke:color-mix(in srgb,var(--hud) 70%,#78859e)}
+  .wbflow{stroke:var(--hud);stroke-width:3;fill:none;stroke-linecap:round;opacity:.95;
+    stroke-dasharray:5 14;animation:wbflow .6s linear infinite;pointer-events:none}
+  @keyframes wbflow{to{stroke-dashoffset:-19}}
+  .wbdrawn{stroke:var(--hud);stroke-width:2.5;stroke-dasharray:4 5;fill:none;pointer-events:none}
+  .wbglow{fill:#ffd76a;pointer-events:none}
+  .wbrotor{transform-box:fill-box;transform-origin:center}
+  .wbpart.run .wbrotor{animation:wbspin .45s linear infinite}
+  @keyframes wbspin{to{transform:rotate(360deg)}}
+  .wbring{stroke:var(--hud);fill:none;stroke-width:1.5;opacity:0}
+  .wbpart.run .wbring{animation:wbring .7s ease-out infinite}
+  @keyframes wbring{from{opacity:.9;transform:scale(.6)}to{opacity:0;transform:scale(1.5)}}
+  @media (prefers-reduced-motion:reduce){
+    .wbflow,.wbpart.run .wbrotor,.wbpart.run .wbring{animation:none}
+  }
+
   /* ============ camera ============ */
   #cam{position:fixed;inset:0;z-index:72;background:#000;display:none}
   #cam.on{display:block}
@@ -1255,6 +1303,19 @@
   </div>
   <iframe id="vizFrame" sandbox="allow-scripts" referrerpolicy="no-referrer" title="Explanation"></iframe>
   <div id="vizSaid"></div>
+</div>
+
+<div id="wb">
+  <div id="wbTop">
+    <span id="wbTitle">Building</span>
+    <button class="wbtxt" id="wbPower">Power on</button>
+    <button class="wbtxt" id="wbBin" disabled>Delete</button>
+    <button class="wbtxt" id="wbWipe">Clear</button>
+    <button class="icobtn" id="wbClose" aria-label="Close"><svg><use href="#i-x"/></svg></button>
+  </div>
+  <svg id="wbBoard" aria-label="Circuit board"></svg>
+  <div id="wbRead"></div>
+  <div id="wbTray"></div>
 </div>
 
 <div id="cam">
@@ -3810,6 +3871,10 @@ var viz = { open:false, busy:false, last:null, lastAsk:'' };
 var VIZ_RE = /^(?:(?:can you )?(?:show|draw|animate|visuali[sz]e|illustrate|diagram|graph|plot|simulate|model)\s+(?:me\s+)?)(.{2,80})$/i;
 /* Only when actually asked to build something. Asking how a thing works is a
    question, and it was being answered with a drawing nobody wanted. */
+/* bare "build" opens the workbench; "build me an engine" still goes to the
+   model. The difference is whether anything follows the word. */
+var BUILD_MODE_RE = new RegExp("^(?:let'?s\\s+)?(?:(?:open|start|enter|go into|turn on)\\s+)?" +
+  "(?:the\\s+)?(?:build(?:ing)?\\s*mode|workbench|build(?:ing)?)\\s*$", "i");
 var VIZ_HINT_RE = /^(?:build|simulate|animate|model)\s+/i;
 
 function wantsPicture3D(q){
@@ -3951,8 +4016,7 @@ function vizBuild(about){
     var parts = vizExtract(text);
     if(!parts.html){
       vizStop();
-      hfSet('wait', hfIdleLabel());
-      speak(parts.say || 'I could not draw that one.');
+      carryOn(parts.say || 'I could not draw that one.');
       return;
     }
     simKeep(about, parts.html, parts.say);
@@ -3975,10 +4039,8 @@ function vizBuild(about){
     fastMode = false;
     viz.busy = false;
     vizStop();
-    hfSet('wait', hfIdleLabel());
     var why = String(err && err.message || err);
-    hfSaid.textContent = why;
-    speak(why);
+    carryOn(why);
   });
 }
 
@@ -4035,19 +4097,614 @@ function vizAsk(question){
       hf.talking = true;
       sayStop();
       sayChunk(answer);
-      sayWhenDone(function(){
-        hf.talking = false;
-        if(!hf.want) return;
-        hfSet("hear", "Listening…");
-        hfQuietTimer();
-      });
+      sayWhenDone(function(){ carryOn(); });
     }).catch(function(e){
       voiceMode = wasVoice;
       viz.busy = false;
       var why = String(e && e.message || e);
       orbInfo(viz.lastAsk, why);
-      hfSet("hear", "Listening…");
+      carryOn();
     });
+}
+
+
+/* ==================== the workbench ====================
+   Building mode. Parts go on a board, wires join them, and it is solved for
+   real: node voltages by elimination, so the lamp is as bright as the current
+   through it actually makes it. No model involved - it is instant and it works
+   with no signal. */
+var WB_KIT = {
+  battery:  { name:"Battery",  tag:"9V",     volts:9,   r:0.5 },
+  cell:     { name:"AA cell",  tag:"1.5V",   volts:1.5, r:0.3 },
+  lamp:     { name:"Lamp",     tag:"3W",     ohms:24,   watts:3 },
+  led:      { name:"LED",      tag:"red",    ohms:180,  watts:0.07, diode:true,
+              said:"LED", art:"an" },
+  resistor: { name:"Resistor", tag:"100R",   ohms:100,  watts:0.5 },
+  motor:    { name:"Motor",    tag:"",       ohms:14,   watts:2,   spins:true },
+  buzzer:   { name:"Buzzer",   tag:"",       ohms:60,   watts:0.6, rings:true },
+  fan:      { name:"Fan",      tag:"",       ohms:20,   watts:1.5, spins:true },
+  toggle:   { name:"Switch",   tag:"",       ohms:0.01, toggles:true }
+};
+var WB_W = 84, WB_H = 46, WB_PIN = 7;
+/* what a part is called out loud, which is not always what is printed on it */
+function wbSaid(kind){
+  var k = WB_KIT[kind];
+  return k ? (k.said || k.name.toLowerCase()) : kind;
+}
+function wbAnArt(kind){
+  var k = WB_KIT[kind];
+  return (k && k.art) || "a";
+}
+
+var wb = { on:false, parts:[], wires:[], seq:0, sel:null, power:true,
+           drag:null, run:null, board:null };
+
+/* ---- solving it ----
+   Batteries are turned into a current source with a conductance beside it, so
+   the whole thing is one conductance matrix and always has an answer. Every
+   node also gets a vanishingly small leak to ground: without it a part sitting
+   on the board with nothing attached makes the matrix unsolvable. */
+function wbGauss(G, I, gnd){
+  var n = I.length, map = [], k;
+  for(k = 0; k < n; k++) if(k !== gnd) map.push(k);
+  var m = map.length, out = [];
+  for(k = 0; k < n; k++) out.push(0);
+  if(!m) return out;
+  var A = [], r, c;
+  for(r = 0; r < m; r++){
+    var row = [];
+    for(c = 0; c < m; c++) row.push(G[map[r]][map[c]]);
+    row.push(I[map[r]]);
+    A.push(row);
+  }
+  for(c = 0; c < m; c++){
+    var piv = c;
+    for(r = c + 1; r < m; r++) if(Math.abs(A[r][c]) > Math.abs(A[piv][c])) piv = r;
+    if(Math.abs(A[piv][c]) < 1e-14) return null;
+    var swap = A[c]; A[c] = A[piv]; A[piv] = swap;
+    for(r = 0; r < m; r++){
+      if(r === c) continue;
+      var f = A[r][c] / A[c][c];
+      if(!f) continue;
+      for(var j = c; j <= m; j++) A[r][j] -= f * A[c][j];
+    }
+  }
+  for(r = 0; r < m; r++) out[map[r]] = A[r][m] / A[r][r];
+  return out;
+}
+
+function wbSolve(parts, wires, powered){
+  var out = { volts:{}, amps:{}, lit:{}, shorted:false, live:false, why:"" };
+  parts.forEach(function(p){ out.volts[p.id] = 0; out.amps[p.id] = 0; out.lit[p.id] = 0; });
+
+  var find = {};
+  function root(k){ while(find[k] !== k){ find[k] = find[find[k]]; k = find[k]; } return k; }
+  function join(a, b){
+    if(!(a in find) || !(b in find)) return;
+    var ra = root(a), rb = root(b);
+    if(ra !== rb) find[ra] = rb;
+  }
+  parts.forEach(function(p){ find[p.id + ":0"] = p.id + ":0"; find[p.id + ":1"] = p.id + ":1"; });
+  wires.forEach(function(w){ join(w.a, w.b); });
+  var idx = {}, n = 0;
+  Object.keys(find).forEach(function(k){
+    var r = root(k);
+    if(!(r in idx)) idx[r] = n++;
+  });
+  function nodeOf(id, pin){ return idx[root(id + ":" + pin)]; }
+
+  var cells = parts.filter(function(p){ return WB_KIT[p.kind] && WB_KIT[p.kind].volts; });
+  if(!cells.length){ out.why = "nothing is pushing - put a battery on the board"; return out; }
+  if(!wires.length){ out.why = "nothing is wired up yet"; return out; }
+  if(!powered){ out.why = "the power is off"; return out; }
+
+  var shut = {}, v = null, pass;
+  for(pass = 0; pass < 5; pass++){
+    var G = [], I = [], a, b;
+    for(a = 0; a < n; a++){
+      var row = [];
+      for(b = 0; b < n; b++) row.push(0);
+      row[a] = 1e-9;              /* the leak that keeps loose parts solvable */
+      G.push(row);
+      I.push(0);
+    }
+    function stamp(n1, n2, g){
+      G[n1][n1] += g; G[n2][n2] += g;
+      G[n1][n2] -= g; G[n2][n1] -= g;
+    }
+    parts.forEach(function(p){
+      var k = WB_KIT[p.kind];
+      if(!k) return;
+      var n1 = nodeOf(p.id, 0), n2 = nodeOf(p.id, 1);
+      if(n1 === n2) return;                       /* both ends on the same wire */
+      if(k.volts){
+        var volts = (p.volts == null ? k.volts : p.volts), r = p.r == null ? k.r : p.r;
+        stamp(n1, n2, 1 / r);
+        I[n1] += volts / r;                       /* pin 0 is the + end */
+        I[n2] -= volts / r;
+        return;
+      }
+      if(k.toggles){ if(p.on !== false) stamp(n1, n2, 1 / k.ohms); return; }
+      if(k.diode && shut[p.id]) return;
+      stamp(n1, n2, 1 / (p.ohms == null ? k.ohms : p.ohms));
+    });
+    v = wbGauss(G, I, nodeOf(cells[0].id, 1));
+    if(!v){ out.why = "that one does not settle - try simpler wiring"; return out; }
+
+    /* an LED only passes current one way round */
+    var flipped = false;
+    parts.forEach(function(p){
+      var k = WB_KIT[p.kind];
+      if(!k || !k.diode || shut[p.id]) return;
+      var dv = v[nodeOf(p.id, 0)] - v[nodeOf(p.id, 1)];
+      if(dv < 0){ shut[p.id] = true; flipped = true; }
+    });
+    if(!flipped) break;
+  }
+
+  parts.forEach(function(p){
+    var k = WB_KIT[p.kind];
+    if(!k) return;
+    var n1 = nodeOf(p.id, 0), n2 = nodeOf(p.id, 1), dv = v[n1] - v[n2], amps;
+    if(n1 === n2) dv = 0;
+    if(k.volts){
+      var volts = (p.volts == null ? k.volts : p.volts), r = p.r == null ? k.r : p.r;
+      /* both ends on one wire is a dead short, not a quiet nothing */
+      amps = n1 === n2 ? volts / r : (volts - dv) / r;
+      if(Math.abs(amps) > 0.5 * volts / r) out.shorted = true;
+    } else if(k.toggles){
+      amps = p.on === false ? 0 : dv / k.ohms;
+    } else if(k.diode && shut[p.id]){
+      amps = 0;
+    } else {
+      amps = dv / (p.ohms == null ? k.ohms : p.ohms);
+    }
+    out.volts[p.id] = dv;
+    out.amps[p.id] = amps;
+    if(k.watts){
+      var res = p.ohms == null ? k.ohms : p.ohms;
+      out.lit[p.id] = Math.max(0, Math.min(1, (amps * amps * res) / k.watts));
+    }
+    if(!k.volts && Math.abs(amps) > 0.002) out.live = true;
+  });
+
+  if(out.shorted){
+    out.why = "the battery is wired straight back to itself - put something in the loop";
+  } else if(!out.live){
+    var opened = parts.filter(function(p){
+      return WB_KIT[p.kind] && WB_KIT[p.kind].toggles && p.on === false;
+    });
+    var loose = parts.filter(function(p){
+      var used = { 0:false, 1:false };
+      wires.forEach(function(w){
+        if(w.a === p.id + ":0" || w.b === p.id + ":0") used[0] = true;
+        if(w.a === p.id + ":1" || w.b === p.id + ":1") used[1] = true;
+      });
+      return !used[0] || !used[1];
+    });
+    if(opened.length) out.why = "the switch is open - tap it to close it";
+    else if(loose.length) out.why = "the loop is not closed - " + loose.length +
+      (loose.length === 1 ? " part still has a loose end" : " parts still have loose ends");
+    else out.why = "no current is going round";
+  }
+  return out;
+}
+
+/* ---- where things are ---- */
+function wbPinAt(p, pin){
+  return { x: p.x + (pin ? WB_W : 0), y: p.y + WB_H / 2 };
+}
+function wbPart(id){
+  for(var i = 0; i < wb.parts.length; i++) if(wb.parts[i].id === id) return wb.parts[i];
+  return null;
+}
+function wbFreeSpot(){
+  var box = wb.board ? wb.board.getBoundingClientRect() : { width:340, height:420 };
+  var stepX = WB_W + 34, stepY = WB_H + 30;
+  var cols = Math.max(1, Math.floor((box.width - 20) / stepX));
+  for(var i = 0; i < 60; i++){
+    var x = 14 + (i % cols) * stepX, y = 16 + Math.floor(i / cols) * stepY;
+    var clash = wb.parts.some(function(p){
+      return Math.abs(p.x - x) < WB_W && Math.abs(p.y - y) < WB_H;
+    });
+    if(!clash) return { x:x, y:Math.min(y, Math.max(16, box.height - WB_H - 16)) };
+  }
+  return { x:14, y:16 };
+}
+function wbAdd(kind){
+  if(!WB_KIT[kind]) return null;
+  var spot = wbFreeSpot();
+  var p = { id:"p" + (++wb.seq), kind:kind, x:spot.x, y:spot.y };
+  if(WB_KIT[kind].toggles) p.on = true;
+  wb.parts.push(p);
+  wb.sel = p.id;
+  wbDraw();
+  return p;
+}
+function wbRemove(id){
+  wb.parts = wb.parts.filter(function(p){ return p.id !== id; });
+  wb.wires = wb.wires.filter(function(w){
+    return w.a.split(":")[0] !== id && w.b.split(":")[0] !== id;
+  });
+  if(wb.sel === id) wb.sel = null;
+  wbDraw();
+}
+function wbJoin(a, b){
+  if(a === b) return false;
+  if(a.split(":")[0] === b.split(":")[0]) return false;   /* both ends of one part */
+  var have = wb.wires.some(function(w){
+    return (w.a === a && w.b === b) || (w.a === b && w.b === a);
+  });
+  if(have) return false;
+  wb.wires.push({ a:a, b:b });
+  return true;
+}
+/* wire everything into one loop, in the order it was put down */
+function wbAutoWire(){
+  var cells = wb.parts.filter(function(p){ return WB_KIT[p.kind].volts; });
+  var rest  = wb.parts.filter(function(p){ return !WB_KIT[p.kind].volts; });
+  if(!cells.length || !rest.length) return false;
+  wb.wires = [];
+  var chain = [cells[0]].concat(rest);
+  /* out of one part and into the next: current leaves a battery at + and goes
+     in at every other part's left-hand pin. Running that loop the other way
+     round is what stops an LED lighting. */
+  for(var i = 0; i < chain.length; i++){
+    var here = chain[i], next = chain[(i + 1) % chain.length];
+    var out = WB_KIT[here.kind].volts ? 0 : 1;
+    var into = WB_KIT[next.kind].volts ? 1 : 0;
+    wbJoin(here.id + ":" + out, next.id + ":" + into);
+  }
+  wbDraw();
+  return true;
+}
+
+/* ---- drawing it ---- */
+function wbSvg(tag, at){
+  var el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for(var k in at) if(at.hasOwnProperty(k)) el.setAttribute(k, at[k]);
+  return el;
+}
+function wbGlyph(g, kind, res, p){
+  var cx = WB_W / 2, cy = WB_H / 2 - 3, k = WB_KIT[kind];
+  var lit = res ? (res.lit[p.id] || 0) : 0;
+  if(k.volts){
+    g.appendChild(wbSvg("line", { x1:cx - 9, y1:cy - 9, x2:cx - 9, y2:cy + 9, class:"wbmark" }));
+    g.appendChild(wbSvg("line", { x1:cx - 2, y1:cy - 5, x2:cx - 2, y2:cy + 5, class:"wbmark" }));
+    g.appendChild(wbSvg("line", { x1:cx + 5, y1:cy - 9, x2:cx + 5, y2:cy + 9, class:"wbmark" }));
+    g.appendChild(wbSvg("line", { x1:cx + 12, y1:cy - 5, x2:cx + 12, y2:cy + 5, class:"wbmark" }));
+    var plus = wbSvg("text", { x:8, y:cy - 6, class:"wblabel" });
+    plus.textContent = "+";
+    g.appendChild(plus);
+    return;
+  }
+  if(k.toggles){
+    g.appendChild(wbSvg("circle", { cx:cx - 13, cy:cy, r:2.5, class:"wbmark" }));
+    g.appendChild(wbSvg("circle", { cx:cx + 13, cy:cy, r:2.5, class:"wbmark" }));
+    g.appendChild(wbSvg("line", { x1:cx - 13, y1:cy, x2:cx + 12,
+      y2:p.on === false ? cy - 12 : cy, class:"wbmark" }));
+    return;
+  }
+  if(k.diode){
+    if(lit > 0.02){
+      var halo = wbSvg("circle", { cx:cx, cy:cy, r:15, class:"wbglow" });
+      halo.setAttribute("fill", "#ff5a5a");
+      halo.setAttribute("opacity", (0.18 + 0.55 * lit).toFixed(3));
+      g.appendChild(halo);
+    }
+    var tri = wbSvg("path", { d:"M" + (cx - 9) + " " + (cy - 8) + "L" + (cx + 6) + " " + cy +
+      "L" + (cx - 9) + " " + (cy + 8) + "Z", class:"wbmark" });
+    if(lit > 0.02) tri.setAttribute("fill", "#ff6b6b");
+    g.appendChild(tri);
+    g.appendChild(wbSvg("line", { x1:cx + 6, y1:cy - 9, x2:cx + 6, y2:cy + 9, class:"wbmark" }));
+    return;
+  }
+  if(kind === "resistor"){
+    g.appendChild(wbSvg("path", { class:"wbmark", d:"M" + (cx - 18) + " " + cy +
+      "l5 0 3 -8 5 16 5 -16 5 16 3 -8 5 0" }));
+    return;
+  }
+  if(k.spins){
+    g.appendChild(wbSvg("circle", { cx:cx, cy:cy, r:12, class:"wbmark" }));
+    var rot = wbSvg("g", { class:"wbrotor" });
+    rot.appendChild(wbSvg("line", { x1:cx - 9, y1:cy, x2:cx + 9, y2:cy, class:"wbmark" }));
+    rot.appendChild(wbSvg("line", { x1:cx, y1:cy - 9, x2:cx, y2:cy + 9, class:"wbmark" }));
+    g.appendChild(rot);
+    return;
+  }
+  if(k.rings){
+    g.appendChild(wbSvg("circle", { cx:cx, cy:cy, r:9, class:"wbmark" }));
+    g.appendChild(wbSvg("circle", { cx:cx, cy:cy, r:9, class:"wbring" }));
+    return;
+  }
+  /* a lamp: a cross in a circle, and a real glow when current goes through */
+  if(lit > 0.02){
+    var g1 = wbSvg("circle", { cx:cx, cy:cy, r:9 + 13 * lit, class:"wbglow" });
+    g1.setAttribute("opacity", (0.12 + 0.5 * lit).toFixed(3));
+    g.appendChild(g1);
+  }
+  var bulb = wbSvg("circle", { cx:cx, cy:cy, r:11, class:"wbmark" });
+  if(lit > 0.02){
+    bulb.setAttribute("fill", "#ffd76a");
+    bulb.setAttribute("fill-opacity", (0.25 + 0.75 * lit).toFixed(3));
+  }
+  g.appendChild(bulb);
+  g.appendChild(wbSvg("line", { x1:cx - 7.8, y1:cy - 7.8, x2:cx + 7.8, y2:cy + 7.8, class:"wbmark" }));
+  g.appendChild(wbSvg("line", { x1:cx + 7.8, y1:cy - 7.8, x2:cx - 7.8, y2:cy + 7.8, class:"wbmark" }));
+}
+
+function wbDraw(){
+  var svg = wb.board;
+  if(!svg) return;
+  var box = svg.getBoundingClientRect();
+  if(box.width) svg.setAttribute("viewBox", "0 0 " + Math.round(box.width) + " " + Math.round(box.height));
+  var res = wbSolve(wb.parts, wb.wires, wb.power);
+  wb.res = res;
+  while(svg.firstChild) svg.removeChild(svg.firstChild);
+
+  /* wires first, so parts sit on top of them */
+  wb.wires.forEach(function(w){
+    var pa = wbPart(w.a.split(":")[0]), pb = wbPart(w.b.split(":")[0]);
+    if(!pa || !pb) return;
+    var A = wbPinAt(pa, +w.a.split(":")[1]), B = wbPinAt(pb, +w.b.split(":")[1]);
+    var mid = (A.x + B.x) / 2;
+    var d = "M" + A.x + " " + A.y + "C" + mid + " " + A.y + " " + mid + " " + B.y +
+            " " + B.x + " " + B.y;
+    var moving = res.live && !res.shorted;
+    svg.appendChild(wbSvg("path", { d:d, class:"wbwire" + (moving ? " live" : "") }));
+    if(moving) svg.appendChild(wbSvg("path", { d:d, class:"wbflow" }));
+  });
+
+  wb.parts.forEach(function(p){
+    var k = WB_KIT[p.kind];
+    var running = !!(res.lit[p.id] > 0.02 || (Math.abs(res.amps[p.id] || 0) > 0.01 && (k.spins || k.rings)));
+    var g = wbSvg("g", {
+      class:"wbpart" + (wb.sel === p.id ? " sel" : "") + (running ? " run" : ""),
+      transform:"translate(" + p.x + "," + p.y + ")", "data-id":p.id
+    });
+    g.appendChild(wbSvg("rect", { x:0, y:0, width:WB_W, height:WB_H, rx:10, class:"wbbody" }));
+    wbGlyph(g, p.kind, res, p);
+    var name = wbSvg("text", { x:WB_W / 2, y:WB_H - 6, class:"wblabel" });
+    name.textContent = k.name + (k.tag ? " " + k.tag : "");
+    g.appendChild(name);
+    [0, 1].forEach(function(pin){
+      var at = { cx: pin ? WB_W : 0, cy: WB_H / 2 };
+      g.appendChild(wbSvg("circle", {
+        cx:at.cx, cy:at.cy, r:WB_PIN, class:"wbpin", "data-pin":p.id + ":" + pin
+      }));
+      g.appendChild(wbSvg("circle", {
+        cx:at.cx, cy:at.cy, r:17, fill:"transparent", "data-pin":p.id + ":" + pin
+      }));
+    });
+    svg.appendChild(g);
+  });
+
+  var bin = $("wbBin");
+  if(bin) bin.disabled = !wb.sel;
+  var pw = $("wbPower");
+  if(pw) pw.textContent = wb.power ? "Power off" : "Power on";
+  wbRead(res);
+}
+
+function wbRead(res){
+  var el = $("wbRead");
+  if(!el) return;
+  if(!wb.parts.length){
+    el.innerHTML = "Tap a part below to put it on the board. Drag from one dot to another to run a wire between them.";
+    return;
+  }
+  var lines = [];
+  wb.parts.forEach(function(p){
+    var k = WB_KIT[p.kind], a = res.amps[p.id] || 0, v = res.volts[p.id] || 0;
+    if(k.volts){
+      lines.push("<b>" + k.name + "</b> giving " + Math.abs(a).toFixed(2) + " A");
+      return;
+    }
+    if(k.toggles){ lines.push("<b>Switch</b> " + (p.on === false ? "open" : "closed")); return; }
+    if(Math.abs(a) < 0.002){ lines.push("<b>" + k.name + "</b> nothing going through it"); return; }
+    var how = k.spins ? "turning" : k.rings ? "sounding" : "lit";
+    var pct = Math.round((res.lit[p.id] || 0) * 100);
+    lines.push("<b>" + k.name + "</b> " + Math.abs(v).toFixed(1) + " V, " +
+      Math.abs(a).toFixed(2) + " A" + (k.watts ? " - " + how + " " + pct + "%" : ""));
+  });
+  if(res.why) lines.push("<b>" + (res.shorted ? "Careful" : "Not running") + ":</b> " + res.why);
+  el.innerHTML = lines.join("<br>");
+}
+
+/* ---- fingers ---- */
+function wbWire(from, to){
+  if(wbJoin(from, to)){ wbDraw(); return true; }
+  return false;
+}
+function wbBoardXY(ev){
+  var box = wb.board.getBoundingClientRect();
+  return { x: ev.clientX - box.left, y: ev.clientY - box.top };
+}
+function wbTouch(){
+  var svg = wb.board;
+  if(!svg) return;
+  svg.addEventListener("pointerdown", function(ev){
+    var pinEl = ev.target.closest ? ev.target.closest("[data-pin]") : null;
+    var at = wbBoardXY(ev);
+    if(pinEl){
+      wb.run = { kind:"wire", from:pinEl.getAttribute("data-pin"), x:at.x, y:at.y, moved:false };
+      var line = wbSvg("path", { class:"wbdrawn", d:"M" + at.x + " " + at.y + "L" + at.x + " " + at.y });
+      line.id = "wbDrawn";
+      svg.appendChild(line);
+      svg.setPointerCapture(ev.pointerId);
+      ev.preventDefault();
+      return;
+    }
+    var partEl = ev.target.closest ? ev.target.closest(".wbpart") : null;
+    if(partEl){
+      var p = wbPart(partEl.getAttribute("data-id"));
+      if(!p) return;
+      wb.sel = p.id;
+      wb.run = { kind:"move", id:p.id, dx:at.x - p.x, dy:at.y - p.y, moved:false };
+      svg.setPointerCapture(ev.pointerId);
+      wbDraw();
+      ev.preventDefault();
+      return;
+    }
+    if(wb.sel){ wb.sel = null; wbDraw(); }
+  });
+  svg.addEventListener("pointermove", function(ev){
+    if(!wb.run) return;
+    var at = wbBoardXY(ev);
+    wb.run.moved = true;
+    if(wb.run.kind === "wire"){
+      var line = $("wbDrawn");
+      var p = wbPart(wb.run.from.split(":")[0]);
+      if(line && p){
+        var a = wbPinAt(p, +wb.run.from.split(":")[1]);
+        line.setAttribute("d", "M" + a.x + " " + a.y + "L" + at.x + " " + at.y);
+      }
+      return;
+    }
+    var part = wbPart(wb.run.id);
+    if(!part) return;
+    var box = svg.getBoundingClientRect();
+    part.x = Math.max(2, Math.min(box.width - WB_W - 2, at.x - wb.run.dx));
+    part.y = Math.max(2, Math.min(box.height - WB_H - 2, at.y - wb.run.dy));
+    wbDraw();
+  });
+  function letGo(ev){
+    if(!wb.run) return;
+    var job = wb.run;
+    wb.run = null;
+    var line = $("wbDrawn");
+    if(line && line.parentNode) line.parentNode.removeChild(line);
+    if(job.kind === "wire"){
+      /* whichever pin is under the finger - the invisible ring makes this
+         forgiving, because pins are small and fingers are not */
+      var under = document.elementFromPoint(ev.clientX, ev.clientY);
+      var pinEl = under && under.closest ? under.closest("[data-pin]") : null;
+      if(pinEl && wbWire(job.from, pinEl.getAttribute("data-pin"))) return;
+      wbDraw();
+      return;
+    }
+    if(!job.moved){
+      var p = wbPart(job.id);
+      if(p && WB_KIT[p.kind].toggles){ p.on = p.on === false; }
+      wbDraw();
+    }
+  }
+  svg.addEventListener("pointerup", letGo);
+  svg.addEventListener("pointercancel", letGo);
+}
+
+/* ---- opening and closing ---- */
+function wbTray(){
+  var tray = $("wbTray");
+  if(!tray || tray.childNodes.length) return;
+  Object.keys(WB_KIT).forEach(function(kind){
+    var b = document.createElement("button");
+    b.className = "wbadd";
+    b.textContent = WB_KIT[kind].name;
+    b.addEventListener("click", function(){ wbAdd(kind); });
+    tray.appendChild(b);
+  });
+}
+function wbOpen(){
+  var el = $("wb");
+  if(!el) return false;
+  if(!wb.board){
+    wb.board = $("wbBoard");
+    wbTray();
+    wbTouch();
+  }
+  closePanels();          /* the panels sit above it - nothing on top of the board */
+  wb.on = true;
+  el.classList.add("on");
+  hudSync();
+  setTimeout(wbDraw, 30);        /* once it has a size to measure */
+  return true;
+}
+function wbClose(){
+  if(!wb.on) return false;
+  wb.on = false;
+  var el = $("wb");
+  if(el) el.classList.remove("on");
+  hudSync();
+  return true;
+}
+function wbWipe(){
+  wb.parts = [];
+  wb.wires = [];
+  wb.sel = null;
+  wb.seq = 0;
+  wbDraw();
+}
+
+/* ---- what he says about it ---- */
+function wbSpoken(){
+  var res = wb.res || wbSolve(wb.parts, wb.wires, wb.power);
+  if(!wb.parts.length) return "The board is empty. Say add a battery, then add a lamp.";
+  if(res.shorted) return "It is shorted out. " + res.why + ".";
+  if(!res.live) return "Nothing is running. " + res.why + ".";
+  var said = [];
+  wb.parts.forEach(function(p){
+    var k = WB_KIT[p.kind];
+    if(k.volts || k.toggles || !k.watts) return;
+    var pct = Math.round((res.lit[p.id] || 0) * 100);
+    if(pct < 3) return;
+    said.push("the " + wbSaid(p.kind) + " is " +
+      (k.spins ? "turning" : k.rings ? "sounding" : "lit") + " at " + pct + " percent");
+  });
+  return said.length ? "Current is going round - " + said.join(", ") + "." : "Current is going round.";
+}
+
+/* the words that work inside building mode. Returns null when it is not one
+   of them, so the question carries on to the model as usual. */
+var WB_ADD_RE = /^(?:add|put|drop|give me|i want|place|stick)\s+(?:me\s+)?(?:(?:another|an|a|the)\s+)?([a-z0-9 ]+?)(?:\s+(?:on|to|in)\s+(?:the\s+)?board)?\s*$/i;
+var WB_NAMES = {
+  battery:"battery", batteries:"battery", cell:"cell", "aa":"cell", "aa cell":"cell",
+  lamp:"lamp", bulb:"lamp", light:"lamp", "light bulb":"lamp", "lightbulb":"lamp",
+  led:"led", diode:"led", resistor:"resistor", resistance:"resistor",
+  motor:"motor", fan:"fan", buzzer:"buzzer", speaker:"buzzer",
+  "switch":"toggle", button:"toggle", toggle:"toggle"
+};
+function wbVoice(q){
+  var s = String(q || "").trim().toLowerCase().replace(/[.!?]+$/, "");
+  if(!s) return null;
+  if(/^(?:close|exit|leave|stop)\b.*\b(?:build|building|workbench|mode)\b/.test(s) ||
+     /^(?:close|exit|leave)$/.test(s) || /^stop building$/.test(s)){
+    wbClose();
+    return "Closed the workbench.";
+  }
+  if(/^(?:clear|wipe|empty|reset|start over|start again)\b/.test(s)){
+    wbWipe();
+    return "Cleared the board.";
+  }
+  if(/\b(?:wire|connect|join|hook)\b.*\b(?:up|it|them|together|everything)\b/.test(s) ||
+     /^(?:wire|connect|join) (?:it|them|everything)\b/.test(s)){
+    return wbAutoWire() ? "Wired up. " + wbSpoken()
+                        : "I need a battery and something to run before I can wire it up.";
+  }
+  if(/^(?:turn|switch|power)\s+(?:it\s+)?on\b/.test(s) || /^(?:run|start|test) it\b/.test(s)){
+    wb.power = true;
+    wb.parts.forEach(function(p){ if(WB_KIT[p.kind].toggles) p.on = true; });
+    wbDraw();
+    return wbSpoken();
+  }
+  if(/^(?:turn|switch|power)\s+(?:it\s+)?off\b/.test(s)){
+    wb.power = false;
+    wbDraw();
+    return "Power off.";
+  }
+  if(/\b(?:what(?:'s| is) wrong|why (?:is|isn't|isnt|does|doesn't|doesnt)|what(?:'s| is) happening|how (?:is|does) it look)\b/.test(s)){
+    return wbSpoken();
+  }
+  var m = s.match(WB_ADD_RE);
+  if(m){
+    var want = m[1].replace(/\s+/g, " ").trim();
+    var kind = WB_NAMES[want] || WB_NAMES[want.replace(/s$/, "")];
+    if(kind){
+      wbAdd(kind);
+      return "Added " + wbAnArt(kind) + " " + wbSaid(kind) + ".";
+    }
+  }
+  return null;
 }
 
 /* tap the ball to put the globe back */
@@ -4057,10 +4714,16 @@ function vizStop(){
   if(!orb.classList.contains('showing')) return false;
   orb.classList.remove('showing');
   $('orbViz').srcdoc = '';        /* stop whatever was running */
-  hfSet(hf.want ? 'hear' : 'wait', hf.want ? 'Listening…' : hfIdleLabel());
   hfSaid.textContent = '';
+  carryOn();
   return true;
 }
+
+$("wbClose").addEventListener("click", function(){ wbClose(); });
+$("wbWipe").addEventListener("click", wbWipe);
+$("wbBin").addEventListener("click", function(){ if(wb.sel) wbRemove(wb.sel); });
+$("wbPower").addEventListener("click", function(){ wb.power = !wb.power; wbDraw(); });
+window.addEventListener("resize", function(){ if(wb.on) wbDraw(); });
 
 $('vizClose').addEventListener('click', vizClose);
 $('vizAgain').addEventListener('click', function(){
@@ -5016,6 +5679,7 @@ function openByVoice(said){
     if(Native && Native.stopSpeaking) Native.stopSpeaking().catch(function(){});
     if(window.speechSynthesis) speechSynthesis.cancel();
     if(abortCtl){ try{ abortCtl.abort(); }catch(e){} }
+    hfDropDraft();
     viz.busy = false;
     hf.talking = false;
     hfSaid.textContent = "";
@@ -5147,8 +5811,7 @@ function editSelf(what){
     fastMode = false;
     var parts = vizExtract(answer);   /* same fence reader as the simulations */
     if(!parts.html){
-      hfSet("wait", hfIdleLabel());
-      speak("I could not write that one.");
+      carryOn("I could not write that one.");
       return;
     }
     var snippet = parts.html;
@@ -5166,19 +5829,16 @@ function editSelf(what){
       }
       orbInfoHide();
       hudSync();
-      hfSet("wait", hfIdleLabel());
-      speak("Done. Say undo that change if it was a mistake.");
+      carryOn("Done. Say undo that change if it was a mistake.");
     }).catch(function(e){
       orbInfoHide();
-      hfSet("wait", hfIdleLabel());
-      speak("Left as it was.");
       hudLog("him", String(e && e.message || e), false);
+      carryOn("Left as it was.");
     });
   }).catch(function(e){
     voiceMode = wasVoice;
     fastMode = false;
-    hfSet("wait", hfIdleLabel());
-    speak(String(e && e.message || e));
+    carryOn(String(e && e.message || e));
   });
 }
 
@@ -5286,10 +5946,9 @@ function learnAbout(topic, onDone){
         voiceMode = wasVoice;
         fastMode = false;
         stopTicking();
-        hfSet('wait', hfIdleLabel());
         var why = String(e && e.message || e);
         hudLog('him', why, false);
-        speak(why);
+        carryOn(why);
         if(onDone) onDone(false);
       });
   }
@@ -5298,8 +5957,7 @@ function learnAbout(topic, onDone){
     stopTicking();
     notes = notes.slice(0, 30);
     if(!notes.length){
-      hfSet('wait', hfIdleLabel());
-      speak('I could not get anywhere with ' + topic + '.');
+      carryOn('I could not get anywhere with ' + topic + '.');
       if(onDone) onDone(false);
       return;
     }
@@ -5311,8 +5969,7 @@ function learnAbout(topic, onDone){
     hudSync();
     var took = Math.round((Date.now() - began) / 1000);
     hudLog('him', 'Learned ' + notes.length + ' things about ' + topic + ' in ' + took + 's.', false);
-    hfSet('wait', hfIdleLabel());
-    speak("Right, I've read up on " + topic + ". Ask me anything about it.");
+    carryOn("Right, I've read up on " + topic + ". Ask me anything about it.");
     if(onDone) onDone(true);
   }
 
@@ -5827,6 +6484,7 @@ function applyBackground(){
     hf.want = false;
     hf.on = false;
     hfPause();
+    hfDropDraft();
   }
 }
 
@@ -5988,12 +6646,18 @@ function hfHeardText(live, finalTxt){
 
     if(hf.phase === "hear"){
       if(finalTxt.trim()){ clearTimeout(hf.settle); hfAsk(finalTxt.trim()); return; }
-      if(live){ hfSettle(live); return; }     /* they are still talking */
+      if(live){
+        hfSettle(live);
+        hfDraftHint(live);   /* start thinking about it before they have finished */
+        return;
+      }
       hfQuietTimer();
     }
 }
 
 function hfPause(){
+  /* only the microphone - asking a question pauses it too, and that must not
+     throw away the answer he has already started writing */
   clearTimeout(hf.restart);
   clearTimeout(hf.settle);
   if(hf.rec && hf.rec.native){ nativeMicStop(); hf.rec = null; return; }
@@ -6002,12 +6666,129 @@ function hfPause(){
 }
 function hfQuietTimer(){
   clearTimeout(hf.quiet);
+  /* Once you are talking to him, keep listening: hearing an answer and thinking
+     of the next question takes longer than a few seconds, and asking you to say
+     his name again every time is not a conversation. Before the first exchange
+     it goes quiet sooner, so it is not sitting open for nothing. */
+  var wait = hf.turns ? 120000 : 25000;
   hf.quiet = setTimeout(function(){
     if(hf.phase === "hear"){
       hfSet("wait", hf.turns ? "Say “" + aiName() + "” to carry on" : hfIdleLabel());
       hfHeard.textContent = "";
     }
-  }, 12000);   /* long enough to gather your thoughts mid-conversation */
+  }, wait);
+}
+
+/* Every single thing he does ends here. Leaving the phase on "wait" is what
+   made you say his name before every question - even after "ask me anything
+   about it". Say the line, then hand the microphone straight back. */
+function carryOn(line){
+  hfDropDraft();     /* whatever he was thinking early, this reply settles it */
+  function back(){
+    hf.talking = false;
+    if(!hf.on) return;
+    if(!hf.want){ hfSet("wait", hfIdleLabel()); return; }
+    hf.turns++;
+    hfSet("hear", "Listening - just ask");
+    hfHeard.textContent = "";
+    hfListen();          /* the words are not enough - the microphone has to run */
+    hfQuietTimer();
+  }
+  if(!line){ back(); return; }
+  hf.talking = true;
+  hfSet("talk", "Speaking");
+  hfSaid.textContent = String(line);
+  speak(String(line), back);   /* every voice calls back, including the failures */
+}
+
+/* ================= thinking while you talk =================
+   A draft is an answer started from what he has heard so far. It says nothing
+   and changes nothing - it is only a head start. When you stop talking, if the
+   finished question is the one he started on, the draft is adopted and the
+   first sentence is already there. */
+var DRAFT_WORDS = 3;       /* fewer than this is not a question yet */
+var DRAFT_TRIES = 4;       /* restarts per question, so a long ramble is not endless */
+
+function draftKey(s){
+  /* apostrophes come and go between the half-heard words and the finished
+     ones, so hows and how's have to key the same */
+  return String(s || "").toLowerCase()
+    .replace(/['’]/g, "")
+    .replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+}
+/* Only plain questions. Anything that does something - building, learning,
+   opening, texting, editing - must happen once, when you have finished asking. */
+function draftable(text){
+  var s = String(text || "").trim();
+  if(!s) return false;
+  if(draftKey(s).split(" ").length < DRAFT_WORDS) return false;
+  if(isDevice() || !isGemini() || !apiKeyNow()) return false;
+  if(hf.answering || hf.talking) return false;
+  if((typeof wb !== "undefined" && wb.on) || (typeof cam !== "undefined" && cam.open)) return false;
+  if(typeof viz !== "undefined" && viz.busy) return false;
+  var doers = [VIZ_RE, VIZ_HINT_RE, BUILD_MODE_RE, STUDY_RE, UNSTUDY_RE, EDIT_RE, UNDO_RE,
+               OPEN_RE, CLOSE_RE, HIDE_RE, STOP_RE, PAUSE_RE, RESUME_RE, TIMER_RE,
+               COIN_RE, DICE_RE, CAM_RE, DRAW_RE, REMEMBER_RE, FORGET_RE, HIGHLIGHT_RE];
+  for(var i = 0; i < doers.length; i++){
+    try{ if(doers[i] && doers[i].test(s)) return false; }catch(e){}
+  }
+  if(/^(?:pedro\s+)?text\b/i.test(s)) return false;
+  return true;
+}
+/* the finished question has to be the one he started on - a couple of tidying
+   words on the end are fine, a change of subject is not */
+function draftFits(key, question){
+  var q = draftKey(question);
+  if(!q || !key) return false;
+  if(q === key) return true;
+  if(q.indexOf(key) !== 0) return false;
+  var tail = q.slice(key.length).trim();
+  if(!tail) return true;
+  var words = tail.split(" ").filter(Boolean);
+  if(words.length > 2) return false;
+  return !/\b(?:and|or|but|also|what|why|how|when|who|where|which|instead|not|no)\b/.test(tail);
+}
+function hfDropDraft(){
+  clearTimeout(hf.draftWait);
+  if(hf.draft){
+    try{ hf.draft.ctl.abort(); }catch(e){}
+    hf.draft = null;
+  }
+}
+function hfDraftStart(text){
+  if(!draftable(text)) return null;
+  var key = draftKey(text);
+  if(hf.draft && hf.draft.key === key) return hf.draft;      /* already on it */
+  if((hf.draftTries || 0) >= DRAFT_TRIES) return null;
+  hfDropDraft();
+  hf.draftTries = (hf.draftTries || 0) + 1;
+  var base = activeChat() || newChat();
+  var d = {
+    key: key, text: String(text).trim(), acc: "", hook: null,
+    ctl: new AbortController(), began: Date.now()
+  };
+  hf.draft = d;
+  /* answers are spoken, so the draft has to be shaped like a spoken one */
+  var was = voiceMode;
+  voiceMode = true;
+  try{
+    d.p = askStream(
+      { messages: base.messages.concat([{ role:"user", content:d.text, t:Date.now() }]) },
+      function(acc){ d.acc = acc; if(d.hook) d.hook(acc); },
+      d.ctl);
+    d.p.catch(function(){});     /* a thrown-away draft is not an error */
+  }catch(e){
+    hf.draft = null;
+  }
+  voiceMode = was;
+  return hf.draft;
+}
+/* called as the words arrive: settle for a beat, then start on it */
+function hfDraftHint(live){
+  clearTimeout(hf.draftWait);
+  hf.draftWait = setTimeout(function(){
+    if(hf.want && hf.phase === "hear") hfDraftStart(live);
+  }, 420);
 }
 
 /* --- speak without hearing ourselves --- */
@@ -6026,15 +6807,27 @@ function hfAsk(question){
   /* If he is already looking, the question is usually about what he can see -
      but "count to a hundred" is not, and attaching a picture to it made him
      describe the room as well. */
+  /* building mode has its own words while it is open */
+  if(wb.on){
+    var did = wbVoice(question);
+    if(did !== null){ carryOn(did || undefined); return; }
+  }
+  if(BUILD_MODE_RE.test(String(question).trim())){
+    wbOpen();
+    carryOn(wb.parts.length ? "Building mode. " + wbSpoken()
+      : "Building mode. Say add a battery, add a lamp, then wire it up.");
+    return;
+  }
+
   /* the ones that need no model at all */
   if(theSmallThings(question)){
-    hfSet(hf.want ? "hear" : "wait", hf.want ? "Listening…" : hfIdleLabel());
+    carryOn();
     return;
   }
 
   /* a request to open or close something, rather than a question */
   if(openByVoice(question)){
-    hfSet(hf.want ? "hear" : "wait", hf.want ? "Listening…" : hfIdleLabel());
+    carryOn();
     return;
   }
 
@@ -6090,6 +6883,11 @@ function hfAsk(question){
     hfSpeak("There's no key saved on this phone yet. Open settings and paste your Google key in.");
     return;
   }
+  /* a head start is only any use for the question it was started on */
+  clearTimeout(hf.draftWait);
+  hf.draftTries = 0;
+  if(hf.draft && (!draftable(question) || !draftFits(hf.draft.key, question))) hfDropDraft();
+
   hf.answering = false;
   hfHeard.textContent = "“" + question + "”";
   hfSaid.textContent = "";
@@ -6102,8 +6900,12 @@ function hfAsk(question){
   voiceMode = true;
   sayStop();
   var spoken = 0;
-  askStream(c, function(acc){
-    /* say each finished sentence while the rest is still being written */
+
+  /* whatever survived the check above is this question's head start */
+  var draft = hf.draft;
+  hf.draft = null;
+  /* say each finished sentence while the rest is still being written */
+  function outLoud(acc){
     var done = wholeSentences(acc);
     if(done.length > spoken){
       var chunk = done.slice(spoken);
@@ -6112,7 +6914,16 @@ function hfAsk(question){
       hfSaid.textContent = done;
       sayChunk(chunk);
     }
-  }).then(function(answer){
+  }
+  var run;
+  if(draft){
+    run = draft.p;
+    draft.hook = outLoud;
+    if(draft.acc) outLoud(draft.acc);   /* whatever is written already, say it now */
+  } else {
+    run = askStream(c, outLoud);
+  }
+  run.then(function(answer){
     voiceMode = false;
     if(answer.length > spoken) sayChunk(answer.slice(spoken));
     hfSaid.textContent = answer;
@@ -6120,19 +6931,9 @@ function hfAsk(question){
     hudLog("him", answer, false);
     hfSet("talk", "Speaking");
     hf.talking = true;
-    hf.turns++;
     /* it has been speaking all along - wait for the last sentence, do not
-       start the whole answer again */
-    sayWhenDone(function(){
-      hf.talking = false;
-      if(!hf.want) return;
-      /* straight back to listening - this is what makes it a conversation.
-         Saying the words is not enough: the microphone has to be started. */
-      hfSet("hear", "Listening…");
-      hfHeard.textContent = "";
-      hfListen();
-      hfQuietTimer();
-    });
+       start the whole answer again, then hand the microphone back */
+    sayWhenDone(function(){ carryOn(); });
     renderAll();
   }).catch(function(err){
     voiceMode = false;
@@ -6140,13 +6941,10 @@ function hfAsk(question){
     hf.talking = false;
     var why = String(err && err.message || err);
     hfSaid.textContent = why;
-    hfSet("talk", "Sorry");
-    /* the real reason, briefly - a timeout and a refusal are different problems */
-    hfSpeak(navigator.onLine ? why.slice(0, 120) : "I need a connection to answer that.",
-      function(){
-        hfSet(hf.want ? "hear" : "wait", hf.want ? "Listening…" : hfIdleLabel());
-        if(hf.want) hfQuietTimer();
-      });
+    /* the real reason, briefly - a timeout and a refusal are different problems.
+       Even a failure hands the microphone back: one bad answer should not cost
+       you the conversation. */
+    carryOn(navigator.onLine ? why.slice(0, 120) : "I need a connection to answer that.");
   });
 }
 
@@ -6184,10 +6982,10 @@ function wholeSentences(text){
 
 /* Read the answer as it comes. Falls back to asking once if anything about the
    streaming goes wrong, so a bad connection never means no answer. */
-function askStream(c, onText){
+function askStream(c, onText, ctl){
   if(isDevice() || !isGemini()) return askOnce(c);   /* only Gemini streams here */
   var req = buildRequest(c.messages);
-  abortCtl = new AbortController();
+  abortCtl = ctl || new AbortController();
 
   /* Give up rather than hang. Waiting for a first word that never comes is the
      one failure that looks exactly like thinking. */
@@ -6325,6 +7123,7 @@ hfOrb.addEventListener("click", function(){
   }
   if(hf.phase === "hear"){          /* pause it */
     hfPause();
+    hfDropDraft();
     hfSet("wait", "Paused - tap to carry on");
     return;
   }
@@ -6339,7 +7138,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.63";
+var BUILD = "2026-08-21.64";
 
 function banner(kind, html){
   var b = $("banner");
