@@ -1131,6 +1131,16 @@
       <div class="sw" id="swManner"></div>
     </div>
     <div class="field">
+      <label for="setPatience">How long he waits before answering</label>
+      <select id="setPatience">
+        <option value="quick">Quick &mdash; answers almost at once</option>
+        <option value="normal">Normal</option>
+        <option value="patient">Patient &mdash; leaves room to think mid-sentence</option>
+      </select>
+      <div class="hint">If he cuts you off while you are still talking, move this
+        down. If he feels slow to answer, move it up.</div>
+    </div>
+    <div class="field">
       <label for="setHeadsUp">A word before something starts</label>
       <select id="setHeadsUp">
         <option value="0">Never</option>
@@ -1468,6 +1478,7 @@ var DEF = {
   voiceName:"",    /* which of the phone's voices to speak with */
   home:null,       /* where he is: {lat, lon, name, country, byHand} */
   manner:"jarvis", /* "jarvis" - composed, British, brief - or "plain" */
+  patience:"normal", /* how long a silence means you have finished talking */
   headsUp:15,      /* minutes before something starts that he says so; 0 = never */
   elevenKey:"",    /* an ElevenLabs key of your own, if you want their voice */
   /* The voice Adam picked and asked for by id. It is from his own account, so
@@ -2020,6 +2031,7 @@ function fillSettings(){
     : "Clear the box to go back to choosing from the list.";
   sw($("swManner"), s.manner !== "plain");
   $("setHeadsUp").value = String(s.headsUp === undefined ? 15 : s.headsUp);
+  $("setPatience").value = s.patience || "normal";
   sw($("swFail"), s.autoFailover !== false);
   $("setEffort").value = s.effort;
   $("setAiName").value = s.aiName || "Pedro";
@@ -2414,6 +2426,7 @@ $("swManner").addEventListener("click", function(){
   sw(this, !on);
   toast(on ? "Plainer, friendlier." : "Composed, British, brief.");
 });
+bindInput("setPatience", "patience");
 bindInput("setHeadsUp", "headsUp", function(){
   store.settings.headsUp = parseInt(store.settings.headsUp, 10) || 0;
   save();
@@ -3646,6 +3659,9 @@ function buildRequest(msgs){
     msgs = [{ role:"user", content:"Earlier in this conversation: " + past, t:0 },
             { role:"assistant", content:"Understood.", t:0 }].concat(msgs);
   }
+  /* Which question the memories and the tool list are chosen for. It has to be
+     the one being asked - keyed to the previous one, he answers with what was
+     relevant last time. */
   for(var i = msgs.length - 1; i >= 0; i--)
     if(msgs[i].role === "user"){ lastUserText = msgs[i].content || ""; break; }
   /* falling through to Claude for a provider that is not Claude produced a key
@@ -7402,7 +7418,21 @@ var MEMORY_RULES = [
   { re: /i (?:prefer|always|usually)\s+([^.!?,;]{2,60})/i,
     say: function(m){ return "They usually " + m[1].trim() + "."; } },
   { re: /i have (?:a|an)\s+([^.!?,;]{2,40})/i,
-    say: function(m){ return "They have a " + m[1].trim() + "."; } }
+    say: function(m){ return "They have a " + m[1].trim() + "."; } },
+  { re: /i(?:\'m| am) allergic to\s+([^.!?,;]{2,40})/i,
+    say: function(m){ return "They are allergic to " + m[1].trim() + "."; } },
+  { re: /i (?:don\'t|do not|never) (?:like|eat|drink|use|watch)\s+([^.!?,;]{2,50})/i,
+    say: function(m){ return "They avoid " + m[1].trim() + "."; } },
+  { re: /i (?:speak|can speak)\s+([^.!?,;]{2,40})/i,
+    say: function(m){ return "They speak " + m[1].trim() + "."; } },
+  /* The general one. Ten narrow patterns missed "my sister's birthday is on
+     the 3rd of June", which is how most facts about a life are actually said.
+     It goes last so a more particular rule phrases it better first. */
+  { re: /\bmy ([a-z][a-z\'\- ]{1,30}?) (?:is|are|was)\s+([^.!?;]{2,60})/i,
+    say: function(m){ return "Their " + m[1].trim() + " is " + m[2].trim() + "."; } },
+  /* and the same about somebody they named */
+  { re: /\b([A-Z][a-z]{1,14})\'s ([a-z][a-z ]{1,24}?) (?:is|are|was)\s+([^.!?;]{2,60})/,
+    say: function(m){ return m[1] + "\'s " + m[2].trim() + " is " + m[3].trim() + "."; } }
 ];
 
 /* said outright - this wins over the patterns, and keeps the words as given */
@@ -7961,6 +7991,52 @@ function rightNow(said){
     return true;
   }
   return false;
+}
+
+/* ---- what the patterns missed ----
+   No list of patterns is ever complete, so the model is asked too. It happens
+   after the answer has been spoken, so it costs nothing anyone is waiting for,
+   and only when the words looked like a statement that the rules did not
+   already catch - most turns cost nothing at all. */
+var MEM_SKIP = /^(?:what|who|when|where|why|how|which|is|are|do|does|did|can|could|would|should|will|tell|show|give|find|play|open|stop|pause)\b/i;
+
+function worthAsking(said, alreadyGot){
+  var t = String(said || "").trim();
+  if(alreadyGot && alreadyGot.length) return false;   /* the rules had it */
+  if(t.length < 12 || t.length > 400) return false;
+  if(/\?\s*$/.test(t)) return false;                  /* a question is asking */
+  if(MEM_SKIP.test(t)) return false;                  /* so is this */
+  /* it has to be about them, or it is just conversation */
+  return /\b(?:i|i\'m|im|my|me|mine|we|our)\b/i.test(t);
+}
+
+function rememberHarder(said){
+  if(!worthAsking(said, null)) return;
+  if(!apiKeyNow() || isDevice()) return;      /* not worth a phone model's time */
+  var ask = {
+    messages: [{ role:"user", t: Date.now(), content:
+      "From this one sentence, list any lasting facts about the person worth " +
+      "remembering - names, people, places, dates, preferences, what they are " +
+      "working on. Ignore anything about right now, anything temporary, and " +
+      "anything that is a request rather than a fact. Write each as one short " +
+      "sentence in the third person, one per line, no bullets and no other " +
+      "words. If there is nothing lasting, reply with the single word: none." +
+      String.fromCharCode(10, 10) + "Sentence: " + String(said).slice(0, 400) }]
+  };
+  var was = voiceMode;
+  voiceMode = false;
+  askOnce(ask).then(function(answer){
+    voiceMode = was;
+    var lines = String(answer || "").split(String.fromCharCode(10));
+    var kept = [];
+    lines.forEach(function(line){
+      var t = line.replace(/^[-*\d.\s]+/, "").trim();
+      if(!t || t.length < 6 || t.length > 160) return;
+      if(/^none\b/i.test(t)) return;
+      if(addMemory(t)) kept.push(t);
+    });
+    if(kept.length) hudLog("him", "Remembered: " + kept.join("; "), false);
+  }).catch(function(){ voiceMode = was; });
 }
 
 /* ==================== keeping a note of trouble ====================
@@ -8984,7 +9060,7 @@ function backupData(){
       localUrl:s.localUrl, localModel:s.localModel,
       effort:s.effort, tts:s.tts, voiceName:s.voiceName, voiceTalk:s.voiceTalk,
       volume:s.volume, rate:s.rate, elevenKey:s.elevenKey, elevenVoice:s.elevenVoice,
-      manner:s.manner, headsUp:s.headsUp, mood:s.mood, home:s.home,
+      manner:s.manner, headsUp:s.headsUp, mood:s.mood, home:s.home, patience:s.patience,
       panelSpots:s.panelSpots, panelSizes:s.panelSizes,
       voiceByHand:s.voiceByHand, voiceMoved:s.voiceMoved,
       background:s.background, voiceFirst:s.voiceFirst, enterSends:s.enterSends,
@@ -9544,23 +9620,49 @@ function stillGoing(text){
   return HF_HANGING.indexOf(last) > -1;
 }
 
+/* How long a silence has to be before he takes it as you having finished.
+   Everyone pauses differently, so it is a setting rather than my guess. */
+var PATIENCE = {
+  quick:   { min: 450,  mid: 700,  max: 1200 },
+  normal:  { min: 700,  mid: 1000, max: 1700 },
+  patient: { min: 1000, mid: 1500, max: 2600 }
+};
+function patienceNow(){
+  return PATIENCE[store.settings.patience] || PATIENCE.normal;
+}
+
+/* A sentence that has clearly landed can be answered sooner; one that has
+   obviously not can wait. Two words is almost never a whole question - it is
+   usually the start of one, and cutting in there is the thing he complained
+   about. */
+function settleFor(text){
+  var pace = patienceNow();
+  var t = String(text || "").trim();
+  if(!t) return pace.max;
+  var words = t.split(/\s+/).length;
+  if(stillGoing(t)) return pace.max;                  /* ends on and, but, because */
+  if(words <= 2 && !HF_SHORT_ASK.test(t)) return pace.max;
+  if(/[?.!]$/.test(t) && words >= 4) return pace.min;  /* it landed */
+  if(words >= 8) return pace.mid;
+  return Math.round((pace.mid + pace.max) / 2);
+}
+
 function hfSettle(text){
   clearTimeout(hf.settle);
+  var waitFor = settleFor(text);
   hf.settle = setTimeout(function(){
     var q = String(text || "").trim();
     if(!q || !hf.want || hf.phase !== "hear") return;
     if(!worthAnswering(q)){          /* caught in passing - let it go quietly */
+      hf.said = "";
       hfHeard.textContent = "";
       hfDropDraft();
       hfQuietTimer();
       return;
     }
+    hf.said = "";                    /* this question is on its way */
     hfAsk(q);
-    /* Straight in when you have clearly finished. He has usually started on the
-       answer already, so this pause is the only thing left before he speaks. */
-    /* A pause in the middle of a sentence is often longer than a third of a
-       second, and cutting in there is worse than waiting a moment. */
-  }, stillGoing(text) ? 1100 : 620);
+  }, waitFor);
 }
 
 function hfHeardText(live, finalTxt){
@@ -9618,20 +9720,24 @@ function hfHeardText(live, finalTxt){
     }
 
     if(hf.phase === "hear"){
+      /* iOS calls a stretch of speech final on quite a short breath, so acting
+         on one straight away answered the first half of a sentence. It is
+         gathered instead, and a real silence is what ends the question - which
+         also means "text mum" then "that I am late" is one question, not two. */
       if(finalTxt.trim()){
-        clearTimeout(hf.settle);
-        if(!worthAnswering(finalTxt)){
-          hfHeard.textContent = "";
-          hfDropDraft();
-          hfQuietTimer();
-          return;
-        }
-        hfAsk(finalTxt.trim());
+        hf.said = (hf.said ? hf.said + " " : "") + finalTxt.trim();
+        hfHeard.textContent = hf.said;
+        hudLog("you", hf.said, true);
+        hfSettle(hf.said);
+        hfDraftHint(hf.said);
         return;
       }
       if(live){
-        hfSettle(live);
-        hfDraftHint(live);   /* start thinking about it before they have finished */
+        /* what has been settled already, plus what is being said now */
+        var sofar = (hf.said ? hf.said + " " : "") + live;
+        hfHeard.textContent = sofar;
+        hfSettle(sofar);
+        hfDraftHint(sofar);   /* start thinking about it before they have finished */
         return;
       }
       hfQuietTimer();
@@ -9674,6 +9780,7 @@ function carryOn(line){
     if(!hf.on) return;
     if(!hf.want){ hfSet("wait", hfIdleLabel()); return; }
     hf.turns++;
+    hf.said = "";                /* nothing carried over from the last question */
     hfSet("hear", "Listening - just ask");
     hfHeard.textContent = "";
     /* If something was said over the top of him it is still sitting in the
@@ -9931,6 +10038,7 @@ function hfPauseIt(){
 
 /* --- ask, then answer out loud --- */
 function hfAsk(question){
+  hf.said = "";                 /* this question is on its way - start again */
   clearTimeout(hf.quiet);
   /* the timers, not the microphone: it has to stay open to hear "stop" while
      he is thinking. Anything heard now that is not stop or pause is ignored. */
@@ -10028,6 +10136,15 @@ function hfAsk(question){
   hfHeard.textContent = "“" + question + "”";
   hfSaid.textContent = "";
   hfSet("busy", "Thinking…");
+
+  /* Anything worth keeping, written down before the question goes - so that it
+     is in the memory this very turn, not the one after. This was only ever
+     done for typed messages, so nothing said out loud was ever remembered. */
+  var learned = rememberFrom(question);
+  if(learned.length) hudLog("him", "Remembered: " + learned.join("; "), false);
+  /* and what the patterns missed, once he has finished speaking - so nothing
+     anyone is waiting for is held up by it */
+  else setTimeout(function(){ rememberHarder(question); }, 2500);
 
   var c = activeChat() || newChat();
   c.messages.push({ role:"user", content:question, t:Date.now() });
@@ -10335,7 +10452,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.88";
+var BUILD = "2026-08-21.89";
 
 function banner(kind, html){
   var b = $("banner");

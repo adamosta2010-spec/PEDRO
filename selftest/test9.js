@@ -119,7 +119,7 @@ t("not on a provider that cannot stream",
   const has = s => src.indexOf(s) > -1;
   const ask = grab("hfAsk");
   t("the words being heard start him thinking",
-    grab("hfHeardText").indexOf("hfDraftHint(live)") > -1, true);
+    grab("hfHeardText").indexOf("hfDraftHint(sofar)") > -1, true);
   t("there is a beat before he starts, not on every syllable",
     /420/.test(grab("hfDraftHint")), true);
   t("a draft says nothing by itself", grab("hfDraftStart").indexOf("sayChunk") === -1, true);

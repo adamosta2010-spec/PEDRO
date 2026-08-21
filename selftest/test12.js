@@ -41,12 +41,12 @@ const t = (n, g, w) => {
 
   const settle = grab("hfSettle");
   t("he no longer waits most of a second", settle.indexOf("}, 900);") === -1, true);
-  /* 380ms was too eager - a natural pause mid-sentence is often longer than
-     that, and cutting in there is worse than waiting a moment */
-  t("a finished sentence is answered promptly",
-    settle.indexOf("stillGoing(text) ? 1100 : 620") > -1, true);
-  t("but somebody mid-sentence is given much longer",
-    settle.indexOf("1100") > -1, true);
+  /* how long a silence has to be is a setting now, and depends on what was
+     said - two words is usually the start of a sentence, not the end of one */
+  t("how long to wait is worked out, not fixed",
+    settle.indexOf("settleFor(text)") > -1, true);
+  t("and it is no longer 620ms for everything",
+    settle.indexOf("stillGoing(text) ? 1100 : 620") > -1, false);
 }
 
 /* ---------- the ball stays put and changes pace ---------- */

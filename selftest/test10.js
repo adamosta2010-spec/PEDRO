@@ -54,8 +54,9 @@ t("so does a one word answer to his question", worth("yes"), true);
   const has = s => src.indexOf(s) > -1;
   t("a settled noise is dropped rather than asked",
     grab("hfSettle").indexOf("worthAnswering(q)") > -1, true);
+  /* the check moved into hfSettle, which everything now goes through */
   t("a finished noise is dropped too",
-    grab("hfHeardText").indexOf("worthAnswering(finalTxt)") > -1, true);
+    grab("hfSettle").indexOf("worthAnswering(q)") > -1, true);
   t("and he does not start thinking about one",
     grab("draftable").indexOf("worthAnswering(s)") > -1, true);
   t("dropping one leaves him listening, not stuck",

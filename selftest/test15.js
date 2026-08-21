@@ -177,9 +177,11 @@ const has = s => src.indexOf(s) > -1;
   const settle = grab("hfSettle");
   t("a pause mid-sentence is no longer taken as the end",
     settle.indexOf("380") === -1, true);
-  t("it waits a beat", settle.indexOf("620") > -1, true);
+  /* the wait is worked out from what was said, and how patient he is told to
+     be - a fixed number could only ever suit one person */
+  t("it waits a beat", settle.indexOf("settleFor(text)") > -1, true);
   t("and much longer when the sentence is plainly unfinished",
-    settle.indexOf("1100") > -1, true);
+    grab("settleFor").indexOf("if(stillGoing(t)) return pace.max;") > -1, true);
   const hanging = new Function(decl("HF_HANGING") + " return HF_HANGING;")();
   t("there are plenty of words that mean he is still going", hanging.length > 60, true);
   ["about", "into", "really", "want", "three"].forEach(w =>

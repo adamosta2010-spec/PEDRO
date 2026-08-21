@@ -89,7 +89,7 @@ t("and no setting for which model drew them", src.indexOf("imageModel") > -1, fa
   t("it listens again after Apple stops itself on a pause", inIt(nat, "setTimeout(hfListen"), true);
   t("a blocked microphone ends the loop instead of spinning", inIt(nat, "hf.want = false"), true);
   t("both recognisers share the wake-word logic", inIt(heard, "wakeRe()"), true);
-  t("the shared handler still asks the question", inIt(heard, "hfAsk("), true);
+  t("the shared handler still gathers what was said", inIt(heard, "hf.said"), true);
   t("pausing stops the native microphone too", inIt(pause, "nativeMicStop()"), true);
   t("closing stops the native microphone too", inIt(close, "nativeMicStop()"), true);
 }
@@ -274,14 +274,14 @@ function nativeFrom(cap, exp){
   const settle = grab("hfSettle");
   const inIt = (src, bit) => src.indexOf(bit) > -1;
 
-  t("a pause is what sends the question", inIt(heard, "hfSettle(live)"), true);
-  /* this used to pin the exact one-liner; the branch now has the noise guard
-     in it, so check what it does rather than how it is laid out */
-  t("it no longer waits for a final marker that never comes",
-    inIt(heard, "if(finalTxt.trim()){") && inIt(heard, "clearTimeout(hf.settle);") &&
-    inIt(heard, "hfAsk(finalTxt.trim());"), true);
-  t("but a noise picked up in passing is not asked",
-    inIt(heard, "worthAnswering(finalTxt)"), true);
+  /* iOS calls a stretch of speech final on quite a short breath, so acting on
+     one straight away answered the first half of a sentence. A final is now a
+     hint that you stopped, not proof that you finished. */
+  t("a pause is what sends the question", inIt(heard, "hfSettle(sofar)"), true);
+  t("a final is gathered rather than acted on",
+    inIt(heard, "hf.said = (hf.said ? hf.said") && !inIt(heard, "hfAsk(finalTxt.trim());"), true);
+  t("and a noise picked up in passing is still not asked",
+    grab("hfSettle").indexOf("worthAnswering(q)") > -1, true);
   t("a question in one breath is sent too", inIt(heard, "hfSettle(after)"), true);
   t("the wake word alone still just answers", inIt(heard, "Yeah?"), true);
 

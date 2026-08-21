@@ -591,5 +591,81 @@ const has = s => src.indexOf(s) > -1;
 }
 
 
+/* ---------- being cut off, and being remembered ---------- */
+{
+  /* iOS calls a stretch of speech final on quite a short breath, so acting on
+     one straight away answered the first half of a sentence - and several
+     finals for one sentence each started their own question. */
+  const heard = grab("hfHeardText");
+  t("a final is gathered rather than acted on",
+    heard.indexOf('hf.said = (hf.said ? hf.said + " " : "") + finalTxt.trim()') > -1, true);
+  t("so it never asks straight off a final", heard.indexOf("hfAsk(finalTxt.trim())") > -1, false);
+  t("and what is being said now is added to it",
+    heard.indexOf('var sofar = (hf.said ? hf.said + " " : "") + live') > -1, true);
+  t("what was gathered is cleared when the question goes",
+    grab("hfAsk").indexOf('hf.said = "";') > -1, true);
+  t("and when the microphone comes back",
+    grab("carryOn").indexOf('hf.said = "";') > -1, true);
+
+  const PATIENCE = new Function(decl("PATIENCE") + " return PATIENCE;")();
+  t("how long a silence has to be is a setting", !!PATIENCE.normal, true);
+  t("quick is quicker than normal", PATIENCE.quick.mid < PATIENCE.normal.mid, true);
+  t("and patient is longer", PATIENCE.patient.mid > PATIENCE.normal.mid, true);
+  t("even quick leaves longer than it used to", PATIENCE.quick.mid > 620, true);
+
+  const settleFor = new Function("store", "HF_SHORT_ASK", "HF_HANGING",
+    decl("PATIENCE") + grab("patienceNow") + grab("stillGoing") + grab("settleFor") +
+    " return settleFor;")({ settings:{ patience:"normal" } },
+      /^(?:why|how|what)\b/i, ["and", "but", "because", "so"]);
+  t("a sentence ending on 'and' gets the longest wait",
+    settleFor("tell me about dogs and"), PATIENCE.normal.max);
+  t("two words gets the longest wait too - it is usually the start of something",
+    settleFor("text mum"), PATIENCE.normal.max);
+  t("but a short follow-up is answered sooner",
+    settleFor("why?") < PATIENCE.normal.max, true);
+  t("a question that has clearly landed is answered soonest",
+    settleFor("what is the capital of France?"), PATIENCE.normal.min);
+  t("and nothing at all waits the longest", settleFor(""), PATIENCE.normal.max);
+
+  /* Nothing said out loud was ever remembered: rememberFrom was only called
+     from send(), the typed path. */
+  t("what he says out loud is remembered too",
+    grab("hfAsk").indexOf("rememberFrom(question)") > -1, true);
+  t("before the question goes, so it is there this turn and not the next",
+    grab("hfAsk").indexOf("rememberFrom(question)") <
+    grab("hfAsk").indexOf('c.messages.push({ role:"user", content:question'), true);
+
+  const RULES = new Function(decl("MEMORY_RULES") + " return MEMORY_RULES;")();
+  const rf = new Function("MEMORY_RULES", "REMEMBER_RE", "FORGET_RE", "addMemory", "forgetMemory",
+    grab("rememberFrom") + " return rememberFrom;");
+  const got = [];
+  const run = rf(RULES, /^remember (?:that )?(.+)/i, /^forget (.+)/i,
+    x => { got.push(x); return true; }, () => 0);
+  const said = s => { got.length = 0; run(s); return got.slice(); };
+  /* ten narrow patterns missed the way most facts about a life are said */
+  t("my sister's birthday is remembered",
+    said("my sister's birthday is on the 3rd of June")[0],
+    "Their sister's birthday is on the 3rd of June.");
+  t("so is my dog's name", said("my dog is called Rex").length > 0, true);
+  t("and a fact about somebody named",
+    said("Marcus's favourite food is sushi")[0], "Marcus's favourite food is sushi.");
+  t("an allergy is worth keeping", said("I am allergic to peanuts").length > 0, true);
+  t("but a question is not a statement", said("what is the capital of France?").length, 0);
+  t("nor is an instruction", said("play some music").length, 0);
+
+  /* no list of patterns is ever complete, so the model is asked too */
+  t("the model is asked as well", has("function rememberHarder"), true);
+  t("only when the patterns found nothing",
+    grab("hfAsk").indexOf("else setTimeout(function(){ rememberHarder(question); }") > -1, true);
+  t("and after he has finished speaking, so nothing waits on it",
+    grab("hfAsk").indexOf("}, 2500);") > -1, true);
+  const worth = new Function("MEM_SKIP", decl("MEM_SKIP") + grab("worthAsking") + " return worthAsking;")();
+  t("a question is never sent to it", worth("what is the capital of france?"), false);
+  t("nor an instruction", worth("play some music for me now"), false);
+  t("nor something with nothing personal in it", worth("the sky is blue today"), false);
+  t("but something about them is", worth("my sister just moved to Berlin"), true);
+}
+
+
 console.log(fail ? NL + fail + " FAILURES" : NL + "All " + pass + " JARVIS tests passed");
 process.exit(fail ? 1 : 0);
