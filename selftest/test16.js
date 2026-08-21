@@ -504,5 +504,56 @@ const has = s => src.indexOf(s) > -1;
 }
 
 
+/* ---------- the answers show what they found ---------- */
+{
+  const page = fs.readFileSync("index.html", "utf8");
+  const inPage = s => page.indexOf(s) > -1;
+
+  /* Asking the time and only hearing it wastes a screen. */
+  t("there is a card for what he found", inPage('data-panel="answer"'), true);
+  t("it is one of the panels, so it is themed with everything else",
+    inPage('<div class="hudpanel" data-panel="answer">'), true);
+  t("filled in from one place", has("function showCard"), true);
+  t("with the values put in as text, never as markup",
+    grab("showCard").indexOf("innerHTML") === grab("showCard").lastIndexOf("innerHTML"), true);
+  t("and an empty row is left out rather than drawn blank",
+    grab("showCard").indexOf("if(!r || (!r.label && !r.value)) return;") > -1, true);
+
+  const rn = grab("rightNow");
+  ["Time", "Date", "Battery", "Coming up"].forEach(k =>
+    t('"' + k + '" gets a card', rn.indexOf('showCard("' + k + '"') > -1, true));
+  t("the weather gets its own, with the numbers laid out",
+    has("function weatherCard"), true);
+  t("wind and humidity too, which the spoken answer leaves out",
+    grab("weatherCard").indexOf("relative_humidity_2m") > -1, true);
+  t("and the briefing shows the diary rather than only saying the first",
+    grab("briefNow").indexOf("diaryNext(24, 4)") > -1, true);
+
+  /* moved and resized */
+  t("every panel gets a corner to resize by",
+    grab("showHudPanel").indexOf('grip.className = "hgrip"') > -1, true);
+  t("added once, not on every open",
+    grab("showHudPanel").indexOf('if(!panel.querySelector(".hgrip"))') > -1, true);
+  t("the corner is read before the panel, or it would just move",
+    grab("handsOn").indexOf('ev.target.closest(".hgrip")') > -1, true);
+  t("resizing does not move it", grab("handsOn").indexOf("wasSize.w + (ev.clientX - at.x)") > -1, true);
+  t("it cannot be shrunk to nothing", grab("handsOn").indexOf("Math.max(150") > -1, true);
+  t("nor grown past the screen", grab("handsOn").indexOf("window.innerWidth - 20") > -1, true);
+  t("the size is remembered", has("function panelSize"), true);
+  t("and given back next time", grab("showHudPanel").indexOf("panel.style.width = was.w") > -1, true);
+  t("and carried to a new install", has("panelSizes:s.panelSizes"), true);
+
+  /* it could only ever be done inside the app, which is not where it gets tested */
+  t("picking things up is set up when the voice screen opens",
+    grab("hfOpen").indexOf("handsOn();") > -1, true);
+  t("and only once, or there would be two of every listener",
+    grab("handsOn").indexOf("if(handsAreOn) return;") > -1, true);
+
+  /* and the words under the ball stop competing with it */
+  t("the words under the ball are smaller", inPage("#hfState{font-size:10.5px"), true);
+  t("and so is what he heard you say", inPage("#hfHeard{color:var(--tx);font-size:14.5px"), true);
+}
+
+
 console.log(fail ? NL + fail + " FAILURES" : NL + "All " + pass + " JARVIS tests passed");
 process.exit(fail ? 1 : 0);

@@ -387,6 +387,22 @@
   .hudpanel[data-panel].on.grow{max-height:44vh}
   .hudpanel[data-panel].on.held{cursor:grabbing;
     border-color:color-mix(in srgb,var(--hud) 70%,transparent)}
+  /* Every panel can be resized, not only moved. The grip is the bottom-right
+     corner, which the clipped shape already points at. */
+  .hudpanel[data-panel].on{overflow:hidden}
+  .hudpanel[data-panel].on .hgrip{display:block}
+  .hgrip{display:none;position:absolute;right:0;bottom:0;width:26px;height:26px;
+    cursor:nwse-resize;touch-action:none;z-index:2}
+  .hgrip::after{content:"";position:absolute;right:6px;bottom:6px;width:9px;height:9px;
+    border-right:2px solid color-mix(in srgb,var(--hud) 70%,transparent);
+    border-bottom:2px solid color-mix(in srgb,var(--hud) 70%,transparent)}
+  .hudpanel[data-panel].sizing{border-color:color-mix(in srgb,var(--hud) 70%,transparent)}
+  /* the card scrolls rather than growing without limit */
+  .hudpanel[data-panel="answer"].on{overflow-y:auto;-webkit-overflow-scrolling:touch}
+  #cardBig:empty{display:none}
+  #cardNote:empty{display:none}
+  #cardRows:empty{display:none}
+  #cardRows .hrow:last-child{border-bottom:0}
   /* the columns are only a place to keep them when nothing is shown */
   .hudcol{pointer-events:none}
   .hudpanel[data-panel].on{pointer-events:auto}
@@ -529,11 +545,11 @@
   #orbInfoText{font-size:13px;line-height:1.5;color:var(--tx)}
 
   /* HUD lettering: spaced, upright, quiet */
-  #hfState{font-size:13px;font-weight:700;letter-spacing:.26em;text-transform:uppercase;
+  #hfState{font-size:10.5px;font-weight:700;letter-spacing:.24em;text-transform:uppercase;
     color:var(--hud);position:relative;z-index:1}
-  #hfHeard{color:var(--tx);font-size:19px;min-height:52px;max-width:520px;line-height:1.4;
+  #hfHeard{color:var(--tx);font-size:14.5px;min-height:38px;max-width:420px;line-height:1.4;
     z-index:1;font-weight:500}
-  #hfSaid{color:var(--tx2);font-size:15.5px;max-width:560px;line-height:1.6;min-height:24px;z-index:1}
+  #hfSaid{color:var(--tx2);font-size:12.5px;max-width:440px;line-height:1.55;min-height:0;z-index:1}
   /* Scaled back by however much the ball was scaled up, so the words keep their
      own size - and moved on their own when you drag them. */
   #hfWords{display:flex;flex-direction:column;align-items:center;gap:6px;
@@ -1303,6 +1319,12 @@
         <div class="hrow"><span>Microphone</span><b id="hudMic">&mdash;</b></div>
         <div class="hrow"><span>Background</span><b id="hudBg">&mdash;</b></div>
         <div class="hrow"><span>Build</span><b id="hudBuild">&mdash;</b></div>
+      </div>
+      <div class="hudpanel" data-panel="answer">
+        <div class="hlabel" id="cardTitle">Answer</div>
+        <div class="hbig" id="cardBig"></div>
+        <div id="cardRows"></div>
+        <div class="hsub" id="cardNote"></div>
       </div>
       <div class="hudpanel grow" data-panel="transcript" hidden>
         <div class="hlabel">Transcript</div>
@@ -7531,9 +7553,12 @@ function gripMiddle(){
   return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
 }
 
+var handsAreOn = false;
 function handsOn(){
   var orb = $("hfOrb");
   if(!orb) return;
+  if(handsAreOn) return;          /* twice would mean two of every listener */
+  handsAreOn = true;
   orb.style.touchAction = "none";
 
   orb.addEventListener("pointerdown", function(ev){
@@ -7579,10 +7604,27 @@ function handsOn(){
   orb.addEventListener("pointerup", letGo);
   orb.addEventListener("pointercancel", letGo);
 
-  /* every panel that is showing can be picked up */
+  /* every panel that is showing can be picked up, and resized by its corner */
   var held = null, from = { x:0, y:0 }, at = { x:0, y:0 };
+  var sizing = null, wasSize = { w:0, h:0 };
   var SHOWN = ".hudpanel[data-panel].on";
   document.addEventListener("pointerdown", function(ev){
+    /* the corner grip first - it sits inside the panel, so it would otherwise
+       be read as picking the panel up */
+    var grip = ev.target.closest ? ev.target.closest(".hgrip") : null;
+    if(grip){
+      var owner = grip.closest(SHOWN);
+      if(owner){
+        sizing = owner;
+        owner.classList.add("sizing");
+        var b = owner.getBoundingClientRect();
+        wasSize = { w: b.width, h: b.height };
+        at = { x: ev.clientX, y: ev.clientY };
+        try{ grip.setPointerCapture(ev.pointerId); }catch(e){}
+        ev.preventDefault();
+        return;
+      }
+    }
     var panel = ev.target.closest ? ev.target.closest(SHOWN) : null;
     if(!panel) return;
     held = panel;
@@ -7593,6 +7635,15 @@ function handsOn(){
     try{ panel.setPointerCapture(ev.pointerId); }catch(e){}
   });
   document.addEventListener("pointermove", function(ev){
+    if(sizing){
+      /* small enough to still be a panel, large enough to be worth resizing */
+      var w = Math.max(150, Math.min(window.innerWidth - 20, wasSize.w + (ev.clientX - at.x)));
+      var hgt = Math.max(70, Math.min(window.innerHeight - 20, wasSize.h + (ev.clientY - at.y)));
+      sizing.style.width = Math.round(w) + "px";
+      sizing.style.height = Math.round(hgt) + "px";
+      sizing.style.maxHeight = "none";
+      return;
+    }
     if(!held) return;
     var x = Math.max(4, Math.min(window.innerWidth - 60, from.x + (ev.clientX - at.x)));
     var y = Math.max(4, Math.min(window.innerHeight - 40, from.y + (ev.clientY - at.y)));
@@ -7601,6 +7652,12 @@ function handsOn(){
     held.style.right = "auto";
   });
   document.addEventListener("pointerup", function(){
+    if(sizing){
+      sizing.classList.remove("sizing");
+      panelSize(sizing.dataset.panel, sizing.style.width, sizing.style.height);
+      sizing = null;
+      return;
+    }
     if(!held) return;
     held.classList.remove("held");
     panelWhere(held.dataset.panel, held.style.left, held.style.top);
@@ -7613,6 +7670,12 @@ function panelWhere(name, left, top){
   spots[name] = { left: left, top: top };
   save();
 }
+/* how big it was left, which is remembered the same way as where it was left */
+function panelSize(name, w, hgt){
+  var sizes = store.settings.panelSizes || (store.settings.panelSizes = {});
+  sizes[name] = { w: w, h: hgt };
+  save();
+}
 
 /* show or hide one of the readouts by name */
 function showHudPanel(name, on){
@@ -7620,6 +7683,20 @@ function showHudPanel(name, on){
   if(!panel) return false;
   panel.classList.toggle("on", on !== false);
   if(on !== false){
+    /* the corner it is resized by, added once */
+    if(!panel.querySelector(".hgrip")){
+      var grip = document.createElement("span");
+      grip.className = "hgrip";
+      grip.setAttribute("aria-hidden", "true");
+      panel.appendChild(grip);
+    }
+    var sizes = store.settings.panelSizes || {};
+    var was = sizes[name];
+    if(was && was.w){
+      panel.style.width = was.w;
+      panel.style.height = was.h;
+      panel.style.maxHeight = "none";
+    }
     var spots = store.settings.panelSpots || {};
     var spot = spots[name];
     if(spot && spot.left){
@@ -7728,10 +7805,18 @@ function rightNow(said){
 
   if(NOW_RE.time.test(q)){
     var t = now.toLocaleTimeString(undefined, { hour:"numeric", minute:"2-digit" });
+    showCard("Time", t, [
+      { label:"Date", value: now.toLocaleDateString(undefined, { day:"numeric", month:"short" }) },
+      { label:"Day", value: now.toLocaleDateString(undefined, { weekday:"long" }) }
+    ], Intl.DateTimeFormat().resolvedOptions().timeZone);
     sayNow("It's " + t + ".");
     return true;
   }
   if(NOW_RE.date.test(q)){
+    showCard("Date", now.toLocaleDateString(undefined, { day:"numeric", month:"long" }), [
+      { label:"Day", value: now.toLocaleDateString(undefined, { weekday:"long" }) },
+      { label:"Year", value: now.getFullYear() }
+    ]);
     sayNow("It's " + now.toLocaleDateString(undefined,
       { weekday:"long", day:"numeric", month:"long", year:"numeric" }) + ".");
     return true;
@@ -7742,6 +7827,8 @@ function rightNow(said){
   }
   if(NOW_RE.weather.test(q)){
     hfSet("busy", "Looking outside");
+    /* the numbers are worth looking at, not only hearing */
+    whereIsIt("").then(weatherCard).catch(function(){});
     toolRun({ tool:"weather.now", args:{} }).then(function(r){
       sayNow(r.ok ? r.said : String(r.said));
     });
@@ -7778,6 +7865,9 @@ function rightNow(said){
   }
   if(NOW_RE.battery.test(q)){
     batteryNow().then(function(b){
+      showCard("Battery", b.percent + "%", [
+        { label:"State", value: b.charging ? "Charging" : "On battery" }
+      ], b.low ? "You may want a charger." : "");
       sayNow(b.said);
     }).catch(function(){
       sayNow("The phone will not tell me the battery from in here.");
@@ -7791,7 +7881,13 @@ function rightNow(said){
   }
   if(NOW_RE.next.test(q)){
     hfSet("busy", "Checking the diary");
-    diaryNext(12, 1).then(function(list){
+    diaryNext(12, 4).then(function(list){
+      showCard("Coming up", "", list.length ? list.map(function(e){
+        return { label: e.title, value: e.allDay ? "all day"
+          : typeof e.inMinutes === "number" && e.inMinutes < 60 ? "in " + e.inMinutes + "m"
+          : new Date(Date.now() + (e.inMinutes || 0) * 60000)
+              .toLocaleTimeString(undefined, { hour:"numeric", minute:"2-digit" }) };
+      }) : [{ label:"Nothing today", value:"" }]);
       sayNow(list.length ? capFirst(eventSaid(list[0])) : capFirst("nothing else today."));
     }).catch(function(){
       sayNow("I cannot read the calendar from here - that one needs the app.");
@@ -7967,6 +8063,28 @@ function briefNow(){
     })
   ];
   var left = timerLeft();
+  /* the same things, laid out - the briefing is the one worth looking at */
+  Promise.all([
+    whereIsIt("").then(weatherCard).catch(function(){ return null; }),
+    diaryNext(24, 4).catch(function(){ return []; }),
+    batteryNow().catch(function(){ return null; })
+  ]).then(function(got){
+    var events = got[1] || [], bat = got[2];
+    var rows = events.map(function(e){
+      return { label: e.title, value: e.allDay ? "all day"
+        : typeof e.inMinutes === "number" && e.inMinutes < 60 ? e.inMinutes + "m"
+        : new Date(Date.now() + (e.inMinutes || 0) * 60000)
+            .toLocaleTimeString(undefined, { hour:"numeric", minute:"2-digit" }) };
+    });
+    if(!rows.length) rows.push({ label:"Diary", value:"clear" });
+    if(bat) rows.push({ label:"Battery", value: bat.percent + "%" +
+      (bat.charging ? ", charging" : "") });
+    if(left) rows.push({ label:"Timer", value: left });
+    showCard(partOfDay().replace("Good ", ""),
+      now.toLocaleTimeString(undefined, { hour:"numeric", minute:"2-digit" }),
+      rows, now.toLocaleDateString(undefined, { weekday:"long", day:"numeric", month:"long" }));
+  });
+
   Promise.all(parts).then(function(bits){
     if(left) bits.push("Your timer has " + left + ".");
     var said = [head].concat(bits.filter(function(x){ return x; })).join(" ");
@@ -8085,6 +8203,62 @@ function watchBattery(){
     hfSpeak("Battery is down to " + b.percent + " percent" + sir + ".");
     hudLog("him", "Battery " + b.percent + "%", false);
   }).catch(function(){});
+}
+
+/* ==================== showing what he found ====================
+   Hearing the weather is one thing; the numbers are worth looking at. Every
+   instant answer puts what it found on a card as well as saying it. It is one
+   of the panels that already exist, so it is themed, movable and resizable
+   with everything else. */
+function showCard(title, big, rows, note){
+  var panel = document.querySelector('.hudpanel[data-panel="answer"]');
+  if(!panel) return;
+  hudSet("cardTitle", title || "Answer");
+  hudSet("cardBig", big || "");
+  hudSet("cardNote", note || "");
+  var body = $("cardRows");
+  if(body){
+    body.innerHTML = "";
+    (rows || []).forEach(function(r){
+      if(!r || (!r.label && !r.value)) return;
+      var line = document.createElement("div");
+      line.className = "hrow";
+      var l = document.createElement("span");
+      l.textContent = String(r.label || "");
+      var v = document.createElement("b");
+      v.textContent = String(r.value === undefined || r.value === null ? "" : r.value);
+      line.appendChild(l); line.appendChild(v);
+      body.appendChild(line);
+    });
+  }
+  showHudPanel("answer", true);
+}
+
+/* The weather in full. weatherAt says it in a sentence; this is the same
+   numbers laid out, which is what a screen is for. */
+function weatherCard(spot){
+  return fetch("https://api.open-meteo.com/v1/forecast?latitude=" + spot.lat +
+               "&longitude=" + spot.lon +
+               "&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,relative_humidity_2m" +
+               "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max" +
+               "&forecast_days=1&timezone=auto")
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      var now = j && j.current;
+      if(!now) return;
+      var d = j.daily || {};
+      showCard("Weather", Math.round(now.temperature_2m) + "°", [
+        { label:"Feels like", value: Math.round(now.apparent_temperature) + "°" },
+        { label:"Sky", value: SKY[now.weather_code] || "hard to say" },
+        { label:"High / low", value: d.temperature_2m_max
+            ? Math.round(d.temperature_2m_max[0]) + "° / " + Math.round(d.temperature_2m_min[0]) + "°"
+            : "—" },
+        { label:"Rain", value: d.precipitation_probability_max
+            ? d.precipitation_probability_max[0] + "%" : "0%" },
+        { label:"Wind", value: Math.round(now.wind_speed_10m) + " km/h" },
+        { label:"Humidity", value: now.relative_humidity_2m + "%" }
+      ], spot.name + (spot.country ? ", " + spot.country : ""));
+    });
 }
 
 /* say it, write it down, and hand the microphone straight back */
@@ -8768,6 +8942,7 @@ function backupData(){
       effort:s.effort, tts:s.tts, voiceName:s.voiceName, voiceTalk:s.voiceTalk,
       volume:s.volume, rate:s.rate, elevenKey:s.elevenKey, elevenVoice:s.elevenVoice,
       manner:s.manner, headsUp:s.headsUp, mood:s.mood, home:s.home,
+      panelSpots:s.panelSpots, panelSizes:s.panelSizes,
       voiceByHand:s.voiceByHand,
       background:s.background, voiceFirst:s.voiceFirst, enterSends:s.enterSends,
       showThink:s.showThink, theme:s.theme, authEmail:s.authEmail
@@ -9016,6 +9191,9 @@ function hfOpen(){
   hfEl.classList.add("on");
   hfHeard.textContent = ""; hfSaid.textContent = "";
   hudSync();
+  /* the panels are picked up and resized on this screen, so this is where it
+     belongs - it used to be set up only inside the app */
+  handsOn();
 
   if(!nativeMicSupported()){
     hf.want = false;
@@ -10114,7 +10292,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.86";
+var BUILD = "2026-08-21.87";
 
 function banner(kind, html){
   var b = $("banner");
