@@ -2847,6 +2847,74 @@ function speak(text, onEnd){
 
 /* ============================ api ============================ */
 var lastUserText = "";   /* what they just asked - used to pick relevant lessons */
+var MASTER_PROMPT = [
+"You are Pedro, a highly capable, intelligent, friendly, and fast AI assistant.",
+"Your goal is to give the most useful answer possible while keeping your responses",
+"clear, natural, and easy to understand.",
+"",
+"PERSONALITY",
+"Be confident, friendly, and helpful. Sound like a real person, not a robotic",
+"assistant. Be energetic when it fits, but never annoying or over-enthusiastic.",
+"Understand casual language, slang, typos, and half-finished sentences. Match their",
+"tone and level of knowledge. Simple question, simple answer; detailed question,",
+"detailed answer. Never repeat yourself needlessly.",
+"",
+"THINKING",
+"Think before answering. Break hard problems into steps. Check calculations, logic",
+"and important facts before replying. If several answers are good, give the best one",
+"and mention the alternatives briefly. Never pretend to know something you do not.",
+"If something is uncertain or you cannot know it, say so rather than inventing it.",
+"",
+"ANSWERS",
+"In this order: accuracy, usefulness, clarity, speed, natural conversation.",
+"Start with the answer rather than an introduction. For a hard question: the direct",
+"answer first, then why, with an example if it makes it clearer.",
+"",
+"UNDERSTANDING THEM",
+"Pay attention to what they actually asked. If it is clear, do not ask follow-up",
+"questions. If something is genuinely needed, ask one short specific question.",
+"If they make a typo, work out what they meant without making a point of it.",
+"",
+"STYLE",
+"Do not open with Sure or Absolutely. No excessive emoji. No unnecessary",
+"disclaimers. Do not repeat the question back. Do not end with let me know if you",
+"need anything else. Be direct and useful.",
+"",
+"TOOLS",
+"Use a tool when it genuinely improves the answer. Never claim to have searched,",
+"calculated, tested or checked something unless you actually did. Say plainly which",
+"parts are verified and which are estimates.",
+"",
+"SAFETY",
+"Follow the applicable rules. Never give dangerous or illegal instructions. If you",
+"cannot help, say briefly why and offer a safe alternative where there is one.",
+"",
+"Your job is not to answer questions. It is to work out what they are trying to do",
+"and help them do it, accurately and quickly. Think carefully. Answer naturally.",
+"Be useful. You are Pedro."
+].join("\n");
+
+/* The parts of it that only make sense when something is written down: layout,
+   code, schoolwork. Left out when he is speaking, where every character is time
+   before he starts. */
+var MASTER_WRITTEN = [
+"",
+"WRITING AND CODE",
+"Use bullet points or numbered steps when they help. Write clean, readable, working",
+"code, and say where it goes. Do not remove working things unless asked. Look for",
+"bugs and edge cases. When you fix something, say what was wrong and what changed.",
+"Prefer the simple solution.",
+"",
+"CREATIVE WORK",
+"Be original and practical - ideas that could actually be built, with real detail",
+"rather than filler. For a game: the loop, progression, rewards, replayability,",
+"the screens, the map, and what brings someone back.",
+"",
+"SCHOOLWORK",
+"Plain language unless they ask for the advanced version. Show the steps. Skip the",
+"complicated vocabulary. Give the final answer clearly."
+].join("\n");
+
 function systemPrompt(){
   var s = store.settings;
   var now = new Date();
@@ -2854,9 +2922,10 @@ function systemPrompt(){
   /* A spoken answer needs almost none of the written-answer instructions, and
      every character of them is time before he starts talking. */
   if(voiceMode){
-    var vp = "You are " + (s.aiName || "Pedro") + ", " +
-      (s.name ? s.name + "'s" : "their") +
-      " assistant, speaking out loud. Today is " + now.toDateString() + ".\n" +
+    var vp = MASTER_PROMPT.split("You are Pedro,")
+        .join("You are " + (s.aiName || "Pedro") + ",") + "\n\n" +
+      "RIGHT NOW you are speaking out loud to " + (s.name || "them") +
+      ". Today is " + now.toDateString() + ".\n" +
       "Answer in one or two short sentences of plain speech - the length you would " +
       "actually say. No markdown, no lists, no headings, no code, no emoji. " +
       "No label or category before the answer. Lead with the answer. " +
@@ -2868,11 +2937,15 @@ function systemPrompt(){
       "said to you, say you did not catch that and stop. Never invent a situation, " +
       "a problem, a story or a character to explain it, and never answer a question " +
       "that was not asked.\n";
+    var tools = toolsBlock(lastUserText);
+    if(tools) vp += tools + "\n";
     if(s.about) vp += "About them: " + String(s.about).slice(0, 200) + "\n";
     vp += taughtBlock(lastUserText);
     return vp;
   }
-  var p = "You are " + (s.aiName || "Pedro") + ", " + (s.name ? s.name + "'s" : "the user's") +
+  var p = MASTER_PROMPT.split("You are Pedro,")
+      .join("You are " + (s.aiName || "Pedro") + ",") + MASTER_WRITTEN + "\n\n" +
+    "You are " + (s.name ? s.name + "'s" : "the user's") +
     " personal assistant, running on their phone. You help with anything they ask: " +
     "questions, ideas, writing, planning, code, decisions, or just talking things through.\n\n" +
     "Today is " + now.toDateString() + " (" +
@@ -4360,6 +4433,308 @@ function vizAsk(question){
     });
 }
 
+
+
+/* ==================== things he can do ====================
+   Each one says what it needs and what it gives back. "hands" means it opens
+   the phone's own screen with everything filled in and waits for a tap - iOS
+   does not let any app send or dial on its own, and pretending otherwise would
+   be worse than saying so. */
+var TOOLS = {
+  "web.search": {
+    needs: "what to look up",
+    hands: false,
+    tell: "search the web",
+    run: function(a){
+      var q = String(a.q || a.query || a.text || "").trim();
+      if(!q) return Promise.resolve({ ok:false, said:"there was nothing to look up" });
+      return openThing("https://duckduckgo.com/?q=" + encodeURIComponent(q))
+        .then(function(){ return { ok:true, said:"opened a search for " + q }; });
+    }
+  },
+  "web.open": {
+    needs: "a web address",
+    hands: false,
+    tell: "open a page",
+    run: function(a){
+      var u = String(a.url || a.q || "").trim();
+      if(!/^https?:/i.test(u)) u = "https://" + u.replace(/^\/+/, "");
+      if(!/^https?:\/\/[^\s]+\.[^\s]+/i.test(u)) {
+        return Promise.resolve({ ok:false, said:"that is not an address I can open" });
+      }
+      return openThing(u).then(function(){ return { ok:true, said:"opened " + u }; });
+    }
+  },
+  "maps.directions": {
+    needs: "where to",
+    hands: false,
+    tell: "get directions",
+    run: function(a){
+      var to = String(a.to || a.q || "").trim();
+      if(!to) return Promise.resolve({ ok:false, said:"nowhere was named" });
+      return openThing("maps://?daddr=" + encodeURIComponent(to) + "&dirflg=d")
+        .then(function(){ return { ok:true, said:"opened directions to " + to }; });
+    }
+  },
+  "app.open": {
+    needs: "which app",
+    hands: false,
+    tell: "open an app",
+    run: function(a){
+      var name = appNamed(a.name || a.app || "");
+      if(!name) return Promise.resolve({ ok:false, said:"I do not know that app" });
+      return openThing(APPS[name](String(a.q || "")))
+        .then(function(){ return { ok:true, said:"opened " + name }; });
+    }
+  },
+  "message.write": {
+    needs: "who it is to, and what it says",
+    hands: true,
+    tell: "write a message ready to send",
+    run: function(a){
+      var to = String(a.to || a.who || "").replace(/[^0-9+]/g, "");
+      var body = String(a.text || a.body || a.message || "").trim();
+      if(!body) return Promise.resolve({ ok:false, said:"there was nothing to say in it" });
+      return openThing("sms:" + to + "&body=" + encodeURIComponent(body))
+        .then(function(){
+          return { ok:true, hands:true,
+            said:"wrote it out ready to send" + (to ? " to " + to : "") + " - it needs one tap" };
+        });
+    }
+  },
+  "phone.call": {
+    needs: "a number",
+    hands: true,
+    tell: "bring up a call ready to dial",
+    run: function(a){
+      var num = String(a.number || a.to || a.who || "").replace(/[^0-9+]/g, "");
+      if(!num) return Promise.resolve({ ok:false, said:"no number to call" });
+      return openThing("tel:" + num)
+        .then(function(){ return { ok:true, hands:true, said:"brought up " + num + " - it needs one tap to dial" }; });
+    }
+  },
+  "mail.write": {
+    needs: "who it is to, a subject, and what it says",
+    hands: true,
+    tell: "write an email ready to send",
+    run: function(a){
+      var to = String(a.to || "").trim();
+      var url = "mailto:" + encodeURIComponent(to) +
+        "?subject=" + encodeURIComponent(String(a.subject || "")) +
+        "&body=" + encodeURIComponent(String(a.text || a.body || ""));
+      return openThing(url).then(function(){
+        return { ok:true, hands:true, said:"wrote the email out - it needs one tap to send" };
+      });
+    }
+  },
+  "calendar.add": {
+    needs: "a title and when it starts",
+    hands: false,
+    tell: "put something in the calendar",
+    run: function(a){
+      if(!(Native && Native.calendarAdd)){
+        return Promise.resolve({ ok:false, said:"the calendar needs the app, not the web page" });
+      }
+      var when = whenIsThat(a.start || a.when || a.date);
+      if(!when) return Promise.resolve({ ok:false, said:"I could not work out when that is" });
+      return Native.calendarAdd({
+        title: String(a.title || a.what || "Something"),
+        start: when.iso,
+        minutes: Math.max(5, Math.min(1440, parseInt(a.minutes, 10) || 60)),
+        notes: String(a.notes || "")
+      }).then(function(){
+        return { ok:true, said:"put " + (a.title || "it") + " in the calendar for " + when.said };
+      }).catch(function(e){
+        return { ok:false, said:String(e && e.message || e) };
+      });
+    }
+  },
+  "reminder.add": {
+    needs: "what to be reminded of, and when",
+    hands: false,
+    tell: "set a reminder",
+    run: function(a){
+      if(!(Native && Native.reminderAdd)){
+        return Promise.resolve({ ok:false, said:"reminders need the app, not the web page" });
+      }
+      var when = whenIsThat(a.when || a.due || a.date);
+      return Native.reminderAdd({
+        title: String(a.title || a.what || a.text || "Reminder"),
+        due: when ? when.iso : "",
+        notes: String(a.notes || "")
+      }).then(function(){
+        return { ok:true, said:"set a reminder to " + (a.title || a.what || "do that") +
+          (when ? " for " + when.said : "") };
+      }).catch(function(e){
+        return { ok:false, said:String(e && e.message || e) };
+      });
+    }
+  },
+  "contact.find": {
+    needs: "a name",
+    hands: false,
+    tell: "look someone up in your contacts",
+    run: function(a){
+      if(!(Native && Native.contactFind)){
+        return Promise.resolve({ ok:false, said:"contacts need the app, not the web page" });
+      }
+      var name = String(a.name || a.who || "").trim();
+      if(!name) return Promise.resolve({ ok:false, said:"no name to look for" });
+      return Native.contactFind({ name: name }).then(function(r){
+        var found = (r && r.matches) || [];
+        if(!found.length) return { ok:false, said:"nobody called " + name + " in your contacts" };
+        return { ok:true, said:found.map(function(m){
+          return m.name + " " + m.number;
+        }).join("; ") };
+      }).catch(function(e){
+        return { ok:false, said:String(e && e.message || e) };
+      });
+    }
+  },
+  "shortcut.run": {
+    needs: "the name of one of your Shortcuts",
+    hands: false,
+    tell: "run one of your Shortcuts",
+    run: function(a){
+      var name = String(a.name || "").trim();
+      if(!name) return Promise.resolve({ ok:false, said:"no shortcut named" });
+      var url = "shortcuts://run-shortcut?name=" + encodeURIComponent(name) +
+        (a.input ? "&input=text&text=" + encodeURIComponent(String(a.input)) : "");
+      return openThing(url).then(function(){ return { ok:true, said:"ran the shortcut " + name }; });
+    }
+  },
+  "timer.set": {
+    needs: "how long",
+    hands: false,
+    tell: "set a timer here",
+    run: function(a){
+      var secs = parseInt(a.seconds, 10);
+      if(!secs){
+        var n = parseInt(a.minutes, 10);
+        secs = n ? n * 60 : 0;
+      }
+      if(!secs || secs < 5) return Promise.resolve({ ok:false, said:"how long for?" });
+      startTimer(Math.min(secs, 6 * 3600));
+      return Promise.resolve({ ok:true, said:"timer set" });
+    }
+  }
+};
+
+function openThing(url){
+  if(Native && Native.openURL) return Native.openURL({ url: url });
+  try{ window.open(url, "_blank"); }catch(e){}
+  return Promise.resolve();
+}
+
+/* "tomorrow at 3", "in twenty minutes", or a proper date - turned into
+   something the phone can use, and into words to say back. */
+function whenIsThat(text){
+  var s = String(text == null ? "" : text).trim();
+  if(!s) return null;
+  var now = new Date();
+  var when = null;
+
+  var iso = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{1,2}):(\d{2}))?/);
+  if(iso){
+    when = new Date(+iso[1], +iso[2] - 1, +iso[3], iso[4] ? +iso[4] : 9, iso[5] ? +iso[5] : 0, 0, 0);
+  }
+  if(!when){
+    var inMins = s.match(/^in\s+(\d{1,4})\s*(minute|minutes|min|mins|hour|hours|hr|hrs|day|days)/i);
+    if(inMins){
+      var n = +inMins[1], unit = inMins[2].toLowerCase();
+      var mult = unit.indexOf("day") === 0 ? 1440 : (unit.indexOf("h") === 0 ? 60 : 1);
+      when = new Date(now.getTime() + n * mult * 60000);
+    }
+  }
+  if(!when){
+    var day = 0;
+    if(/tomorrow/i.test(s)) day = 1;
+    else if(/today|tonight|this evening/i.test(s)) day = 0;
+    else if(/next week/i.test(s)) day = 7;
+    var at = s.match(/(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+    if(at || day){
+      var hour = at ? +at[1] : 9, mins = at && at[2] ? +at[2] : 0;
+      var half = at && at[3] ? at[3].toLowerCase() : "";
+      if(half === "pm" && hour < 12) hour += 12;
+      if(half === "am" && hour === 12) hour = 0;
+      if(!half && /tonight|this evening/i.test(s) && hour < 12) hour += 12;
+      when = new Date(now.getFullYear(), now.getMonth(), now.getDate() + day, hour, mins, 0, 0);
+      if(!day && when.getTime() < now.getTime() - 60000){
+        when = new Date(when.getTime() + 86400000);   /* already gone - so tomorrow */
+      }
+    }
+  }
+  if(!when || isNaN(when.getTime())) return null;
+  function two(n){ return (n < 10 ? "0" : "") + n; }
+  return {
+    iso: when.getFullYear() + "-" + two(when.getMonth() + 1) + "-" + two(when.getDate()) +
+         "T" + two(when.getHours()) + ":" + two(when.getMinutes()) + ":00",
+    said: when.toLocaleString(undefined,
+      { weekday:"long", hour:"numeric", minute:"2-digit", day:"numeric", month:"long" })
+  };
+}
+
+/* Words that mean something is being asked for rather than asked about. The
+   list of tools is long, and sending it with every "what is the capital of
+   France" costs time on the one thing that should be quickest. */
+var DOING_RE = new RegExp("\\b(?:text|message|msg|call|ring|dial|phone|email|mail|" +
+  "open|launch|start|play|search|google|look ?up|find|show me|take me|navigate|" +
+  "directions|put|add|schedule|book|arrange|set|remind|remember to|create|make|" +
+  "write|send|run|shortcut|timer|alarm|diary|calendar|appointment|meeting)\\b", "i");
+function looksLikeDoing(text){
+  return DOING_RE.test(String(text || ""));
+}
+
+/* what he is told he can do - only when he might need it */
+function toolsBlock(text){
+  if(arguments.length && !looksLikeDoing(text)) return "";
+  var lines = [];
+  for(var name in TOOLS){
+    if(!TOOLS.hasOwnProperty(name)) continue;
+    lines.push(name + " - " + TOOLS[name].tell);
+  }
+  return "To do something on this phone, reply with only this: " +
+    "{\"tool\":\"name\",\"args\":{...}}\n" +
+    lines.join("\n") + "\n" +
+    "Only when asked to do something - answer questions with words.\n" +
+    "Dates plainly: 2026-08-22T15:00, or tomorrow at 3pm.\n" +
+    "You cannot send or dial yourself - no app on iOS can - so those two are put " +
+    "on screen ready and take one tap.";
+}
+
+/* reading what he chose, without trusting a word of it */
+function toolRead(text){
+  var s = String(text || "");
+  var open = s.indexOf("{"), close = s.lastIndexOf("}");
+  if(open < 0 || close < open) return null;
+  var raw;
+  try{ raw = JSON.parse(s.slice(open, close + 1)); }catch(e){ return null; }
+  if(!raw || typeof raw.tool !== "string") return null;
+  if(!TOOLS.hasOwnProperty(raw.tool)) return null;
+  var args = (raw.args && typeof raw.args === "object") ? raw.args : {};
+  var safe = {};
+  for(var k in args){
+    if(!args.hasOwnProperty(k)) continue;
+    var v = args[k];
+    if(v == null) continue;
+    if(typeof v === "number" || typeof v === "boolean"){ safe[k] = v; continue; }
+    safe[k] = String(v).slice(0, 400);
+  }
+  return { tool: raw.tool, args: safe };
+}
+
+/* doing it, and saying what happened */
+function toolRun(call){
+  var tool = TOOLS[call.tool];
+  if(!tool) return Promise.resolve({ ok:false, said:"I cannot do that one" });
+  try{
+    return Promise.resolve(tool.run(call.args)).catch(function(e){
+      return { ok:false, said:String(e && e.message || e) };
+    });
+  }catch(e){
+    return Promise.resolve({ ok:false, said:String(e && e.message || e) });
+  }
+}
 
 /* ==================== the 3D model ====================
    A spec is a list of parts: what shape each one is, how big, where it sits,
@@ -7125,6 +7500,20 @@ var HF_PHASES = ["wait", "hear", "busy", "talk"];
 function hfSet(phase, label){
   setTimeout(hudSync, 0);
   hf.phase = phase;
+  /* A voice that never reports finishing used to leave him in "talk" for good,
+     where he listens for nothing but stop. Whatever happens, he comes back. */
+  clearTimeout(hf.stuck);
+  if(phase === "talk" || phase === "busy"){
+    var words = (hfSaid && hfSaid.textContent ? hfSaid.textContent.length : 0);
+    var guess = phase === "talk" ? 6000 + words * 90 : 34000;
+    hf.stuck = setTimeout(function(){
+      if(hf.phase !== phase) return;             /* it moved on by itself */
+      hudLog("him", "(that took too long - listening again)", false);
+      sayStop();
+      hf.talking = false;
+      carryOn();
+    }, Math.min(120000, guess));
+  }
   /* Only the phase. Assigning className outright took "showing" with it, which
      wiped every simulation off the screen the moment it was put up. */
   for(var i = 0; i < HF_PHASES.length; i++) hfOrb.classList.remove(HF_PHASES[i]);
@@ -7254,14 +7643,33 @@ function hudSync(){
 /* What was said, as it is said. The last line is rewritten while you talk
    rather than waiting for you to finish. */
 var hudLive = null;
+/* Scroll to the bottom at most once a frame, and only when it is already
+   near the bottom - so reading back through it is not yanked away. */
+var hudScrollWanted = false;
+function hudScrollSoon(box){
+  if(hudScrollWanted) return;
+  hudScrollWanted = true;
+  requestAnimationFrame(function(){
+    hudScrollWanted = false;
+    if(!box) return;
+    var near = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+    if(near) box.scrollTop = box.scrollHeight;
+  });
+}
+
 function hudLog(who, text, live){
   var box = $("hudLog");
   if(!box) return;
   text = String(text || "").trim();
   if(!text) return;
   if(live && hudLive && hudLive.dataset.who === who){
-    hudLive.querySelector(".tx").textContent = text;
-    box.scrollTop = box.scrollHeight;
+    /* The words while you are still talking arrive about ten times a second.
+       Writing them is cheap; reading scrollHeight straight afterwards is not -
+       it makes the browser lay the whole page out before it can answer. So the
+       text goes in now and the scrolling happens on the next frame, once. */
+    var tx = hudLive.tx || (hudLive.tx = hudLive.querySelector(".tx"));
+    if(tx) tx.textContent = text;
+    hudScrollSoon(box);
     return;
   }
   var line = document.createElement("div");
@@ -7272,7 +7680,7 @@ function hudLog(who, text, live){
   line.querySelector(".tx").textContent = text;
   box.appendChild(line);
   while(box.children.length > 40) box.removeChild(box.firstChild);
-  box.scrollTop = box.scrollHeight;
+  hudScrollSoon(box);
   hudLive = live ? line : null;
 }
 function hudLogDone(){ hudLive = null; }
@@ -7478,6 +7886,7 @@ function hfQuietTimer(){
    made you say his name before every question - even after "ask me anything
    about it". Say the line, then hand the microphone straight back. */
 function carryOn(line){
+  clearTimeout(hf.stuck);
   hfDropDraft();     /* whatever he was thinking early, this reply settles it */
   function back(){
     hf.talking = false;
@@ -7585,6 +7994,46 @@ function hfDraftHint(live){
   hf.draftWait = setTimeout(function(){
     if(hf.want && hf.phase === "hear") hfDraftStart(live);
   }, 420);
+}
+
+/* Do what he chose, then let him say what happened. The app knows the plain
+   result; he turns it into a sentence. If he cannot be reached for that, the
+   plain result is said as it is - never silence. */
+function doTheThing(call, chat){
+  var tool = TOOLS[call.tool] || {};
+  hfSet("busy", tool.tell ? tool.tell.charAt(0).toUpperCase() + tool.tell.slice(1) : "Doing it");
+  hudLog("him", "Using " + call.tool, false);
+  toolRun(call).then(function(result){
+    var plain = String(result.said || (result.ok ? "done" : "that did not work"));
+    if(chat && chat.messages){
+      chat.messages.push({ role:"assistant", content:"[" + call.tool + "] " + plain, t:Date.now() });
+      save();
+    }
+    /* he says it, briefly, in his own words */
+    var telling = {
+      messages: [{ role:"user", content:
+        "You just did this on the phone: " + call.tool + ". What happened: " + plain +
+        ". Tell them in one short sentence of plain speech. If it needs a tap to " +
+        "finish, say so. Do not use a tool now.", t:Date.now() }]
+    };
+    var wasVoice = voiceMode;
+    voiceMode = true;
+    fastMode = true;
+    askStream(telling, function(){}).then(function(line){
+      voiceMode = wasVoice; fastMode = false;
+      var say = toolRead(line) ? plain : String(line || plain).trim();
+      hfSaid.textContent = say;
+      hudLog("him", say, false);
+      hfSet("talk", "Speaking");
+      hf.talking = true;
+      sayChunk(say);
+      sayWhenDone(function(){ carryOn(); });
+      renderAll();
+    }).catch(function(){
+      voiceMode = wasVoice; fastMode = false;
+      carryOn(plain);           /* say the plain result rather than nothing */
+    });
+  });
 }
 
 /* --- speak without hearing ourselves --- */
@@ -7730,6 +8179,9 @@ function hfAsk(question){
   hf.draft = null;
   /* say each finished sentence while the rest is still being written */
   function outLoud(acc){
+    /* the start of a tool call is not something to read out loud */
+    if(acc.indexOf("{") > -1 && acc.slice(0, 40).indexOf("tool") > -1) return;
+    if(/^\s*[{`]/.test(acc)) return;
     var done = wholeSentences(acc);
     if(done.length > spoken){
       var chunk = done.slice(spoken);
@@ -7748,6 +8200,13 @@ function hfAsk(question){
     run = askStream(c, outLoud);
   }
   run.then(function(answer){
+    /* he asked for something to be done rather than said */
+    var wants = toolRead(answer);
+    if(wants){
+      sayStop();
+      doTheThing(wants, c);
+      return;
+    }
     voiceMode = false;
     if(answer.length > spoken) sayChunk(answer.slice(spoken));
     hfSaid.textContent = answer;
@@ -7962,7 +8421,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.70";
+var BUILD = "2026-08-21.71";
 
 function banner(kind, html){
   var b = $("banner");

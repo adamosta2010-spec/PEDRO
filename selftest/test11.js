@@ -8,32 +8,9 @@ const fs = require("fs");
 /* the file is CRLF on this machine; the patterns below are written with
    plain newlines, so read it in those terms */
 const src = fs.readFileSync(process.argv[2], "utf8").split(String.fromCharCode(13,10)).join(String.fromCharCode(10));
-function grab(name){
-  const i = src.indexOf("function " + name + "(");
-  if(i < 0) throw new Error("no such function: " + name);
-  let d = 0;
-  for(let k = src.indexOf("{", i); k < src.length; k++){
-    if(src[k] === "{") d++;
-    else if(src[k] === "}"){ d--; if(!d) return src.slice(i, k + 1); }
-  }
-}
-
-/* These declarations are long strings full of semicolons and brackets, so find
-   the end by scanning with the quotes in mind rather than by pattern. */
-function decl(name){
-  const i = src.indexOf("var " + name + " =");
-  if(i < 0) throw new Error("no declaration: " + name);
-  let q = null, depth = 0;
-  for(let k = i; k < src.length; k++){
-    const ch = src[k];
-    if(q){ if(ch === "\\") k++; else if(ch === q) q = null; continue; }
-    if(ch === "'" || ch === '"') { q = ch; continue; }
-    if(ch === "(" || ch === "[" || ch === "{") depth++;
-    else if(ch === ")" || ch === "]" || ch === "}") depth--;
-    else if(ch === ";" && depth === 0) return src.slice(i, k + 1);
-  }
-  throw new Error("unterminated: " + name);
-}
+/* braces live inside strings and regexes, so the shared reader asks the
+   JavaScript engine which slice is a whole function rather than guessing */
+const { grab, decl } = require("./lib").reader(src);
 
 let fail = 0, pass = 0;
 const t = (n, g, w) => {

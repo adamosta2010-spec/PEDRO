@@ -31,6 +31,10 @@ function grabVar(name){
   const j = name === "MEMORY_RULES" ? src.indexOf("];", i) + 2 : src.indexOf(";", i) + 1;
   return src.slice(i, j);
 }
+/* the prompt is built from a plain declaration as well as from functions */
+const { decl: declOf } = require("./lib").reader(src);
+eval(declOf("MASTER_PROMPT"));
+eval(declOf("MASTER_WRITTEN"));
 eval(["MEMORY_RULES", "REMEMBER_RE", "FORGET_RE"].map(grabVar).join("\n") +
      "\n" + names.map(grab).join("\n"));
 

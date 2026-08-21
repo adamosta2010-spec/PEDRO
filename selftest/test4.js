@@ -26,6 +26,10 @@ let store = { settings:{ provider:"gemini", aiName:"Pedro",
 let voiceMode = false;
 let fastMode = false;   /* the quick path, used for building animations */
 const isLocked = () => false;
+/* the prompt is built from a plain declaration as well as from functions */
+const { decl: declOf } = require("./lib").reader(src);
+eval(declOf("MASTER_PROMPT"));
+eval(declOf("MASTER_WRITTEN"));
 eval(names.map(grab).join("\n"));
 
 let fail = 0, pass = 0;

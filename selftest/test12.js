@@ -89,5 +89,42 @@ const t = (n, g, w) => {
   t("they are turned on with everything else", src.indexOf("wordsOn();") > -1, true);
 }
 
+/* ---------- why he lagged, and why he sometimes went quiet ---------- */
+{
+  /* The words while you talk arrive about ten times a second. Writing them is
+     cheap; reading scrollHeight straight back is not - it makes the browser lay
+     the whole page out before it can answer. */
+  const log = grab("hudLog");
+  t("the live line no longer reads the layout back",
+    log.indexOf("box.scrollTop = box.scrollHeight") === -1, true);
+  t("it asks for a scroll on the next frame instead",
+    log.indexOf("hudScrollSoon(box)") > -1, true);
+  const scroll = grab("hudScrollSoon");
+  t("and that happens once a frame at most",
+    scroll.indexOf("hudScrollWanted") > -1, true);
+  t("on a frame, not straight away",
+    scroll.indexOf("requestAnimationFrame") > -1, true);
+  t("and it does not yank you back if you scrolled up",
+    scroll.indexOf("near") > -1, true);
+  t("the live line finds its text box once, not every time",
+    log.indexOf("hudLive.tx ||") > -1, true);
+
+  /* If the voice never reported finishing he stayed in "talk" for good, where
+     he listens for nothing but stop. He looked dead, and was. */
+  const set = grab("hfSet");
+  t("talking is watched over", set.indexOf("hf.stuck") > -1, true);
+  t("and thinking is too", set.indexOf('phase === "busy"') > -1, true);
+  t("the wait is judged by how much there is to say",
+    set.indexOf("words * 90") > -1, true);
+  t("it does not fire if he moved on by himself",
+    set.indexOf("if(hf.phase !== phase) return") > -1, true);
+  t("when it fires he goes back to listening",
+    set.indexOf("carryOn()") > -1, true);
+  t("and says why, rather than going quiet",
+    set.indexOf("took too long") > -1, true);
+  t("answering normally calls it off",
+    grab("carryOn").indexOf("clearTimeout(hf.stuck)") > -1, true);
+}
+
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " ball-and-words tests passed");
 process.exit(fail ? 1 : 0);

@@ -1,3 +1,6 @@
+/* the prompt now lists what he can do on the phone; the harness does not
+   need the real list, only something to call */
+global.toolsBlock = function(){ return "TOOLS"; };
 global.window = {};
 const fs = require("fs");
 const src = fs.readFileSync(process.argv[2], "utf8");
@@ -23,6 +26,10 @@ let store = { settings:{ provider:"gemini", aiName:"Pedro", apiKey:"", geminiKey
 let voiceMode = false;
 let fastMode = false;   /* the quick path, used for building animations */
 const isLocked = () => false;
+/* the prompt is built from a plain declaration as well as from functions */
+const { decl: declOf } = require("./lib").reader(src);
+eval(declOf("MASTER_PROMPT"));
+eval(declOf("MASTER_WRITTEN"));
 eval(names.map(grab).join("\n"));
 
 let fail = 0, pass = 0;
@@ -89,7 +96,15 @@ voiceMode = true; const spoken = systemPrompt(); voiceMode = false;
 /* the spoken prompt is a different, much shorter one now - that is the point */
 t("speaking gets its own short prompt",
   spoken.includes("speaking out loud") && !long.includes("speaking out loud"), true);
-t("and it is far shorter than the written one", spoken.length < long.length / 3, true);
+/* A third of the written one was an arbitrary line, and the spoken prompt has
+   since earned a few hundred characters telling him what to do when the words
+   are half-heard. What matters is that it stays small, because it is sent with
+   every single question - so check that, and that it is still much the shorter. */
+t("and it is shorter than the written one", spoken.length < long.length * 0.7, true);
+/* Adam asked for his master prompt to be used, and it is bigger than what was
+   here before - deliberately. It is still much the smaller of the two, and the
+   tool list is only added when something is actually being asked for. */
+t("and still much smaller than the written one", spoken.length < 3400, true);
 t("it still carries what he was taught", spoken.includes("Pedro"), true);
 t("persona is Pedro", long.startsWith("You are Pedro,"), true);
 t("prompt carries user context", long.includes("Adam") && long.includes("Roblox"), true);

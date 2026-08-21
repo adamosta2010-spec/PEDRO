@@ -1,15 +1,9 @@
 /* Microphone diagnosis + picture-model recovery. */
 const fs = require("fs");
 const src = fs.readFileSync(process.argv[2], "utf8");
-function grab(name){
-  const i = src.indexOf("function " + name + "(");
-  if(i < 0) throw new Error("no such function: " + name);
-  let d = 0, j = src.indexOf("{", i);
-  for(let k = j; k < src.length; k++){
-    if(src[k] === "{") d++;
-    else if(src[k] === "}"){ d--; if(!d) return src.slice(i, k + 1); }
-  }
-}
+/* counting braces in the raw text walks into the string "{" and never
+   finds the end - the shared reader counts against a masked copy */
+const grab = require("./lib").reader(src).grab;
 
 let fail = 0, pass = 0;
 const t = (n, g, w) => {
@@ -703,7 +697,10 @@ function nativeFrom(cap, exp){
   t("the answer appears over it", inSrc("function orbInfo"), true);
   t("and it knows what you are watching", grab("vizAsk").indexOf("viz.lastAsk") > -1, true);
 
-  t("speaking sends a much shorter prompt", inSrc("speaking out loud. Today is"), true);
+  /* the wording moved when the master prompt went in - what matters is that
+     the spoken path still tells him he is being heard, not read */
+  t("speaking sends its own prompt", inSrc("you are speaking out loud to"), true);
+  t("and still says not to write markdown at it", inSrc("No markdown, no lists"), true);
 }
 
 

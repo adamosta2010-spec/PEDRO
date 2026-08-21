@@ -3,15 +3,10 @@
    that DOES something - starting a build twice would be a real bug. */
 const fs = require("fs");
 const src = fs.readFileSync(process.argv[2], "utf8");
-function grab(name){
-  const i = src.indexOf("function " + name + "(");
-  if(i < 0) throw new Error("no such function: " + name);
-  let d = 0;
-  for(let k = src.indexOf("{", i); k < src.length; k++){
-    if(src[k] === "{") d++;
-    else if(src[k] === "}"){ d--; if(!d) return src.slice(i, k + 1); }
-  }
-}
+/* braces live inside strings and regexes, so the shared reader asks the
+   JavaScript engine which slice is a whole function rather than guessing */
+const { grab, decl } = require("./lib").reader(src);
+
 let fail = 0, pass = 0;
 const t = (n, g, w) => {
   const ok = JSON.stringify(g) === JSON.stringify(w);

@@ -6,74 +6,10 @@ const src = fs.readFileSync(process.argv[2], "utf8").split(String.fromCharCode(1
 /* A copy of the source with strings, comments and regex literals blanked out.
    Counting braces in the raw text walks straight into "{" and /x{6}/ and never
    finds the end of the function. */
-const MASK = (() => {
-  const q1 = String.fromCharCode(39), q2 = String.fromCharCode(34);
-  const tick = String.fromCharCode(96), esc = String.fromCharCode(92);
-  let out = "", mode = null, prev = "";
-  for(let i = 0; i < src.length; i++){
-    const c = src[i], next = src[i + 1];
-    if(mode === "line"){ if(c === "\n"){ mode = null; out += c; } else out += " "; continue; }
-    if(mode === "block"){
-      if(c === "*" && next === "/"){ mode = null; out += "  "; i++; }
-      else out += (c === "\n" ? c : " ");
-      continue;
-    }
-    if(mode === "str"){
-      if(c === esc){ out += "  "; i++; continue; }
-      if(c === prev){ mode = null; out += " "; continue; }
-      out += (c === "\n" ? c : " ");
-      continue;
-    }
-    if(mode === "re"){
-      if(c === esc){ out += "  "; i++; continue; }
-      if(c === "["){ mode = "class"; out += " "; continue; }
-      if(c === "/"){ mode = null; out += " "; continue; }
-      out += (c === "\n" ? c : " ");
-      continue;
-    }
-    if(mode === "class"){
-      if(c === esc){ out += "  "; i++; continue; }
-      if(c === "]"){ mode = "re"; out += " "; continue; }
-      out += (c === "\n" ? c : " ");
-      continue;
-    }
-    if(c === "/" && next === "/"){ mode = "line"; out += "  "; i++; continue; }
-    if(c === "/" && next === "*"){ mode = "block"; out += "  "; i++; continue; }
-    if(c === q1 || c === q2 || c === tick){ mode = "str"; prev = c; out += " "; continue; }
-    if(c === "/"){
-      /* a regex only ever follows one of these; after a value it is division */
-      let back = out.length - 1;
-      while(back >= 0 && /\s/.test(out[back])) back--;
-      const before = back >= 0 ? out[back] : "";
-      if(before === "" || "(,=:[!&|?{};+-*%~^".indexOf(before) > -1){ mode = "re"; out += " "; continue; }
-    }
-    out += c;
-  }
-  return out;
-})();
-
-function grab(name){
-  const i = MASK.indexOf("function " + name + "(");
-  if(i < 0) throw new Error("no such function: " + name);
-  let d = 0;
-  for(let k = MASK.indexOf("{", i); k < MASK.length; k++){
-    if(MASK[k] === "{") d++;
-    else if(MASK[k] === "}"){ d--; if(!d) return src.slice(i, k + 1); }
-  }
-  throw new Error("could not find the end of: " + name);
-}
-function decl(name){
-  const i = MASK.indexOf("var " + name + " =");
-  if(i < 0) throw new Error("no declaration: " + name);
-  let depth = 0;
-  for(let k = i; k < MASK.length; k++){
-    const ch = MASK[k];
-    if(ch === "(" || ch === "[" || ch === "{") depth++;
-    else if(ch === ")" || ch === "]" || ch === "}") depth--;
-    else if(ch === ";" && depth === 0) return src.slice(i, k + 1);
-  }
-  throw new Error("unterminated: " + name);
-}
+/* Braces live inside strings and regexes, so every hand-written scanner
+   eventually swallowed half the file. The shared reader asks the JavaScript
+   engine which slice is a whole function instead. */
+const { grab, decl } = require("./lib").reader(src);
 
 let fail = 0, pass = 0;
 const t = (n, g, w) => {

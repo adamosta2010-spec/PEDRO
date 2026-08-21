@@ -5,6 +5,8 @@ import Speech
 import AVFoundation
 import Vision
 import LocalAuthentication
+import EventKit
+import Contacts
 
 #if canImport(FoundationModels)
 import FoundationModels
@@ -36,7 +38,10 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
         CAPPluginMethod(name: "warm",           returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setWords",       returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "analyse",        returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "authenticate",   returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "authenticate",   returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "calendarAdd",    returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "reminderAdd",    returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "contactFind",    returnType: CAPPluginReturnPromise)
     ]
 
     // MARK: - on-device model
@@ -334,6 +339,147 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
         DispatchQueue.main.async { [weak self] in
             self?.synth.stopSpeaking(at: .immediate)
             call.resolve(["speaking": false])
+        }
+    }
+
+    // MARK: - the diary
+
+    /// One store for both: calendar entries and reminders come from the same
+    /// framework, and asking twice would prompt twice.
+    private let events = EKEventStore()
+
+    /// Dates arrive as plain local time - 2026-08-22T15:00 - because that is
+    /// what a person says and what the model writes back.
+    private func readDate(_ text: String) -> Date? {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone.current
+        for shape in ["yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-dd'T'HH:mm", "yyyy-MM-dd HH:mm", "yyyy-MM-dd"] {
+            f.dateFormat = shape
+            if let d = f.date(from: text) { return d }
+        }
+        return nil
+    }
+
+    private func askForCalendar(_ done: @escaping (Bool, String) -> Void) {
+        if #available(iOS 17.0, *) {
+            events.requestWriteOnlyAccessToEvents { granted, error in
+                done(granted, error?.localizedDescription ?? "")
+            }
+        } else {
+            events.requestAccess(to: .event) { granted, error in
+                done(granted, error?.localizedDescription ?? "")
+            }
+        }
+    }
+
+    private func askForReminders(_ done: @escaping (Bool, String) -> Void) {
+        if #available(iOS 17.0, *) {
+            events.requestFullAccessToReminders { granted, error in
+                done(granted, error?.localizedDescription ?? "")
+            }
+        } else {
+            events.requestAccess(to: .reminder) { granted, error in
+                done(granted, error?.localizedDescription ?? "")
+            }
+        }
+    }
+
+    @objc func calendarAdd(_ call: CAPPluginCall) {
+        let title = call.getString("title") ?? "Something"
+        let startText = call.getString("start") ?? ""
+        let minutes = call.getInt("minutes") ?? 60
+        let notes = call.getString("notes") ?? ""
+        guard let start = readDate(startText) else {
+            call.reject("I could not read that date")
+            return
+        }
+        askForCalendar { [weak self] granted, why in
+            guard let self = self else { return }
+            guard granted else {
+                call.reject(why.isEmpty ? "the calendar is not allowed - turn it on in Settings" : why)
+                return
+            }
+            let event = EKEvent(eventStore: self.events)
+            event.title = title
+            event.startDate = start
+            event.endDate = start.addingTimeInterval(TimeInterval(max(5, minutes) * 60))
+            if !notes.isEmpty { event.notes = notes }
+            event.calendar = self.events.defaultCalendarForNewEvents
+            do {
+                try self.events.save(event, span: .thisEvent, commit: true)
+                call.resolve(["ok": true, "id": event.eventIdentifier ?? ""])
+            } catch {
+                call.reject("could not save it: " + error.localizedDescription)
+            }
+        }
+    }
+
+    @objc func reminderAdd(_ call: CAPPluginCall) {
+        let title = call.getString("title") ?? "Reminder"
+        let dueText = call.getString("due") ?? ""
+        let notes = call.getString("notes") ?? ""
+        askForReminders { [weak self] granted, why in
+            guard let self = self else { return }
+            guard granted else {
+                call.reject(why.isEmpty ? "reminders are not allowed - turn them on in Settings" : why)
+                return
+            }
+            let item = EKReminder(eventStore: self.events)
+            item.title = title
+            if !notes.isEmpty { item.notes = notes }
+            item.calendar = self.events.defaultCalendarForNewReminders()
+            if let due = self.readDate(dueText) {
+                item.dueDateComponents = Calendar.current.dateComponents(
+                    [.year, .month, .day, .hour, .minute], from: due)
+                item.addAlarm(EKAlarm(absoluteDate: due))
+            }
+            do {
+                try self.events.save(item, commit: true)
+                call.resolve(["ok": true])
+            } catch {
+                call.reject("could not save it: " + error.localizedDescription)
+            }
+        }
+    }
+
+    // MARK: - who they are
+
+    /// Looking a name up so a number can be dialled or a message addressed.
+    /// Only the names and numbers that match come back, and nothing is stored.
+    @objc func contactFind(_ call: CAPPluginCall) {
+        let wanted = (call.getString("name") ?? "").trimmingCharacters(in: .whitespaces)
+        guard !wanted.isEmpty else {
+            call.reject("no name to look for")
+            return
+        }
+        CNContactStore().requestAccess(for: .contacts) { granted, error in
+            guard granted else {
+                call.reject(error?.localizedDescription ??
+                    "contacts are not allowed - turn them on in Settings")
+                return
+            }
+            let store = CNContactStore()
+            let keys = [CNContactGivenNameKey, CNContactFamilyNameKey,
+                        CNContactPhoneNumbersKey] as [CNKeyDescriptor]
+            var found: [[String: String]] = []
+            do {
+                let request = CNContactFetchRequest(keysToFetch: keys)
+                try store.enumerateContacts(with: request) { person, stop in
+                    let full = (person.givenName + " " + person.familyName)
+                        .trimmingCharacters(in: .whitespaces)
+                    if full.lowercased().contains(wanted.lowercased()) {
+                        for number in person.phoneNumbers {
+                            found.append(["name": full,
+                                          "number": number.value.stringValue])
+                            if found.count >= 6 { stop.pointee = true; break }
+                        }
+                    }
+                }
+                call.resolve(["matches": found])
+            } catch {
+                call.reject("could not read contacts: " + error.localizedDescription)
+            }
         }
     }
 

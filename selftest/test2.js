@@ -24,6 +24,10 @@ const isLocked = () => false;
 /* DRAW_RE lives at module scope in the app */
 const DRAW_SRC = src.match(/var DRAW_RE = (\/.*\/i);/)[1];
 eval("var DRAW_RE = " + DRAW_SRC + ";");
+/* the prompt is built from a plain declaration as well as from functions */
+const { decl: declOf } = require("./lib").reader(src);
+eval(declOf("MASTER_PROMPT"));
+eval(declOf("MASTER_WRITTEN"));
 eval(names.map(grab).join("\n"));
 
 let fail = 0, pass = 0;
