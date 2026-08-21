@@ -42,6 +42,8 @@ eval(declOf("SUM_AFTER"));
 eval("var summaryOf = " + grab("summaryOf").replace("function summaryOf", "function") + ";");
 eval(declOf("MASTER_WRITTEN"));
 /* and the manner - composed and British, or nothing at all */
+/* set while a photograph is attached - the prompt changes when it is */
+var lookingAt = false;
 eval(declOf("MANNERS"));
 eval(declOf("MANNER_REPLACES"));
 eval("var promptWithout = " + grab("promptWithout").replace("function promptWithout", "function") + ";");

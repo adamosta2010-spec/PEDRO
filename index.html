@@ -549,6 +549,26 @@
   @keyframes hudTalk{from{transform:scale(.94);opacity:.8}to{transform:scale(1.08);opacity:1}}
   @keyframes spin{to{transform:rotate(360deg)}}
 
+  /* ============ everything he answers to ============
+     A long list, so it scrolls, and the words are the thing you are scanning
+     for - they are what gets the weight. */
+  #features{position:fixed;inset:0;z-index:9;display:none;flex-direction:column;
+    background:color-mix(in srgb,var(--bg) 96%,transparent);
+    padding:calc(var(--safe-t) + 12px) 14px calc(var(--safe-b) + 12px)}
+  #features.on{display:flex}
+  #features .ftop{display:flex;align-items:center;justify-content:space-between;
+    gap:12px;padding:0 2px 10px;border-bottom:1px solid var(--line);flex:none}
+  #features .ftop b{font-size:15px;letter-spacing:-.01em}
+  #featuresList{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:8px 2px 4px}
+  #features .frow{display:grid;grid-template-columns:minmax(0,1fr);gap:2px;
+    padding:9px 2px;border-bottom:1px solid color-mix(in srgb,var(--line) 60%,transparent)}
+  #features .frow b{color:var(--hud);font-size:13.5px;font-weight:600;letter-spacing:.01em}
+  #features .frow span{color:var(--tx2);font-size:12.5px;line-height:1.45}
+  #features .fnote{flex:none;padding-top:10px;color:var(--tx3);font-size:12px;text-align:center}
+  @media(min-width:520px){
+    #features .frow{grid-template-columns:minmax(0,3fr) minmax(0,4fr);gap:14px;align-items:baseline}
+  }
+
   /* ============ party mode ============
      Hue-rotating a blue ball cycles colour but never looks like a rainbow - it
      is one colour at a time, moving. So the ball's gradient is replaced with an
@@ -582,7 +602,7 @@
 
   /* Four beams from a point at the top, swinging at different speeds - the
      shape of something hanging over a dance floor. */
-  #partyLights{position:absolute;inset:0;z-index:0;display:none;
+  #partyLights{position:fixed;inset:0;z-index:8;display:none;
     pointer-events:none;overflow:hidden}
   #hf.party #partyLights{display:block}
   /* They hung from one point in the middle, so most of their length ran down
@@ -591,6 +611,10 @@
   #partyLights i{position:absolute;top:-4%;width:40vw;height:140vh;
     margin-left:-20vw;transform-origin:50% 0;opacity:1;
     clip-path:polygon(47% 0, 53% 0, 100% 100%, 0 100%);
+    /* Over the top of everything, a beam has to read as light falling on the
+       room rather than as paint over it - screen keeps what is underneath.
+       It is four elements and only while a party is on. */
+    mix-blend-mode:screen;
     will-change:transform}
   #partyLights i:nth-child(1){left:16%;
     background:linear-gradient(180deg, rgba(255,40,90,1), rgba(255,40,90,.34) 46%, transparent 76%);
@@ -655,6 +679,7 @@
   @keyframes beamD{0%,100%{transform:rotate(40deg)}50%{transform:rotate(-40deg)}}
 
   /* and a wash behind everything, so it is the room and not just the ball */
+  /* the wash stays underneath - over the top it fogs the whole screen */
   #hf.party::after{
     content:""; position:absolute; inset:0; z-index:0; pointer-events:none;
     background:radial-gradient(circle at 50% 46%,
@@ -1487,6 +1512,12 @@
 <div id="shade"><img alt=""></div>
 
 <div id="hf">
+  <!-- Outside the grid on purpose: .hudcentre is transformed, and a transform
+       makes an element the containing block for anything fixed inside it - so
+       in there these were positioned against the ball, not the screen. -->
+  <div id="partyLights" aria-hidden="true"><i></i><i></i><i></i><i></i>
+    <b class="bulbs"><s></s><s></s><s></s><s></s><s></s><s></s><s></s><s></s><s></s></b>
+  </div>
   <div class="hudgrid">
     <div class="hudcol">
       <div class="hudpanel" data-panel="clock">
@@ -1509,9 +1540,6 @@
     </div>
 
     <div class="hudcentre">
-      <div id="partyLights" aria-hidden="true"><i></i><i></i><i></i><i></i>
-        <b class="bulbs"><s></s><s></s><s></s><s></s><s></s><s></s><s></s><s></s><s></s></b>
-      </div>
       <div id="hfOrb" class="wait">
         <span class="disc"><i class="sheen a"></i><i class="sheen b"></i><i class="glow"></i></span>
         <span class="hat" aria-hidden="true"><i class="pom"></i></span>
@@ -1553,6 +1581,15 @@
     </div>
   </div>
   <div id="hfWarn"></div>
+
+  <div id="features">
+    <div class="ftop">
+      <b id="featuresTitle">Everything he answers to</b>
+      <button class="icobtn" id="featuresClose" aria-label="Close"><svg><use href="#i-x"/></svg></button>
+    </div>
+    <div id="featuresList"></div>
+    <div class="fnote" id="featuresNote">Say stop at any time to put everything away.</div>
+  </div>
 
   <div id="dockPanel">
     <div class="dockrow">
@@ -3442,6 +3479,10 @@ function speak(text, onEnd){
 
 /* ============================ api ============================ */
 var lastUserText = "";   /* what they just asked - used to pick relevant lessons */
+/* Set while a picture is attached. Without it a photograph is judged by the
+   spoken prompt, which says nothing about there being a picture and does tell
+   him that what he has may be half-heard speech to be refused. */
+var lookingAt = false;
 
 /* ---- the manner ----
    Not a costume. JARVIS is worth copying because of what he does not do: he
@@ -3575,11 +3616,19 @@ function systemPrompt(){
       "Jokes, riddles, a verse of a song, a story - do them properly when asked, " +
       "rather than explaining that you are an assistant.\n" +
       (moodNow().tone ? moodNow().tone + "\n" : "") +
-      "This is speech that has been transcribed, so it is sometimes half-heard " +
-      "or picked up by accident. If what you get does not make sense as something " +
-      "said to you, say you did not catch that and stop. Never invent a situation, " +
-      "a problem, a story or a character to explain it, and never answer a question " +
-      "that was not asked.\n";
+      (lookingAt
+        ? "There is a PHOTOGRAPH attached, taken just now by the camera in front " +
+          "of you. Answer about what is actually in it. Describe what you can see " +
+          "and nothing you cannot. If there is writing in it, read the writing - " +
+          "in whatever language it is in - and say what it says. If you are asked " +
+          "to translate, give the translation and say what language it was. If the " +
+          "picture is too dark or blurred to tell, say so plainly rather than " +
+          "guessing at it.\n"
+        : "This is speech that has been transcribed, so it is sometimes half-heard " +
+          "or picked up by accident. If what you get does not make sense as something " +
+          "said to you, say you did not catch that and stop. Never invent a situation, " +
+          "a problem, a story or a character to explain it, and never answer a question " +
+          "that was not asked.\n");
     var tools = toolsBlock(lastUserText);
     if(tools) vp += tools + "\n";
     if(s.about) vp += "About them: " + String(s.about).slice(0, 200) + "\n";
@@ -5796,6 +5845,37 @@ function whereAmI(){
   });
 }
 
+/* The exact spot, asked for on purpose. whereAmI uses the phone's clock
+   because it always answers and needs no permission; this is for when that is
+   not good enough - it asks for the real thing and keeps it. */
+function pinpoint(){
+  return new Promise(function(done, fail){
+    if(!navigator.geolocation){ fail(new Error("this phone will not say where it is")); return; }
+    navigator.geolocation.getCurrentPosition(function(pos){
+      var spot = { lat: pos.coords.latitude, lon: pos.coords.longitude,
+                   name: "where you are", country: "", t: Date.now() };
+      /* turn it into a name, so he can say it rather than read out numbers */
+      fetch("https://api.open-meteo.com/v1/forecast?latitude=" + spot.lat +
+            "&longitude=" + spot.lon + "&current=temperature_2m&timezone=auto")
+        .then(function(r){ return r.json(); })
+        .then(function(j){
+          var tz = (j && j.timezone) || "";
+          if(tz.indexOf("/") > -1){
+            spot.name = tz.split("/").pop().split("_").join(" ");
+          }
+        })
+        .catch(function(){})
+        .then(function(){
+          store.settings.home = spot;
+          save();
+          done(spot);
+        });
+    }, function(){
+      fail(new Error("I need permission to know where you are - it is in Settings, under Pedro, Location"));
+    }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 });
+  });
+}
+
 function whereIsIt(place){
   var name = String(place || "").trim();
   if(name) return lookUpPlace(name);
@@ -6139,7 +6219,7 @@ function toolRun(call){
    what colour, and a line about what it does. This turns one into a page that
    draws it, turns it, and lets it be taken apart with a finger. Written and
    checked outside the app first, then brought in whole. */
-var VIZ3D_RENDER = "\nvar SPEC = __SPEC__;\nvar c = document.getElementById(\"c\"), g = c.getContext(\"2d\");\nfunction fit(){\n  /* It used to be square, at the size of the shorter side - which on a tall\n     phone is a box sitting in the middle of a dark rectangle. It fills what it\n     is given now. */\n  var w = window.innerWidth, hh = window.innerHeight;\n  var dpr = Math.min(2, window.devicePixelRatio || 1);\n  c.width = Math.round(w * dpr); c.height = Math.round(hh * dpr);\n  c.style.width = w + \"px\"; c.style.height = hh + \"px\";\n}\naddEventListener(\"resize\", fit); fit();\n\n/* ---- the shapes every part is made of ---- */\nfunction box(){\n  var v = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]];\n  return { v: v, f: [[0,1,2,3],[5,4,7,6],[4,0,3,7],[1,5,6,2],[4,5,1,0],[3,2,6,7]] };\n}\nfunction tube(n, topR){\n  var v = [], f = [], i;\n  if(topR === undefined) topR = 1;\n  for(i = 0; i < n; i++){\n    var a = i / n * Math.PI * 2;\n    v.push([Math.cos(a), -1, Math.sin(a)]);\n    v.push([Math.cos(a) * topR, 1, Math.sin(a) * topR]);\n  }\n  for(i = 0; i < n; i++){\n    var j = (i + 1) % n;\n    f.push([i * 2, j * 2, j * 2 + 1, i * 2 + 1]);\n  }\n  var bottom = [], top = [];\n  for(i = 0; i < n; i++){ bottom.push(i * 2); top.push((n - 1 - i) * 2 + 1); }\n  f.push(bottom); f.push(top);\n  return { v: v, f: f };\n}\nfunction ball(rows, cols){\n  var v = [], f = [], i, j;\n  for(i = 0; i <= rows; i++){\n    var th = i / rows * Math.PI;\n    for(j = 0; j < cols; j++){\n      var ph = j / cols * Math.PI * 2;\n      v.push([Math.sin(th) * Math.cos(ph), Math.cos(th), Math.sin(th) * Math.sin(ph)]);\n    }\n  }\n  for(i = 0; i < rows; i++){\n    for(j = 0; j < cols; j++){\n      var a = i * cols + j, b = i * cols + (j + 1) % cols;\n      f.push([a, b, b + cols, a + cols]);\n    }\n  }\n  return { v: v, f: f };\n}\nvar SHAPES = {\n  box: box(), plate: box(), cyl: tube(12), cone: tube(12, 0.02),\n  ball: ball(7, 12), wedge: tube(3)\n};\n\n/* ---- turning a part into faces in the world ---- */\nfunction radians(d){ return (d || 0) * Math.PI / 180; }\nfunction spin(p, rx, ry, rz){\n  var x = p[0], y = p[1], z = p[2], s, k;\n  s = Math.sin(rx); k = Math.cos(rx); var y1 = y * k - z * s, z1 = y * s + z * k;\n  s = Math.sin(ry); k = Math.cos(ry); var x1 = x * k + z1 * s, z2 = -x * s + z1 * k;\n  s = Math.sin(rz); k = Math.cos(rz); var x2 = x1 * k - y1 * s, y2 = x1 * s + y1 * k;\n  return [x2, y2, z2];\n}\nvar FACES = [];\n(SPEC.parts || []).forEach(function(part, idx){\n  var shape = SHAPES[part.s] || SHAPES.box;\n  var d = part.d || [1, 1, 1], p = part.p || [0, 0, 0], r = part.r || [0, 0, 0];\n  var pts = shape.v.map(function(v){\n    var q = [v[0] * (d[0] || 1) / 2, v[1] * (d[1] || 1) / 2, v[2] * (d[2] || 1) / 2];\n    q = spin(q, radians(r[0]), radians(r[1]), radians(r[2]));\n    return [q[0] + p[0], q[1] + p[1], q[2] + p[2]];\n  });\n  shape.f.forEach(function(face){\n    FACES.push({ pts: face.map(function(i){ return pts[i]; }), c: part.c || \"#8fd8ff\",\n                 part: idx, spin: part.spin, at: p });\n  });\n});\n\n/* everything is scaled to fit whatever it is drawn into */\nvar far = 0.001;\nFACES.forEach(function(f){ f.pts.forEach(function(p){\n  far = Math.max(far, Math.hypot(p[0], p[1], p[2]));\n}); });\nvar UNIT = 1 / far;\n\n/* ---- the ball it starts as ---- */\nFACES.forEach(function(f){\n  f.from = f.pts.map(function(p){\n    var len = Math.hypot(p[0], p[1], p[2]) || 1;\n    return [p[0] / len * far * 0.72, p[1] / len * far * 0.72, p[2] / len * far * 0.72];\n  });\n});\n\n/* ---- looking at it ---- */\nvar view = { ry: 0.5, rx: -0.25, zoom: 1, px: 0, py: 0, t: 0, morph: 0, spun: 0 };\nvar HOME = { ry: 0.5, rx: -0.25, zoom: 1, px: 0, py: 0 };\n\n/* One finger turns it on both axes. Two move it and pinch it bigger or\n   smaller. A double tap puts it back where it started, because it is very easy\n   to push a thing off the side of a phone and not know how to get it back. */\nvar touch = null, fingers = {}, pinch = null, lastTapAt = 0;\n\nfunction fingerCount(){ var n = 0; for(var k in fingers) if(fingers.hasOwnProperty(k)) n++; return n; }\nfunction middleOf(){\n  var x = 0, y = 0, n = 0;\n  for(var k in fingers){ if(!fingers.hasOwnProperty(k)) continue; x += fingers[k].x; y += fingers[k].y; n++; }\n  return n ? { x: x / n, y: y / n } : { x: 0, y: 0 };\n}\nfunction spreadOf(){\n  var all = [];\n  for(var k in fingers) if(fingers.hasOwnProperty(k)) all.push(fingers[k]);\n  if(all.length < 2) return 0;\n  return Math.hypot(all[0].x - all[1].x, all[0].y - all[1].y);\n}\n\nc.addEventListener(\"pointerdown\", function(e){\n  fingers[e.pointerId] = { x: e.clientX, y: e.clientY };\n  try{ c.setPointerCapture(e.pointerId); }catch(err){}\n  if(fingerCount() >= 2){\n    pinch = { spread: spreadOf(), zoom: view.zoom,\n              mid: middleOf(), px: view.px, py: view.py };\n    touch = null;                      /* it stopped being a turn */\n  } else {\n    touch = { x: e.clientX, y: e.clientY, moved: false };\n  }\n});\nc.addEventListener(\"pointermove\", function(e){\n  if(!fingers[e.pointerId]) return;\n  fingers[e.pointerId] = { x: e.clientX, y: e.clientY };\n  if(pinch && fingerCount() >= 2){\n    var spread = spreadOf();\n    if(pinch.spread > 12 && spread > 12){\n      view.zoom = Math.max(0.35, Math.min(4, pinch.zoom * (spread / pinch.spread)));\n    }\n    var mid = middleOf();\n    view.px = pinch.px + (mid.x - pinch.mid.x);\n    view.py = pinch.py + (mid.y - pinch.mid.y);\n    return;\n  }\n  if(!touch) return;\n  view.ry += (e.clientX - touch.x) * 0.01;\n  view.rx += (e.clientY - touch.y) * 0.01;\n  view.rx = Math.max(-1.4, Math.min(1.4, view.rx));\n  touch.x = e.clientX; touch.y = e.clientY; touch.moved = true;\n});\nfunction letGo(e){\n  if(fingers[e.pointerId]) delete fingers[e.pointerId];\n  if(fingerCount() < 2) pinch = null;\n  if(fingerCount() === 0){\n    if(touch && !touch.moved){\n      var now = Date.now();\n      if(now - lastTapAt < 320){        /* double tap - put it back */\n        view.ry = HOME.ry; view.rx = HOME.rx;\n        view.zoom = HOME.zoom; view.px = HOME.px; view.py = HOME.py;\n        lastTapAt = 0;\n      } else {\n        lastTapAt = now;\n        tap(e);\n      }\n    }\n    touch = null;\n  }\n}\nc.addEventListener(\"pointerup\", letGo);\nc.addEventListener(\"pointercancel\", letGo);\n\n/* Tapping a single part to hear its name is gone. Asking what a thing is made\n   of names all of them at once, on the model, which is what you actually want\n   when you ask that. */\nvar LABELS_ON = false;\nfunction tap(e){ /* nothing - a tap is for turning it, not for picking at it */ }\naddEventListener(\"message\", function(ev){\n  if(!ev.data || typeof ev.data !== \"object\") return;\n  if(ev.data.pedroLabels !== undefined) LABELS_ON = !!ev.data.pedroLabels;\n});\n\n/* ---- drawing ---- */\nvar drawn = [];\n/* A hologram is mostly edges. The face is a wash you can see through, so the\n   parts behind show; the line is what you actually read the shape from. And\n   every colour is pulled two thirds of the way to cyan - enough that it is all\n   one light, enough of its own colour left to tell the parts apart. */\nfunction parts3(hex){\n  var n = parseInt(String(hex).replace(\"#\", \"\"), 16);\n  if(isNaN(n)) n = 0x8fd8ff;\n  var r = (n >> 16) & 255, g2 = (n >> 8) & 255, b = n & 255;\n  /* towards #38e1f0 */\n  var m = 0.62;\n  return [Math.round(r + (0x38 - r) * m),\n          Math.round(g2 + (0xe1 - g2) * m),\n          Math.round(b + (0xf0 - b) * m)];\n}\nfunction shade(hex, light, alpha){\n  var c3 = parts3(hex);\n  var k = 0.55 + 0.75 * Math.max(0, light);\n  return \"rgba(\" + Math.min(255, Math.round(c3[0] * k)) + \",\" +\n                   Math.min(255, Math.round(c3[1] * k)) + \",\" +\n                   Math.min(255, Math.round(c3[2] * k)) + \",\" + alpha + \")\";\n}\nfunction frame(){\n  var W = c.width, H = c.height, mid = Math.min(W, H) / 2;\n  var dpr2 = c.width / (c.getBoundingClientRect().width || c.width);\n  g.clearRect(0, 0, W, H);\n  view.t += 0.016;\n  if(view.morph < 1) view.morph = Math.min(1, view.morph + 0.022);\n  var ease = view.morph < 1 ? 1 - Math.pow(1 - view.morph, 3) : 1;\n  if(!touch && !pinch) view.ry += 0.004;\n  view.spun += 0.14;\n\n  var cosY = Math.cos(view.ry), sinY = Math.sin(view.ry);\n  var cosX = Math.cos(view.rx), sinX = Math.sin(view.rx);\n  drawn = [];\n  for(var i = 0; i < FACES.length; i++){\n    var f = FACES[i], flat = [], depth = 0, ok = true;\n    for(var k = 0; k < f.pts.length; k++){\n      var a = f.pts[k], b = f.from[k];\n      var x = (b[0] + (a[0] - b[0]) * ease) * UNIT;\n      var y = (b[1] + (a[1] - b[1]) * ease) * UNIT;\n      var z = (b[2] + (a[2] - b[2]) * ease) * UNIT;\n      if(f.spin){                       /* propellers, wheels, anything told to turn */\n        var ax = (f.at || [0,0,0]);\n        var dx = x - ax[0] * UNIT, dy = y - ax[1] * UNIT, dz = z - ax[2] * UNIT;\n        var s = Math.sin(view.spun), cq = Math.cos(view.spun);\n        if(f.spin === \"y\"){ var nx = dx * cq + dz * s; dz = -dx * s + dz * cq; dx = nx; }\n        else if(f.spin === \"x\"){ var ny = dy * cq - dz * s; dz = dy * s + dz * cq; dy = ny; }\n        else { var mx = dx * cq - dy * s; dy = dx * s + dy * cq; dx = mx; }\n        x = ax[0] * UNIT + dx; y = ax[1] * UNIT + dy; z = ax[2] * UNIT + dz;\n      }\n      var x1 = x * cosY + z * sinY, z1 = -x * sinY + z * cosY;\n      var y1 = y * cosX - z1 * sinX, z2 = y * sinX + z1 * cosX;\n      var persp = 2.6 / (2.6 + z2 * 0.9);\n      /* px and py are in screen pixels, so they are scaled the same way the\n         canvas is - otherwise dragging it moves it half as far on a retina */\n      flat.push([W / 2 + view.px * dpr2 + x1 * mid * 0.78 * persp * view.zoom,\n                 H / 2 + view.py * dpr2 - y1 * mid * 0.78 * persp * view.zoom]);\n      depth += z2;\n    }\n    if(!ok) continue;\n    /* which way the face is pointing, for the light and for hiding its back */\n    var ax2 = flat[1][0] - flat[0][0], ay2 = flat[1][1] - flat[0][1];\n    var bx2 = flat[2][0] - flat[0][0], by2 = flat[2][1] - flat[0][1];\n    var cross = ax2 * by2 - ay2 * bx2;\n    if(cross >= 0) continue;                       /* facing away - skip it */\n    drawn.push({ flat: flat, depth: depth / f.pts.length, c: f.c, part: f.part,\n                 light: Math.min(1, Math.abs(cross) / (mid * mid * 0.06)) });\n  }\n  drawn.sort(function(a, b){ return b.depth - a.depth; });\n\n  /* A grid under it. Without one it floats in the dark with no sense of size\n     or of which way up it is - which is most of why it looked like a toy. */\n  var floorY = H / 2 + view.py * dpr2 + mid * 0.62 * view.zoom;\n  g.lineWidth = Math.max(1, c.width / 1400);\n  for(var gl = 1; gl <= 7; gl++){\n    var t2 = gl / 7;\n    var yy = floorY + Math.pow(t2, 1.9) * mid * 0.55 * view.zoom;\n    if(yy > H) break;\n    g.strokeStyle = \"rgba(56,225,240,\" + (0.16 * (1 - t2)).toFixed(3) + \")\";\n    g.beginPath(); g.moveTo(0, yy); g.lineTo(W, yy); g.stroke();\n  }\n  for(var gv = -5; gv <= 5; gv++){\n    var xx = W / 2 + view.px * dpr2 + gv * mid * 0.20 * view.zoom;\n    g.strokeStyle = \"rgba(56,225,240,\" + (0.13 * (1 - Math.abs(gv) / 6)).toFixed(3) + \")\";\n    g.beginPath();\n    g.moveTo(W / 2 + view.px * dpr2 + gv * mid * 0.08 * view.zoom, floorY);\n    g.lineTo(xx, Math.min(H, floorY + mid * 0.55 * view.zoom));\n    g.stroke();\n  }\n  var wide = Math.max(2, c.width / 220);\n  var thin = Math.max(1, c.width / 900);\n  for(var d = 0; d < drawn.length; d++){\n    var q = drawn[d];\n    g.beginPath();\n    g.moveTo(q.flat[0][0], q.flat[0][1]);\n    for(var m = 1; m < q.flat.length; m++) g.lineTo(q.flat[m][0], q.flat[m][1]);\n    g.closePath();\n    /* a wash you can see through, so what is behind still shows */\n    g.fillStyle = shade(q.c, 0.35 + q.light, 0.13 + q.light * 0.10);\n    g.fill();\n    /* the glow, faked with a wide soft pass under a narrow bright one -\n       shadowBlur on sixty paths a frame is what makes a phone hot */\n    g.strokeStyle = shade(q.c, 1, 0.16);\n    g.lineWidth = wide;\n    g.stroke();\n    g.strokeStyle = shade(q.c, 1.2, 0.92);\n    g.lineWidth = thin;\n    g.stroke();\n  }\n  /* Every part named at once, each on its own part, with a line out to the\n     name so it does not sit on top of the thing it is naming. Only the parts\n     actually facing you, or the far side labels the near side. */\n  if(LABELS_ON){\n    var unit0 = Math.min(W, H);\n    var nearest = {};\n    drawn.forEach(function(f){\n      var seen = nearest[f.part];\n      if(!seen || f.depth < seen.depth) nearest[f.part] = f;\n    });\n    g.font = \"600 \" + Math.round(unit0 / 40) + \"px -apple-system,sans-serif\";\n    g.textAlign = \"left\";\n    var placed = [];\n    Object.keys(nearest).forEach(function(k){\n      var f = nearest[k];\n      var part = (SPEC.parts || [])[f.part];\n      if(!part || !part.n) return;\n      var cx = 0, cy = 0;\n      f.flat.forEach(function(pt){ cx += pt[0]; cy += pt[1]; });\n      cx /= f.flat.length; cy /= f.flat.length;\n      /* out to whichever side it is already on, so the lines do not cross */\n      var side = cx < W / 2 ? -1 : 1;\n      var tx = cx + side * unit0 * 0.13;\n      var ty = cy;\n      /* nudge apart anything that landed on top of something else */\n      for(var q = 0; q < placed.length; q++){\n        if(Math.abs(placed[q].y - ty) < unit0 * 0.045 &&\n           Math.abs(placed[q].x - tx) < unit0 * 0.30){ ty = placed[q].y + unit0 * 0.05; q = -1; }\n      }\n      placed.push({ x: tx, y: ty });\n      g.strokeStyle = \"rgba(56,225,240,.55)\";\n      g.lineWidth = Math.max(1, unit0 / 700);\n      g.beginPath(); g.moveTo(cx, cy); g.lineTo(tx, ty); g.stroke();\n      var text = part.n;\n      var wide2 = g.measureText(text).width;\n      var lx = side < 0 ? tx - wide2 : tx;\n      g.fillStyle = \"rgba(4,8,16,.72)\";\n      g.fillRect(lx - unit0 * 0.012, ty - unit0 * 0.028,\n                 wide2 + unit0 * 0.024, unit0 * 0.042);\n      g.fillStyle = \"#7ff0ff\";\n      g.fillText(text, lx, ty + unit0 * 0.005);\n    });\n  }\n  if(SPEC.name){\n    /* sized against the narrow side, or it is enormous on a tall screen */\n    var unit = Math.min(W, H);\n    g.font = \"600 \" + Math.round(unit / 26) + \"px -apple-system,sans-serif\";\n    g.textAlign = \"center\";\n    g.fillStyle = \"rgba(56,225,240,.62)\";\n    g.fillText(SPEC.name, W / 2, H - unit * 0.06);\n  }\n  requestAnimationFrame(frame);\n}\nframe();\n";
+var VIZ3D_RENDER = "\nvar SPEC = __SPEC__;\nvar c = document.getElementById(\"c\"), g = c.getContext(\"2d\");\nvar SCALE = 1;\nfunction fit(){\n  /* It used to be square, at the size of the shorter side - which on a tall\n     phone is a box sitting in the middle of a dark rectangle. It fills what it\n     is given now. */\n  var w = window.innerWidth, hh = window.innerHeight;\n  var dpr = Math.min(2, window.devicePixelRatio || 1);\n  c.width = Math.round(w * dpr); c.height = Math.round(hh * dpr);\n  c.style.width = w + \"px\"; c.style.height = hh + \"px\";\n  /* Worked out here, where the size is already changing, and NOT in the draw\n     loop. It was being read with getBoundingClientRect inside frame(), which\n     forces the page to be laid out again sixty times a second for a number\n     that only changes when the window does. That was the lag. */\n  SCALE = dpr;\n}\naddEventListener(\"resize\", fit); fit();\n\n/* ---- the shapes every part is made of ---- */\nfunction box(){\n  var v = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]];\n  return { v: v, f: [[0,1,2,3],[5,4,7,6],[4,0,3,7],[1,5,6,2],[4,5,1,0],[3,2,6,7]] };\n}\nfunction tube(n, topR){\n  var v = [], f = [], i;\n  if(topR === undefined) topR = 1;\n  for(i = 0; i < n; i++){\n    var a = i / n * Math.PI * 2;\n    v.push([Math.cos(a), -1, Math.sin(a)]);\n    v.push([Math.cos(a) * topR, 1, Math.sin(a) * topR]);\n  }\n  for(i = 0; i < n; i++){\n    var j = (i + 1) % n;\n    f.push([i * 2, j * 2, j * 2 + 1, i * 2 + 1]);\n  }\n  var bottom = [], top = [];\n  for(i = 0; i < n; i++){ bottom.push(i * 2); top.push((n - 1 - i) * 2 + 1); }\n  f.push(bottom); f.push(top);\n  return { v: v, f: f };\n}\nfunction ball(rows, cols){\n  var v = [], f = [], i, j;\n  for(i = 0; i <= rows; i++){\n    var th = i / rows * Math.PI;\n    for(j = 0; j < cols; j++){\n      var ph = j / cols * Math.PI * 2;\n      v.push([Math.sin(th) * Math.cos(ph), Math.cos(th), Math.sin(th) * Math.sin(ph)]);\n    }\n  }\n  for(i = 0; i < rows; i++){\n    for(j = 0; j < cols; j++){\n      var a = i * cols + j, b = i * cols + (j + 1) % cols;\n      f.push([a, b, b + cols, a + cols]);\n    }\n  }\n  return { v: v, f: f };\n}\nvar SHAPES = {\n  box: box(), plate: box(), cyl: tube(12), cone: tube(12, 0.02),\n  ball: ball(7, 12), wedge: tube(3)\n};\n\n/* ---- turning a part into faces in the world ---- */\nfunction radians(d){ return (d || 0) * Math.PI / 180; }\nfunction spin(p, rx, ry, rz){\n  var x = p[0], y = p[1], z = p[2], s, k;\n  s = Math.sin(rx); k = Math.cos(rx); var y1 = y * k - z * s, z1 = y * s + z * k;\n  s = Math.sin(ry); k = Math.cos(ry); var x1 = x * k + z1 * s, z2 = -x * s + z1 * k;\n  s = Math.sin(rz); k = Math.cos(rz); var x2 = x1 * k - y1 * s, y2 = x1 * s + y1 * k;\n  return [x2, y2, z2];\n}\nvar FACES = [];\n(SPEC.parts || []).forEach(function(part, idx){\n  var shape = SHAPES[part.s] || SHAPES.box;\n  var d = part.d || [1, 1, 1], p = part.p || [0, 0, 0], r = part.r || [0, 0, 0];\n  var pts = shape.v.map(function(v){\n    var q = [v[0] * (d[0] || 1) / 2, v[1] * (d[1] || 1) / 2, v[2] * (d[2] || 1) / 2];\n    q = spin(q, radians(r[0]), radians(r[1]), radians(r[2]));\n    return [q[0] + p[0], q[1] + p[1], q[2] + p[2]];\n  });\n  shape.f.forEach(function(face){\n    FACES.push({ pts: face.map(function(i){ return pts[i]; }), c: part.c || \"#8fd8ff\",\n                 part: idx, spin: part.spin, at: p });\n  });\n});\n\n/* everything is scaled to fit whatever it is drawn into */\nvar far = 0.001;\nFACES.forEach(function(f){ f.pts.forEach(function(p){\n  far = Math.max(far, Math.hypot(p[0], p[1], p[2]));\n}); });\nvar UNIT = 1 / far;\n\n/* ---- the ball it starts as ---- */\nFACES.forEach(function(f){\n  f.from = f.pts.map(function(p){\n    var len = Math.hypot(p[0], p[1], p[2]) || 1;\n    return [p[0] / len * far * 0.72, p[1] / len * far * 0.72, p[2] / len * far * 0.72];\n  });\n});\n\n/* ---- looking at it ---- */\n/* One finger turns it, on both axes. That is all.\n   Moving it about and pinching it went: they were what dragged a layout read\n   into the draw loop, and a thing you can shove off the side of the screen is\n   a thing you then have to get back. */\nvar view = { ry: 0.5, rx: -0.25, zoom: 1, px: 0, py: 0, t: 0, morph: 0, spun: 0 };\nvar touch = null;\n\nc.addEventListener(\"pointerdown\", function(e){\n  touch = { x: e.clientX, y: e.clientY };\n  try{ c.setPointerCapture(e.pointerId); }catch(err){}\n});\nc.addEventListener(\"pointermove\", function(e){\n  if(!touch) return;\n  view.ry += (e.clientX - touch.x) * 0.01;\n  view.rx += (e.clientY - touch.y) * 0.01;\n  view.rx = Math.max(-1.4, Math.min(1.4, view.rx));\n  touch.x = e.clientX; touch.y = e.clientY;\n});\nfunction letGo(){ touch = null; }\nc.addEventListener(\"pointerup\", letGo);\nc.addEventListener(\"pointercancel\", letGo);\n\n/* No labels and no tapping. What is left is the thing itself, every part\n   showing through the ones in front of it, turning. */\n\n/* ---- drawing ---- */\nvar drawn = [];\n/* A hologram is mostly edges. The face is a wash you can see through, so the\n   parts behind show; the line is what you actually read the shape from. And\n   every colour is pulled two thirds of the way to cyan - enough that it is all\n   one light, enough of its own colour left to tell the parts apart. */\nfunction parts3(hex){\n  var n = parseInt(String(hex).replace(\"#\", \"\"), 16);\n  if(isNaN(n)) n = 0x8fd8ff;\n  var r = (n >> 16) & 255, g2 = (n >> 8) & 255, b = n & 255;\n  /* towards #38e1f0 */\n  var m = 0.62;\n  return [Math.round(r + (0x38 - r) * m),\n          Math.round(g2 + (0xe1 - g2) * m),\n          Math.round(b + (0xf0 - b) * m)];\n}\nfunction shade(hex, light, alpha){\n  var c3 = parts3(hex);\n  var k = 0.55 + 0.75 * Math.max(0, light);\n  return \"rgba(\" + Math.min(255, Math.round(c3[0] * k)) + \",\" +\n                   Math.min(255, Math.round(c3[1] * k)) + \",\" +\n                   Math.min(255, Math.round(c3[2] * k)) + \",\" + alpha + \")\";\n}\nfunction frame(){\n  var W = c.width, H = c.height, mid = Math.min(W, H) / 2;\n  g.clearRect(0, 0, W, H);\n  view.t += 0.016;\n  if(view.morph < 1) view.morph = Math.min(1, view.morph + 0.022);\n  var ease = view.morph < 1 ? 1 - Math.pow(1 - view.morph, 3) : 1;\n  if(!touch) view.ry += 0.004;\n  view.spun += 0.14;\n\n  var cosY = Math.cos(view.ry), sinY = Math.sin(view.ry);\n  var cosX = Math.cos(view.rx), sinX = Math.sin(view.rx);\n  drawn = [];\n  for(var i = 0; i < FACES.length; i++){\n    var f = FACES[i], flat = [], depth = 0, ok = true;\n    for(var k = 0; k < f.pts.length; k++){\n      var a = f.pts[k], b = f.from[k];\n      var x = (b[0] + (a[0] - b[0]) * ease) * UNIT;\n      var y = (b[1] + (a[1] - b[1]) * ease) * UNIT;\n      var z = (b[2] + (a[2] - b[2]) * ease) * UNIT;\n      if(f.spin){                       /* propellers, wheels, anything told to turn */\n        var ax = (f.at || [0,0,0]);\n        var dx = x - ax[0] * UNIT, dy = y - ax[1] * UNIT, dz = z - ax[2] * UNIT;\n        var s = Math.sin(view.spun), cq = Math.cos(view.spun);\n        if(f.spin === \"y\"){ var nx = dx * cq + dz * s; dz = -dx * s + dz * cq; dx = nx; }\n        else if(f.spin === \"x\"){ var ny = dy * cq - dz * s; dz = dy * s + dz * cq; dy = ny; }\n        else { var mx = dx * cq - dy * s; dy = dx * s + dy * cq; dx = mx; }\n        x = ax[0] * UNIT + dx; y = ax[1] * UNIT + dy; z = ax[2] * UNIT + dz;\n      }\n      var x1 = x * cosY + z * sinY, z1 = -x * sinY + z * cosY;\n      var y1 = y * cosX - z1 * sinX, z2 = y * sinX + z1 * cosX;\n      var persp = 2.6 / (2.6 + z2 * 0.9);\n      /* px and py are in screen pixels, so they are scaled the same way the\n         canvas is - otherwise dragging it moves it half as far on a retina */\n      flat.push([W / 2 + x1 * mid * 0.78 * persp,\n                 H / 2 - y1 * mid * 0.78 * persp]);\n      depth += z2;\n    }\n    if(!ok) continue;\n    /* which way the face is pointing, for the light and for hiding its back */\n    var ax2 = flat[1][0] - flat[0][0], ay2 = flat[1][1] - flat[0][1];\n    var bx2 = flat[2][0] - flat[0][0], by2 = flat[2][1] - flat[0][1];\n    var cross = ax2 * by2 - ay2 * bx2;\n    if(cross >= 0) continue;                       /* facing away - skip it */\n    drawn.push({ flat: flat, depth: depth / f.pts.length, c: f.c, part: f.part,\n                 light: Math.min(1, Math.abs(cross) / (mid * mid * 0.06)) });\n  }\n  drawn.sort(function(a, b){ return b.depth - a.depth; });\n\n  /* A grid under it. Without one it floats in the dark with no sense of size\n     or of which way up it is - which is most of why it looked like a toy. */\n  var floorY = H / 2 + mid * 0.62;\n  g.lineWidth = Math.max(1, c.width / 1400);\n  for(var gl = 1; gl <= 7; gl++){\n    var t2 = gl / 7;\n    var yy = floorY + Math.pow(t2, 1.9) * mid * 0.55;\n    if(yy > H) break;\n    g.strokeStyle = \"rgba(56,225,240,\" + (0.16 * (1 - t2)).toFixed(3) + \")\";\n    g.beginPath(); g.moveTo(0, yy); g.lineTo(W, yy); g.stroke();\n  }\n  for(var gv = -5; gv <= 5; gv++){\n    var xx = W / 2 + gv * mid * 0.20;\n    g.strokeStyle = \"rgba(56,225,240,\" + (0.13 * (1 - Math.abs(gv) / 6)).toFixed(3) + \")\";\n    g.beginPath();\n    g.moveTo(W / 2 + gv * mid * 0.08, floorY);\n    g.lineTo(xx, Math.min(H, floorY + mid * 0.55));\n    g.stroke();\n  }\n  var wide = Math.max(2, c.width / 220);\n  var thin = Math.max(1, c.width / 900);\n  for(var d = 0; d < drawn.length; d++){\n    var q = drawn[d];\n    g.beginPath();\n    g.moveTo(q.flat[0][0], q.flat[0][1]);\n    for(var m = 1; m < q.flat.length; m++) g.lineTo(q.flat[m][0], q.flat[m][1]);\n    g.closePath();\n    /* a wash you can see through, so what is behind still shows */\n    g.fillStyle = shade(q.c, 0.35 + q.light, 0.13 + q.light * 0.10);\n    g.fill();\n    /* the glow, faked with a wide soft pass under a narrow bright one -\n       shadowBlur on sixty paths a frame is what makes a phone hot */\n    g.strokeStyle = shade(q.c, 1, 0.16);\n    g.lineWidth = wide;\n    g.stroke();\n    g.strokeStyle = shade(q.c, 1.2, 0.92);\n    g.lineWidth = thin;\n    g.stroke();\n  }\n    if(SPEC.name){\n    /* sized against the narrow side, or it is enormous on a tall screen */\n    var unit = Math.min(W, H);\n    g.font = \"600 \" + Math.round(unit / 26) + \"px -apple-system,sans-serif\";\n    g.textAlign = \"center\";\n    g.fillStyle = \"rgba(56,225,240,.62)\";\n    g.fillText(SPEC.name, W / 2, H - unit * 0.06);\n  }\n  requestAnimationFrame(frame);\n}\nframe();\n";
 
 function spec3dPage(spec){
   /* Its own styling, because the shared wrapper sizes canvases to 100vmin -
@@ -7318,6 +7398,18 @@ function needsEyes(q){
 
 function camQuestion(q){
   q = String(q || "").trim();
+  /* reading writing, and turning it into English, are the two things a camera
+     is asked for that a description of the scene does not answer */
+  if(TRANSLATE_RE.test(q)){
+    var into = (q.match(/\binto\s+([a-z]+)/i) || [])[1] || "English";
+    return "Read every word of the writing in this picture, then translate it " +
+      "into " + into + ". Say what language it was written in, then give the " +
+      "translation. If there is no writing, say so.";
+  }
+  if(READ_RE.test(q)){
+    return "Read the writing in this picture out, exactly as it is written, " +
+      "in whatever language it is in. If there is no writing, say so.";
+  }
   if(!q || CAM_ONLY_RE.test(q)) return "What am I looking at?";
   if(/how many|count/i.test(q))
     return q + " Count what is actually visible in the picture, one by one, and give a " +
@@ -7565,6 +7657,7 @@ function camAsk(question){
   if(!shot){ camSet('Nothing to look at yet'); return; }
   question = camQuestion(question) || 'What am I looking at?';
   cam.busy = true;
+  lookingAt = true;              /* there is a picture - say so in the prompt */
   camEl.classList.add('busy');
   camSet('Looking…');
   $('camSaid').textContent = '';
@@ -7597,6 +7690,7 @@ function camAsk(question){
   }
   work.then(function(answer){
     voiceMode = false;
+    lookingAt = false;
     cam.busy = false;
     camEl.classList.remove('busy');
     camSet('Ask another');
@@ -7606,6 +7700,7 @@ function camAsk(question){
     speak(answer);
   }).catch(function(e){
     voiceMode = false;
+    lookingAt = false;
     cam.busy = false;
     camEl.classList.remove('busy');
     camSet('That did not work');
@@ -7668,6 +7763,9 @@ function dockToggle(){
   $("dockVoiceBtn").classList.toggle("on", on);
 }
 
+$("featuresClose").addEventListener("click", function(){
+  $("features").classList.remove("on");
+});
 $("dockVoiceBtn").addEventListener("click", dockToggle);
 $("dockCam").addEventListener("click", function(){ camOpen(); });
 $("dockTeach").addEventListener("click", function(){ renderTeach(); openPanel($("teach")); });
@@ -8471,22 +8569,57 @@ function rightNow(said){
     return true;
   }
   /* asking what it is made of names every part at once, on the model */
+  if(STOP_ALL_RE.test(q)){
+    var put = backToNormal();
+    sayNow(put.length ? "Stopped." : "Nothing to stop.");
+    return true;
+  }
+  if(FEATURES_RE.test(q)){ featuresShow(); return true; }
+  if(TOOLS_GUI_RE.test(q)){ toolsShow(); return true; }
+  if(GUI_CLOSE_RE.test(q)){
+    var shut = guiClose();
+    sayNow(shut.length ? "Closed." : "Nothing is open.");
+    return true;
+  }
+  if(WHERE_RE.test(q)){
+    whereAmI().then(function(spot){
+      showCard("Where you are", spot.name || "here", [
+        { label:"Country", value: spot.country || "\u2014" },
+        { label:"Found by", value: spot.byHand ? "you, in Settings"
+            : spot.name === "where you are" ? "the phone's location" : "the phone's clock" }
+      ], spot.lat != null ? spot.lat.toFixed(3) + ", " + spot.lon.toFixed(3) : "");
+      sayNow((spot.name || "here") + (spot.country ? ", " + spot.country : "") +
+        (spot.byHand ? " - you set that in Settings."
+          : spot.name === "where you are" ? " - from the phone's location."
+          : " - from the phone's clock. Say pinpoint me for the exact spot."));
+    }).catch(function(){ sayNow("I do not know where you are."); });
+    return true;
+  }
+  if(PINPOINT_RE.test(q)){
+    hfSet("busy", "Asking the phone");
+    pinpoint().then(function(spot){
+      showCard("Where you are", spot.name || "here", [
+        { label:"Country", value: spot.country || "\u2014" },
+        { label:"Found by", value:"the phone's location" }
+      ], spot.lat.toFixed(4) + ", " + spot.lon.toFixed(4));
+      sayNow("Got it. " + (spot.name || "here") + (spot.country ? ", " + spot.country : "") + ".");
+    }).catch(function(e){
+      sayNow(String(e && e.message || e));
+    });
+    return true;
+  }
   if(TRIVIA_RE.test(q)){ triviaStart(); return true; }
-  if(TD_RE.test(q)){ tdStart(); return true; }
+  /* Asking what it is made of names them out loud. Nothing is written on the
+     model any more - the parts show through each other instead. */
   if(PARTS_RE.test(q)){
     if(!holoNow || !$("hfOrb").classList.contains("showing")){
       sayNow("There is nothing up to take apart.");
       return true;
     }
-    holoLabels(true);
     var names = holoNow.parts.filter(function(x){ return x; });
-    sayNow(names.length
-      ? "Labelled. " + names.slice(0, 8).join(", ") +
-        (names.length > 8 ? ", and " + (names.length - 8) + " more." : ".")
-      : "Labelled.");
+    sayNow(names.length ? names.join(", ") + "." : "I do not have its parts.");
     return true;
   }
-  if(PARTS_OFF_RE.test(q)){ holoLabels(false); sayNow("Labels off."); return true; }
   if(PARTY_ON_RE.test(q)){ partyStart(); return true; }
   if(PARTY_OFF_RE.test(q)){ partyStop(); return true; }
   if(NOW_RE.check.test(q)){
@@ -8549,6 +8682,25 @@ function rememberHarder(said){
     });
     if(kept.length) hudLog("him", "Remembered: " + kept.join("; "), false);
   }).catch(function(){ voiceMode = was; });
+}
+
+/* Everything that takes over the screen, put away at once. There were four
+   ways out of four things and you had to know which one you were in. */
+function backToNormal(){
+  var out = [];
+  if(gameOn()){ out.push("game"); game.kind = null; game.step = null; game.q = null; game.pool = []; }
+  if($("hf") && $("hf").classList.contains("bg")){ out.push("hologram"); holoHide(); }
+  if($("hfOrb") && $("hfOrb").classList.contains("holo")){ holoHide(); }
+  if($("hfOrb") && $("hfOrb").classList.contains("showing")){ out.push("what was showing"); vizStop(); }
+  if(cam && cam.open){ out.push("camera"); camClose(); }
+  if(wb && wb.on){ out.push("building"); if(typeof wbClose === "function") wbClose(); }
+  if(store.settings.party){ out.push("party"); partySet(false); }
+  document.querySelectorAll(".hudpanel[data-panel].on").forEach(function(el){
+    el.classList.remove("on");
+  });
+  if($("features")) $("features").classList.remove("on");
+  sayStop();
+  return out;
 }
 
 /* ==================== games ====================
@@ -8811,6 +8963,132 @@ function gameHeard(said){
   return false;
 }
 
+/* ==================== what he can do ====================
+   Every word that does something, in alphabetical order. Written out rather
+   than pulled from the regexes - a regex read aloud is unreadable - but there
+   is a test that every instant answer and every tool appears here, so it
+   cannot quietly go stale. */
+var FEATURES = [
+  { say: "add a battery / add a lamp / wire it up", does: "put parts on the board and connect them" },
+  { say: "again / repeat that / what did you say", does: "say the last answer once more" },
+  { say: "battery", does: "how much charge is left" },
+  { say: "build", does: "open the building board" },
+  { say: "calendar", does: "open the calendar app" },
+  { say: "call dad", does: "start a call - iOS needs the tap" },
+  { say: "call yourself Jarvis", does: "rename him; the wake word moves with it" },
+  { say: "clap twice", does: "wake him without saying his name" },
+  { say: "compare X and Y", does: "look both up and set them side by side" },
+  { say: "date / what's the date", does: "today's date" },
+  { say: "day / what day is it", does: "the day of the week" },
+  { say: "email the school", does: "start an email - iOS needs the tap" },
+  { say: "faster / slower", does: "change how quickly he talks" },
+  { say: "forget X", does: "drop something he remembered" },
+  { say: "hologram of the moon", does: "a 3D model of it, filling the screen" },
+  { say: "how do I get to X", does: "directions" },
+  { say: "how many km is 5 miles", does: "convert one unit to another" },
+  { say: "labels off", does: "not used any more - the model shows its parts as it is" },
+  { say: "learn about X", does: "go and read up on something" },
+  { say: "louder / quieter", does: "change how loud he is" },
+  { say: "my notes / what are my notes", does: "read back what he has kept" },
+  { say: "next / what's next", does: "the next thing in the diary" },
+  { say: "notify me in ten minutes", does: "a notification on the phone for later" },
+  { say: "open features", does: "this list" },
+  { say: "open safari / open settings", does: "open an app, or one of his own panels" },
+  { say: "party", does: "rainbow, lights and a hat" },
+  { say: "pause / carry on", does: "hold what he is doing, and pick it up again" },
+  { say: "photo of X / what does X look like", does: "a hologram of it" },
+  { say: "play / pause / skip", does: "control what is playing" },
+  { say: "put the dentist in my calendar", does: "add an event" },
+  { say: "remember that X", does: "keep something about you" },
+  { say: "remind me to X", does: "add a reminder" },
+  { say: "run diagnostics", does: "what is working and what is not" },
+  { say: "run my morning shortcut", does: "run one of your Shortcuts" },
+  { say: "search for X / look up X", does: "read the web and answer from it" },
+  { say: "set a timer for five minutes", does: "a timer" },
+  { say: "simulate an engine", does: "build a working model of it" },
+  { say: "status / brief me / morning", does: "time, weather, diary, battery, all at once" },
+  { say: "stop", does: "put everything away and go back to the plain screen" },
+  { say: "text mum I am late", does: "start a message - iOS needs the tap" },
+  { say: "time / what time is it", does: "the time" },
+  { say: "trivia", does: "a quiz, ten topics, first to five" },
+  { say: "truth or dare", does: "exactly that" },
+  { say: "what am I holding", does: "open the camera and say what it sees" },
+  { say: "what do I have to do", does: "your reminders" },
+  { say: "what have I got on today", does: "your calendar" },
+  { say: "what is 17 percent of 340", does: "work out a sum" },
+  { say: "what is mum's number", does: "look up a contact" },
+  { say: "weather", does: "the weather where you are" },
+  { say: "where am I", does: "where he thinks you are, and how he knows" },
+  { say: "where is the Colosseum", does: "show a place on the map" }
+];
+
+/* One panel, two lists: the words you can say, and the tools he can reach for.
+   Both alphabetical, because a list you have to read all of to find one thing
+   is not a list. */
+function fillPanel(title, rows, note){
+  var panel = $("features");
+  if(!panel) return 0;
+  var body = $("featuresList");
+  if(!body) return 0;
+  var head = $("featuresTitle");
+  if(head) head.textContent = title;
+  var foot = $("featuresNote");
+  if(foot) foot.textContent = note || "Say stop to put everything away.";
+  body.innerHTML = "";
+  rows.slice().sort(function(a, b){
+    return a.say.toLowerCase().localeCompare(b.say.toLowerCase());
+  }).forEach(function(f){
+    var row = document.createElement("div");
+    row.className = "frow";
+    var said = document.createElement("b");
+    said.textContent = f.say;
+    var does = document.createElement("span");
+    does.textContent = f.does;
+    row.appendChild(said); row.appendChild(does);
+    body.appendChild(row);
+  });
+  panel.classList.add("on");
+  body.scrollTop = 0;
+  return rows.length;
+}
+
+function featuresShow(){
+  var n = fillPanel("Everything he answers to", FEATURES);
+  sayNow(n + " things. They are on the screen.");
+}
+
+/* The tools themselves - what he can reach for, rather than what you can say.
+   Built from TOOLS, so it cannot describe one he does not have. */
+function toolsShow(){
+  var rows = Object.keys(TOOLS).map(function(name){
+    var tell = TOOLS[name].tell;
+    return { say: name,
+             does: (typeof tell === "function" ? tell() : tell) +
+                   (TOOLS[name].hands ? " - iOS needs the tap" : "") };
+  });
+  var n = fillPanel("Tools he can use", rows,
+    "Built from what he actually has. Say close gui to put it away.");
+  sayNow(n + " tools. They are on the screen.");
+}
+
+/* Whatever is open, shut. */
+function guiClose(){
+  var shut = [];
+  if($("features") && $("features").classList.contains("on")){
+    shut.push("the list"); $("features").classList.remove("on");
+  }
+  document.querySelectorAll(".hudpanel[data-panel].on").forEach(function(el){
+    shut.push(el.dataset.panel); el.classList.remove("on");
+  });
+  if($("settings") && $("settings").classList.contains("on")){
+    shut.push("settings"); closePanels();
+  }
+  if($("orbInfo") && $("orbInfo").classList.contains("on")){
+    shut.push("the card"); $("orbInfo").classList.remove("on");
+  }
+  return shut;
+}
+
 /* ==================== party mode ====================
    Colour, speed, a livelier voice, and an offer of music - which is the only
    part of a party a phone can actually supply. */
@@ -8818,8 +9096,16 @@ var PARTS_RE = new RegExp("^(?:what|which)\\s+parts?(?:\\s+(?:is|are|does)[^?]*)
   "|^(?:label|name|show)\\s+(?:me\\s+)?(?:the\\s+)?parts?$" +
   "|^what(?:\\'?s| is)\\s+it\\s+made\\s+(?:of|from)\\??$" +
   "|^parts?$", "i");
-var PARTS_OFF_RE = new RegExp("^(?:labels?\\s+off|hide\\s+(?:the\\s+)?labels?" +
-  "|no\\s+labels?|unlabel)$", "i");
+var STOP_ALL_RE = /^(?:stop|stop it|stop everything|close it|close everything|go back|back to normal|normal|exit|never mind|nevermind|that'?s enough|enough)$/i;
+var FEATURES_RE = /^(?:open )?(?:features|commands|what can you do|list|the list|help me|show features|feature list)$/i;
+var TOOLS_GUI_RE = /^(?:open )?(?:tools|the tools|tool list|show tools|what tools)$/i;
+var GUI_CLOSE_RE = new RegExp("^(?:close|hide)\\s*(?:the\\s*)?" +
+  "(?:gui|guis|panel|panels|window|windows|list|menu|menus)$" +
+  "|^close everything open$", "i");
+var WHERE_RE = /^(?:where am i|where are we|what'?s my location|where do you think i am)\??$/i;
+var PINPOINT_RE = /^(?:pinpoint(?: me)?|exact location|precise location|use gps|find me|locate me)\??$/i;
+var TRANSLATE_RE = /\btranslate\b|\bwhat does (?:this|that|it) say in\b|\bin english\b|\binto english\b/i;
+var READ_RE = /^(?:read (?:this|that|it)|what does (?:this|that|it) say|read the (?:sign|label|text|writing|menu|page))\b/i;
 var TRIVIA_RE = /^(?:trivia|quiz|let'?s play trivia|play trivia|start (?:a )?quiz|trivia time)$/i;
 var TD_RE = /^(?:truth or dare|lets play truth or dare|let'?s play truth or dare|play truth or dare)$/i;
 var PARTY_ON_RE = /^(?:party|party time|party mode|let'?s party|start the party|it'?s a party)$/i;
@@ -8938,7 +9224,6 @@ function holoShow(what){
   hfSet("busy", "Looking at " + what);
   $("orbViz").srcdoc = vizPage(vizWaiting(what));
   $("hfOrb").classList.add("showing");
-  holoLabels(false);
 
   /* Built from a photograph of the actual thing. Asked from memory, the model
      produces whatever it imagines and the proportions are nobody's - which is
@@ -8968,11 +9253,7 @@ function holoShow(what){
 var holoNow = null;
 
 /* Every part named at once, on the model. Tapping one at a time is gone. */
-function holoLabels(on){
-  var frame = $("orbViz");
-  if(!frame || !frame.contentWindow) return;
-  try{ frame.contentWindow.postMessage({ pedroLabels: !!on }, "*"); }catch(e){}
-}
+
 
 /* A real photograph of it, treated until it reads as light. Kept for the
    things a model made of boxes and cylinders cannot be: a person, a painting,
@@ -11599,7 +11880,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.96";
+var BUILD = "2026-08-21.97";
 
 function banner(kind, html){
   var b = $("banner");

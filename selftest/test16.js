@@ -860,11 +860,15 @@ const TOOLSRC = decl("TOOLS");
   t("and quickens", inPage("#hfOrb.party .disc{"), true);
   t("the words go with it", inPage("#hf.party #hfState{"), true);
   t("and there is a wash behind it all", inPage("#hf.party::after{"), true);
-  /* four full-height beams that blur or blend would repaint everything
-     underneath on every frame, which is what makes a phone hot */
-  t("the beams do not blur or blend, and it says why",
-    inPage("Nothing here blurs or blends") &&
-    !/#partyLights i\{[^}]*(?:blur|mix-blend)/.test(page), true);
+  /* They are over the top of everything now, where a beam has to read as
+     light falling on the room rather than paint over it - so screen is on
+     purpose. Four elements, only while a party is on. Nothing is blurred. */
+  t("the beams fall as light rather than paint",
+    /#partyLights i{[^}]*mix-blend-mode:screen/.test(page), true);
+  t("but nothing is blurred", /#partyLights i{[^}]*filter:s*blur/.test(page), false);
+  t("and they are over everything, not under it",
+    /#partyLights{[^}]*z-index:8/.test(page), true);
+  t("without taking any taps", /#partyLights{[^}]*pointer-events:none/.test(page), true);
   t("the voice goes with it", grab("partySet").indexOf('"excited"') > -1, true);
   t("and comes back afterwards", grab("partySet").indexOf('"composed"') > -1, true);
   t("it is remembered", grab("partySet").indexOf("store.settings.party") > -1, true);
@@ -887,19 +891,16 @@ const TOOLSRC = decl("TOOLS");
     code.indexOf("view.ry += (e.clientX - touch.x)") > -1 &&
     code.indexOf("view.rx += (e.clientY - touch.y)") > -1, true);
   t("and cannot be turned upside down", code.indexOf("Math.max(-1.4, Math.min(1.4, view.rx))") > -1, true);
-  t("two fingers move it", code.indexOf("view.px = pinch.px + (mid.x - pinch.mid.x)") > -1, true);
-  t("and pinch it bigger or smaller", code.indexOf("pinch.zoom * (spread / pinch.spread)") > -1, true);
-  t("within reason", code.indexOf("Math.max(0.35, Math.min(4,") > -1, true);
-  /* it is very easy to push a thing off the side of a phone and not know how
-     to get it back */
-  t("a double tap puts it back where it started", code.indexOf("HOME.ry") > -1, true);
-  t("moving it is in screen pixels, scaled for the canvas",
-    code.indexOf("view.px * dpr") > -1, true);
-  t("and it stops turning by itself while you are holding it",
-    code.indexOf("if(!touch && !pinch) view.ry += 0.004") > -1, true);
-  t("a second finger is not read as a turn", code.indexOf("touch = null;                      /* it stopped being a turn */") > -1, true);
-  t("and letting go of one of two does not start a turn either",
-    code.indexOf("if(fingerCount() === 0)") > -1, true);
+  /* Moving and pinching came out: they were what dragged a getBoundingClientRect
+     into frame(), forcing a layout sixty times a second for a number that only
+     changes when the window does. That was the lag he was feeling. */
+  t("nothing moves it about any more", code.indexOf("view.px = pinch.px") > -1, false);
+  t("nor pinches it", code.indexOf("pinch.zoom") > -1, false);
+  t("and the pixel ratio is worked out once, where the size changes",
+    code.indexOf("SCALE = dpr;") > -1, true);
+  t("not inside the draw loop",
+    code.slice(code.indexOf("function frame()")).indexOf("getBoundingClientRect") === -1, true);
+  t("and one finger is all it listens for", code.indexOf("fingers[e.pointerId]") > -1, false);
 
   /* it fills the screen behind the words rather than sitting in a porthole */
   t("there is a background mode", inPage("#hf.bg #hfOrb#hfOrb{position:fixed"), true);
@@ -974,23 +975,19 @@ const TOOLSRC = decl("TOOLS");
 
   /* tapping one part is gone; asking names them all */
   t("tapping a part is gone", code.indexOf("pedroPart") === -1, true);
-  t("and a tap does nothing but turn it", code.indexOf("a tap is for turning it") > -1, true);
-  t("asking what it is made of names them all", code.indexOf("LABELS_ON") > -1, true);
-  t("each on its own part, with a line out to the name",
-    code.indexOf("g.lineTo(tx, ty); g.stroke();") > -1, true);
-  t("only the parts facing you, or the far side labels the near side",
-    code.indexOf("if(!seen || f.depth < seen.depth)") > -1, true);
-  t("and labels that land on each other are nudged apart",
-    code.indexOf("q = -1;") > -1, true);
-  t("the app can turn them on", grab("holoLabels").indexOf("pedroLabels") > -1, true);
-
+  /* He asked for the labels gone: what is left is the thing itself, every
+     part showing through the ones in front of it, turning. */
+  t("nothing labels the parts", code.indexOf("LABELS_ON") > -1, false);
+  t("nor is there anything to turn them on", has("function holoLabels"), false);
+  t("and the parts show through each other instead",
+    code.indexOf("a wash you can see through") > -1, true);
   const parts = new Function(decl("PARTS_RE") + " return PARTS_RE;")();
-  const off = new Function(decl("PARTS_OFF_RE") + " return PARTS_OFF_RE;")();
   ["what parts", "what parts is it made of", "which parts are used",
    "label the parts", "name the parts", "parts", "what is it made of"]
-    .forEach(q => t('"' + q + '" labels them', parts.test(q), true));
-  ["labels off", "hide the labels", "no labels"]
-    .forEach(q => t('"' + q + '" takes them off', off.test(q), true));
+    .forEach(q => t('"' + q + '" asks what it is made of', parts.test(q), true));
+  /* "what parts" names them out loud now - nothing is written on the model */
+  t("and asking names them out loud",
+    grab("rightNow").indexOf('names.join(", ")') > -1, true);
   t("but an ordinary question does not", parts.test("what is the capital of france"), false);
   t("and nothing up is said, not silently ignored",
     grab("rightNow").indexOf("There is nothing up to take apart") > -1, true);
@@ -1134,6 +1131,73 @@ const TOOLSRC = decl("TOOLS");
   ["truth or dare", "play truth or dare"].forEach(q =>
     t('"' + q + '" starts truth or dare', TD_RE.test(q), true));
   t("but talking about trivia does not start it", TRIVIA_RE.test("that is trivia"), false);
+}
+
+
+/* ---------- stop, the lists, and looking at things ---------- */
+{
+  const page = fs.readFileSync("index.html", "utf8");
+  const inPage = s => page.indexOf(s) > -1;
+
+  /* there were four ways out of four things and you had to know which you were in */
+  const back = grab("backToNormal");
+  ["gameOn()", "holoHide()", "vizStop()", "camClose()", "partySet(false)"]
+    .forEach(x => t("stop puts away " + x, back.indexOf(x) > -1, true));
+  t("and every panel with it", back.indexOf(".hudpanel[data-panel].on") > -1, true);
+  t("and it says when there was nothing to stop",
+    grab("rightNow").indexOf("Nothing to stop.") > -1, true);
+
+  /* the two lists */
+  const FEATURES = new Function(decl("FEATURES") + " return FEATURES;")();
+  t("there is a list of what he answers to", FEATURES.length > 40, true);
+  t("each with what it does", FEATURES.every(f => f.say && f.does), true);
+  t("and it is sorted when it is shown",
+    grab("fillPanel").indexOf("localeCompare") > -1, true);
+  /* it is written out rather than scraped, so a test has to keep it honest */
+  const NOW_RE = new Function(decl("NOW_RE") + " return NOW_RE;")();
+  const flat = FEATURES.map(f => f.say.toLowerCase()).join(" | ");
+  ["time", "date", "weather", "battery", "brief", "next", "check"].forEach(k =>
+    t("the list mentions " + k, flat.indexOf(k === "brief" ? "status" :
+      k === "check" ? "diagnostics" : k) > -1, true));
+  t("and the tools list is built from the tools themselves, so it cannot lie",
+    grab("toolsShow").indexOf("Object.keys(TOOLS)") > -1, true);
+  t("saying which need a tap", grab("toolsShow").indexOf("iOS needs the tap") > -1, true);
+  t("close gui shuts whatever is open", has("function guiClose"), true);
+  t("and says so when nothing is", grab("rightNow").indexOf("Nothing is open.") > -1, true);
+  t("the panel scrolls, because the list is long",
+    /#featuresList\{[^}]*overflow-y:auto/.test(page), true);
+
+  /* the camera was being judged by the spoken prompt, which says nothing about
+     a picture and does tell him what he has may be misheard speech to refuse */
+  t("he knows when he is looking at something", has("var lookingAt"), true);
+  const sp = grab("systemPrompt");
+  t("a picture is announced as a picture", sp.indexOf("PHOTOGRAPH attached") > -1, true);
+  t("and the clause about mishearing is not applied to it",
+    sp.indexOf("lookingAt") > -1 && sp.indexOf("half-heard") > -1, true);
+  t("it is told to read writing in any language",
+    sp.indexOf("in whatever language it is in") > -1, true);
+  t("and to say when the picture is too poor rather than guess",
+    sp.indexOf("too dark or blurred") > -1, true);
+  t("it is set while a photograph is in flight",
+    grab("camAsk").indexOf("lookingAt = true") > -1, true);
+  t("and cleared whether it works or not",
+    (grab("camAsk").match(/lookingAt = false/g) || []).length, 2);
+
+  const camQ = new Function("CAM_ONLY_RE", "TRANSLATE_RE", "READ_RE",
+    decl("CAM_ONLY_RE") + decl("TRANSLATE_RE") + decl("READ_RE") +
+    grab("camQuestion") + " return camQuestion;")();
+  t("translate this into english asks for a translation",
+    camQ("translate this into english").indexOf("translate it into english") > -1, true);
+  t("and says which language it was", camQ("translate this").indexOf("what language") > -1, true);
+  t("what does this say reads it out",
+    camQ("what does this say").indexOf("exactly as it is written") > -1, true);
+  t("and nothing said still just looks", camQ(""), "What am I looking at?");
+
+  const sw = fs.readFileSync("native/PedroNative.swift", "utf8");
+  /* a sign in Arabic came back as nothing at all, which is indistinguishable
+     from there being no sign */
+  t("the phone's own reader is not limited to English",
+    sw.indexOf("supportedRecognitionLanguages") > -1, true);
 }
 
 

@@ -400,6 +400,15 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
             let text = VNRecognizeTextRequest()
             text.recognitionLevel = .accurate
             text.usesLanguageCorrection = true
+            // It only ever read English. Ask the device what it can read and
+            // let it try all of them - a sign in Arabic came back as nothing at
+            // all, which is indistinguishable from there being no sign.
+            if #available(iOS 15.0, *) {
+                if let able = try? VNRecognizeTextRequest.supportedRecognitionLanguages(
+                        for: .accurate, revision: VNRecognizeTextRequestRevision3) {
+                    text.recognitionLanguages = able
+                }
+            }
             let faceReq = VNDetectFaceRectanglesRequest()
 
             do {

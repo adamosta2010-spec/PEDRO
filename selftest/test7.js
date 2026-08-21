@@ -349,6 +349,7 @@ function nativeFrom(cap, exp){
   const v = n => src.slice(src.indexOf("var " + n), src.indexOf(";", src.indexOf("var " + n)) + 1);
   const bits = new Function(
     v("CAM_RE") + v("CAM_ONLY_RE") + v("HERE_RE") + v("COUNT_ABSTRACT_RE") + v("ELSEWHERE_RE") +
+    v("TRANSLATE_RE") + v("READ_RE") +
     grab("needsEyes") + grab("camQuestion") +
     "; return { needsEyes:needsEyes, camQuestion:camQuestion };")();
   const eyes = q => bits.needsEyes(q);
@@ -625,7 +626,8 @@ function nativeFrom(cap, exp){
   t("nothing animates a height any more",
     inPage("to{height:52px") || inPage("to{height:19px"), false);
   t("the bars scale instead", inPage("transform:scaleY(1)"), true);
-  t("and the sheen does not blend", inPage("    mix-blend-mode:screen;"), false);
+  t("and the sheen does not blend",
+    /#hfOrb .disc .sheen{[^}]*mix-blend-mode/.test(page), false);
 
   t("the orb fits a phone screen", inPage("--orb:min(300px, 78vw, 34vh)"), true);
 }
