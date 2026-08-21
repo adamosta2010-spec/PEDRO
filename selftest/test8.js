@@ -238,5 +238,88 @@ t("the tray has the parts you would expect",
     grab("wbOpen").indexOf("closePanels()") > -1, true);
 }
 
+
+/* ---------- things that turn ---------- */
+{
+  const turns = new Function(
+    chunk("var WB_KIT = {") + "\n" + grab("wbGauss") + "\n" + grab("wbSolve") + "\n" +
+    grab("wbTurns") + "\n return { solve: wbSolve, turns: wbTurns, kit: WB_KIT };")();
+  const solve = turns.solve, spin = turns.turns, K = turns.kit;
+  let n = 0;
+  const M = (kind, extra) => Object.assign({ id: "m" + (++n), kind: kind }, extra || {});
+  const J = (a, ap, b, bp) => ({ a: a.id + ":" + ap, b: b.id + ":" + bp });
+
+  const bat = M("battery"), mot = M("motor"), gear = M("gear"), big = M("biggear");
+  const power = [J(bat, 0, mot, 0), J(mot, 1, bat, 1)];
+  const meshed = power.concat([J(mot, 1, gear, 0), J(gear, 1, big, 0)]);
+  const parts = [bat, mot, gear, big];
+  const res = solve(parts, meshed, true);
+  const sp = spin(parts, meshed, res);
+
+  t("the motor turns its shaft", sp.turn[mot.id] > 1, true);
+  t("a gear meshed on it turns", Math.abs(sp.turn[gear.id]) > 0.5, true);
+  t("and turns the other way", sp.turn[gear.id] * sp.turn[mot.id] < 0, true);
+  t("a bigger gear turns slower",
+    Math.abs(sp.turn[big.id]) < Math.abs(sp.turn[gear.id]), true);
+  t("by exactly the ratio of the teeth",
+    Math.abs(Math.abs(sp.turn[big.id]) - Math.abs(sp.turn[gear.id]) * (K.gear.teeth / K.biggear.teeth)) < 1e-9, true);
+  t("and back the way the motor was going", sp.turn[big.id] * sp.turn[mot.id] > 0, true);
+  t("a small pinion turns faster than the gear driving it", (() => {
+    const b2 = M("battery"), m2 = M("motor"), pin = M("pinion");
+    const w = [J(b2, 0, m2, 0), J(m2, 1, b2, 1), J(m2, 1, pin, 0)];
+    const r2 = solve([b2, m2, pin], w, true);
+    const s2 = spin([b2, m2, pin], w, r2);
+    return Math.abs(s2.turn[pin.id]) > Math.abs(s2.turn[m2.id]);
+  })(), true);
+
+  t("with the power off nothing turns", (() => {
+    const off = solve(parts, meshed, false);
+    const s3 = spin(parts, meshed, off);
+    return Object.keys(s3.turn).every(k => Math.abs(s3.turn[k]) < 0.02);
+  })(), true);
+  t("a gear on its own just sits there", (() => {
+    const lone = M("gear");
+    const r = solve([bat, mot, lone], power, true);
+    const s4 = spin([bat, mot, lone], power, r);
+    return Math.abs(s4.turn[lone.id]) < 0.02;
+  })(), true);
+
+  /* the electricity must not notice the gears at all */
+  t("a gear does not break the circuit", res.why, "");
+  t("the motor still runs with gears hanging off it", res.lit[mot.id] > 0.5, true);
+  t("a gear carries no current", res.amps[gear.id] === 0 || res.amps[gear.id] === undefined, true);
+  t("and a spare gear is not called a loose end", (() => {
+    const lone = M("wheel");
+    const r = solve([bat, mot, lone], power, true);
+    return r.why;
+  })(), "");
+
+  /* driven two ways at once */
+  /* a real fight: one motor drives the gear straight on, the other drives it
+     through a gear in between, so the two want it turning opposite ways */
+  t("two motors driving one gear opposite ways is a jam", (() => {
+    const bb = M("battery"), m1 = M("motor"), m2 = M("motor"),
+          mid = M("gear"), gg = M("gear");
+    const w = [J(bb, 0, m1, 0), J(m1, 1, bb, 1), J(bb, 0, m2, 0), J(m2, 1, bb, 1),
+               J(m1, 1, gg, 0),
+               J(m2, 1, mid, 0), J(mid, 1, gg, 1)];
+    const parts2 = [bb, m1, m2, mid, gg];
+    const r = solve(parts2, w, true);
+    return spin(parts2, w, r).jammed;
+  })(), true);
+  t("but a train that agrees with itself is not a jam", (() => {
+    const bb = M("battery"), m1 = M("motor"), g1 = M("gear"), g2 = M("biggear");
+    const w = [J(bb, 0, m1, 0), J(m1, 1, bb, 1), J(m1, 1, g1, 0), J(g1, 1, g2, 0)];
+    const parts2 = [bb, m1, g1, g2];
+    const r = solve(parts2, w, true);
+    return spin(parts2, w, r).jammed;
+  })(), false);
+
+  t("the tray has things that turn",
+    ["gear", "biggear", "pinion", "wheel"].every(k => K[k] && K[k].mech), true);
+  t("and they have teeth", K.gear.teeth > 0 && K.biggear.teeth > K.gear.teeth, true);
+  t("the motor has a shaft to drive them", K.motor.shaft > 0, true);
+}
+
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " workbench tests passed");
 process.exit(fail ? 1 : 0);

@@ -691,6 +691,7 @@
   .wbdrawn{stroke:var(--hud);stroke-width:2.5;stroke-dasharray:4 5;fill:none;pointer-events:none}
   .wbglow{fill:#ffd76a;pointer-events:none}
   .wbrotor{transform-box:fill-box;transform-origin:center}
+  .wbcog{transform-box:fill-box;transform-origin:center}
   .wbpart.run .wbrotor{animation:wbspin .45s linear infinite}
   @keyframes wbspin{to{transform:rotate(360deg)}}
   .wbring{stroke:var(--hud);fill:none;stroke-width:1.5;opacity:0}
@@ -4323,10 +4324,16 @@ var WB_KIT = {
   led:      { name:"LED",      tag:"red",    ohms:180,  watts:0.07, diode:true,
               said:"LED", art:"an" },
   resistor: { name:"Resistor", tag:"100R",   ohms:100,  watts:0.5 },
-  motor:    { name:"Motor",    tag:"",       ohms:14,   watts:2,   spins:true },
+  motor:    { name:"Motor",    tag:"",       ohms:14,   watts:2,   spins:true, shaft:8 },
   buzzer:   { name:"Buzzer",   tag:"",       ohms:60,   watts:0.6, rings:true },
-  fan:      { name:"Fan",      tag:"",       ohms:20,   watts:1.5, spins:true },
-  toggle:   { name:"Switch",   tag:"",       ohms:0.01, toggles:true }
+  fan:      { name:"Fan",      tag:"",       ohms:20,   watts:1.5, spins:true, shaft:10 },
+  toggle:   { name:"Switch",   tag:"",       ohms:0.01, toggles:true },
+  /* things that turn rather than conduct. They are not part of the circuit at
+     all - wiring one to a motor means meshed with it, not wired to it. */
+  gear:     { name:"Gear",     tag:"12t",    teeth:12,  mech:true },
+  biggear:  { name:"Big gear", tag:"24t",    teeth:24,  mech:true },
+  pinion:   { name:"Pinion",   tag:"6t",     teeth:6,   mech:true },
+  wheel:    { name:"Wheel",    tag:"",       teeth:20,  mech:true }
 };
 var WB_W = 84, WB_H = 46, WB_PIN = 7;
 /* what a part is called out loud, which is not always what is printed on it */
@@ -4417,7 +4424,7 @@ function wbSolve(parts, wires, powered){
     }
     parts.forEach(function(p){
       var k = WB_KIT[p.kind];
-      if(!k) return;
+      if(!k || k.mech) return;                    /* a gear carries no current */
       var n1 = nodeOf(p.id, 0), n2 = nodeOf(p.id, 1);
       if(n1 === n2) return;                       /* both ends on the same wire */
       if(k.volts){
@@ -4447,7 +4454,7 @@ function wbSolve(parts, wires, powered){
 
   parts.forEach(function(p){
     var k = WB_KIT[p.kind];
-    if(!k) return;
+    if(!k || k.mech) return;
     var n1 = nodeOf(p.id, 0), n2 = nodeOf(p.id, 1), dv = v[n1] - v[n2], amps;
     if(n1 === n2) dv = 0;
     if(k.volts){
@@ -4478,6 +4485,7 @@ function wbSolve(parts, wires, powered){
       return WB_KIT[p.kind] && WB_KIT[p.kind].toggles && p.on === false;
     });
     var loose = parts.filter(function(p){
+      if(WB_KIT[p.kind] && WB_KIT[p.kind].mech) return false;
       var used = { 0:false, 1:false };
       wires.forEach(function(w){
         if(w.a === p.id + ":0" || w.b === p.id + ":0") used[0] = true;
@@ -4491,6 +4499,58 @@ function wbSolve(parts, wires, powered){
     else out.why = "no current is going round";
   }
   return out;
+}
+
+/* Turning. A motor with current in it drives its shaft; anything meshed with
+   that turns too - the other way round, and by the ratio of the teeth. Follow
+   it out from the motors until nothing new turns. */
+function wbTurns(parts, wires, res){
+  var turn = {}, teeth = {}, by = {};
+  parts.forEach(function(p){
+    var k = WB_KIT[p.kind];
+    if(!k) return;
+    if(k.mech || k.shaft) teeth[p.id] = k.teeth || k.shaft || 8;
+    turn[p.id] = 0;
+  });
+  /* whatever the electricity is already turning */
+  var queue = [];
+  parts.forEach(function(p){
+    var k = WB_KIT[p.kind];
+    if(!k || !k.shaft) return;
+    var spin = (res.lit[p.id] || 0) * 6;      /* turns a second, near enough */
+    if(spin > 0.02){ turn[p.id] = spin; queue.push(p.id); }
+  });
+  /* who is meshed with whom */
+  var mesh = {};
+  wires.forEach(function(w){
+    var a = w.a.split(":")[0], b = w.b.split(":")[0];
+    if(!(a in teeth) || !(b in teeth) || a === b) return;
+    (mesh[a] = mesh[a] || []).push(b);
+    (mesh[b] = mesh[b] || []).push(a);
+  });
+  var jammed = false, done = {}, driven = {};
+  queue.forEach(function(id){ driven[id] = true; });
+  while(queue.length){
+    var id = queue.shift();
+    if(done[id]) continue;
+    done[id] = true;
+    (mesh[id] || []).forEach(function(next){
+      /* meshed teeth: the other way round, and by the ratio */
+      var want = -turn[id] * (teeth[id] / teeth[next]);
+      if(driven[next]){
+        /* something already decided how this one turns - if the two disagree
+           the train cannot move. Checking "already dealt with" instead of
+           "already given a speed" let the second one quietly win. */
+        if(Math.abs(turn[next] - want) > 0.01) jammed = true;
+        return;
+      }
+      driven[next] = true;
+      turn[next] = want;
+      by[next] = id;
+      queue.push(next);
+    });
+  }
+  return { turn: turn, teeth: teeth, mesh: mesh, jammed: jammed };
 }
 
 /* ---- where things are ---- */
@@ -4602,6 +4662,22 @@ function wbGlyph(g, kind, res, p){
     g.appendChild(wbSvg("line", { x1:cx + 6, y1:cy - 9, x2:cx + 6, y2:cy + 9, class:"wbmark" }));
     return;
   }
+  if(k.mech){
+    var teeth = k.teeth || 8, rr = Math.min(17, 7 + teeth * 0.42);
+    var spun = wbSvg("g", { class:"wbcog" });
+    spun.appendChild(wbSvg("circle", { cx:cx, cy:cy, r:rr * 0.58, class:"wbmark" }));
+    for(var ti = 0; ti < teeth; ti++){
+      var th = ti * 6.2832 / teeth;
+      spun.appendChild(wbSvg("line", {
+        x1:(cx + Math.cos(th) * rr * 0.58).toFixed(1), y1:(cy + Math.sin(th) * rr * 0.58).toFixed(1),
+        x2:(cx + Math.cos(th) * rr).toFixed(1),        y2:(cy + Math.sin(th) * rr).toFixed(1),
+        class:"wbmark"
+      }));
+    }
+    g.appendChild(spun);
+    g.appendChild(wbSvg("circle", { cx:cx, cy:cy, r:2.5, class:"wbmark" }));
+    return;
+  }
   if(kind === "resistor"){
     g.appendChild(wbSvg("path", { class:"wbmark", d:"M" + (cx - 18) + " " + cy +
       "l5 0 3 -8 5 16 5 -16 5 16 3 -8 5 0" }));
@@ -4658,15 +4734,28 @@ function wbDraw(){
     if(moving) svg.appendChild(wbSvg("path", { d:d, class:"wbflow" }));
   });
 
+  var spinning = wbTurns(wb.parts, wb.wires, res);
+  wb.turns = spinning;
   wb.parts.forEach(function(p){
     var k = WB_KIT[p.kind];
-    var running = !!(res.lit[p.id] > 0.02 || (Math.abs(res.amps[p.id] || 0) > 0.01 && (k.spins || k.rings)));
+    var rate = spinning.turn[p.id] || 0;
+    var running = !!(res.lit[p.id] > 0.02 ||
+      (Math.abs(res.amps[p.id] || 0) > 0.01 && (k.spins || k.rings)) ||
+      Math.abs(rate) > 0.02);
     var g = wbSvg("g", {
       class:"wbpart" + (wb.sel === p.id ? " sel" : "") + (running ? " run" : ""),
       transform:"translate(" + p.x + "," + p.y + ")", "data-id":p.id
     });
     g.appendChild(wbSvg("rect", { x:0, y:0, width:WB_W, height:WB_H, rx:10, class:"wbbody" }));
     wbGlyph(g, p.kind, res, p);
+    /* a gear turning twice a second takes half a second to go round */
+    if(Math.abs(rate) > 0.02){
+      var cog = g.querySelector(".wbcog");
+      if(cog){
+        cog.style.animation = "wbspin " + (1 / Math.abs(rate)).toFixed(2) + "s linear infinite";
+        cog.style.animationDirection = rate < 0 ? "reverse" : "normal";
+      }
+    }
     var name = wbSvg("text", { x:WB_W / 2, y:WB_H - 6, class:"wblabel" });
     name.textContent = k.name + (k.tag ? " " + k.tag : "");
     g.appendChild(name);
@@ -4704,12 +4793,21 @@ function wbRead(res){
       return;
     }
     if(k.toggles){ lines.push("<b>Switch</b> " + (p.on === false ? "open" : "closed")); return; }
+    if(k.mech){
+      var spin = (wb.turns && wb.turns.turn[p.id]) || 0;
+      lines.push("<b>" + k.name + "</b> " + (Math.abs(spin) < 0.02 ? "still" :
+        Math.abs(spin).toFixed(1) + " turns a second " + (spin < 0 ? "one way" : "the other")));
+      return;
+    }
     if(Math.abs(a) < 0.002){ lines.push("<b>" + k.name + "</b> nothing going through it"); return; }
     var how = k.spins ? "turning" : k.rings ? "sounding" : "lit";
     var pct = Math.round((res.lit[p.id] || 0) * 100);
     lines.push("<b>" + k.name + "</b> " + Math.abs(v).toFixed(1) + " V, " +
       Math.abs(a).toFixed(2) + " A" + (k.watts ? " - " + how + " " + pct + "%" : ""));
   });
+  if(wb.turns && wb.turns.jammed){
+    lines.push("<b>Jammed:</b> two things are driving the same gear different ways");
+  }
   if(res.why) lines.push("<b>" + (res.shorted ? "Careful" : "Not running") + ":</b> " + res.why);
   el.innerHTML = lines.join("<br>");
 }
@@ -4854,6 +4952,14 @@ function wbSpoken(){
     said.push("the " + wbSaid(p.kind) + " is " +
       (k.spins ? "turning" : k.rings ? "sounding" : "lit") + " at " + pct + " percent");
   });
+  wb.parts.forEach(function(p){
+    var k = WB_KIT[p.kind];
+    if(!k.mech) return;
+    var spin = (wb.turns && wb.turns.turn[p.id]) || 0;
+    if(Math.abs(spin) < 0.02) return;
+    said.push("the " + k.name.toLowerCase() + " is turning at " +
+      Math.abs(spin).toFixed(1) + " a second");
+  });
   return said.length ? "Current is going round - " + said.join(", ") + "." : "Current is going round.";
 }
 
@@ -4865,7 +4971,10 @@ var WB_NAMES = {
   lamp:"lamp", bulb:"lamp", light:"lamp", "light bulb":"lamp", "lightbulb":"lamp",
   led:"led", diode:"led", resistor:"resistor", resistance:"resistor",
   motor:"motor", fan:"fan", buzzer:"buzzer", speaker:"buzzer",
-  "switch":"toggle", button:"toggle", toggle:"toggle"
+  "switch":"toggle", button:"toggle", toggle:"toggle",
+  gear:"gear", cog:"gear", "small gear":"gear", "big gear":"biggear",
+  biggear:"biggear", "large gear":"biggear", pinion:"pinion",
+  wheel:"wheel", tyre:"wheel", tire:"wheel"
 };
 function wbVoice(q){
   var s = String(q || "").trim().toLowerCase().replace(/[.!?]+$/, "");
@@ -7473,7 +7582,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.66";
+var BUILD = "2026-08-21.67";
 
 function banner(kind, html){
   var b = $("banner");
