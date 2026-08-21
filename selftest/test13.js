@@ -3,29 +3,78 @@
    clamped, so a bad answer cannot break the page or reach the app. */
 const fs = require("fs");
 const src = fs.readFileSync(process.argv[2], "utf8").split(String.fromCharCode(13, 10)).join(String.fromCharCode(10));
+/* A copy of the source with strings, comments and regex literals blanked out.
+   Counting braces in the raw text walks straight into "{" and /x{6}/ and never
+   finds the end of the function. */
+const MASK = (() => {
+  const q1 = String.fromCharCode(39), q2 = String.fromCharCode(34);
+  const tick = String.fromCharCode(96), esc = String.fromCharCode(92);
+  let out = "", mode = null, prev = "";
+  for(let i = 0; i < src.length; i++){
+    const c = src[i], next = src[i + 1];
+    if(mode === "line"){ if(c === "\n"){ mode = null; out += c; } else out += " "; continue; }
+    if(mode === "block"){
+      if(c === "*" && next === "/"){ mode = null; out += "  "; i++; }
+      else out += (c === "\n" ? c : " ");
+      continue;
+    }
+    if(mode === "str"){
+      if(c === esc){ out += "  "; i++; continue; }
+      if(c === prev){ mode = null; out += " "; continue; }
+      out += (c === "\n" ? c : " ");
+      continue;
+    }
+    if(mode === "re"){
+      if(c === esc){ out += "  "; i++; continue; }
+      if(c === "["){ mode = "class"; out += " "; continue; }
+      if(c === "/"){ mode = null; out += " "; continue; }
+      out += (c === "\n" ? c : " ");
+      continue;
+    }
+    if(mode === "class"){
+      if(c === esc){ out += "  "; i++; continue; }
+      if(c === "]"){ mode = "re"; out += " "; continue; }
+      out += (c === "\n" ? c : " ");
+      continue;
+    }
+    if(c === "/" && next === "/"){ mode = "line"; out += "  "; i++; continue; }
+    if(c === "/" && next === "*"){ mode = "block"; out += "  "; i++; continue; }
+    if(c === q1 || c === q2 || c === tick){ mode = "str"; prev = c; out += " "; continue; }
+    if(c === "/"){
+      /* a regex only ever follows one of these; after a value it is division */
+      let back = out.length - 1;
+      while(back >= 0 && /\s/.test(out[back])) back--;
+      const before = back >= 0 ? out[back] : "";
+      if(before === "" || "(,=:[!&|?{};+-*%~^".indexOf(before) > -1){ mode = "re"; out += " "; continue; }
+    }
+    out += c;
+  }
+  return out;
+})();
+
 function grab(name){
-  const i = src.indexOf("function " + name + "(");
+  const i = MASK.indexOf("function " + name + "(");
   if(i < 0) throw new Error("no such function: " + name);
   let d = 0;
-  for(let k = src.indexOf("{", i); k < src.length; k++){
-    if(src[k] === "{") d++;
-    else if(src[k] === "}"){ d--; if(!d) return src.slice(i, k + 1); }
+  for(let k = MASK.indexOf("{", i); k < MASK.length; k++){
+    if(MASK[k] === "{") d++;
+    else if(MASK[k] === "}"){ d--; if(!d) return src.slice(i, k + 1); }
   }
+  throw new Error("could not find the end of: " + name);
 }
 function decl(name){
-  const i = src.indexOf("var " + name + " =");
+  const i = MASK.indexOf("var " + name + " =");
   if(i < 0) throw new Error("no declaration: " + name);
-  let q = null, depth = 0;
-  for(let k = i; k < src.length; k++){
-    const ch = src[k];
-    if(q){ if(ch === String.fromCharCode(92)) k++; else if(ch === q) q = null; continue; }
-    if(ch === "'" || ch === '"'){ q = ch; continue; }
+  let depth = 0;
+  for(let k = i; k < MASK.length; k++){
+    const ch = MASK[k];
     if(ch === "(" || ch === "[" || ch === "{") depth++;
     else if(ch === ")" || ch === "]" || ch === "}") depth--;
     else if(ch === ";" && depth === 0) return src.slice(i, k + 1);
   }
   throw new Error("unterminated: " + name);
 }
+
 let fail = 0, pass = 0;
 const t = (n, g, w) => {
   const ok = JSON.stringify(g) === JSON.stringify(w);
@@ -165,8 +214,43 @@ const KNOWN = new Function(decl("SPEC3D_KNOWN") + " return SPEC3D_KNOWN;")();
   t("and the outside of a shape faces you", has("if(cross >= 0) continue;"), true);
   t("the ball turns into the thing", has("f.from = f.pts.map"), true);
   t("a tap tells the app which part it was", has("pedroPart"), true);
-  t("and the app only listens to its own frame",
-    has("ev.source !== frame.contentWindow"), true);
+  t("and the app only listens to its own frames",
+    has("if(!mine) return;"), true);
+}
+
+/* ---- building anything, in the workbench ---- */
+{
+  const has = x => src.indexOf(x) > -1;
+  t("the workbench has somewhere to stand what is built",
+    has(String.fromCharCode(60) + 'iframe id="wbBuilt"'), true);
+  t("and what is built takes over from the parts board",
+    has("#wb.built #wbBoard{display:none}"), true);
+  const build = grab("wbBuild");
+  t("what he already knows goes up at once",
+    build.indexOf("spec3dKnownAll(what)") > -1, true);
+  t("anything else he works out", build.indexOf("spec3dAsk(what)") > -1, true);
+  t("and it stops as soon as the model is whole",
+    build.indexOf("abortCtl.abort()") > -1, true);
+  t("he says plainly when he cannot do it without a signal",
+    build.indexOf("I need the online model") > -1, true);
+  t("what arrives is checked before it is used",
+    build.indexOf("spec3dRead(text)") > -1, true);
+  const add2 = grab("wbBuiltAdd");
+  t("things stack up rather than replacing each other",
+    add2.indexOf("wb.built.push(spec)") > -1, true);
+  t("with a limit on how many stand there", add2.indexOf("length >= 4") > -1, true);
+  const show = grab("wbShowBuilt");
+  t("two or more are stood side by side", show.indexOf("spec3dMerge") > -1, true);
+  t("and the page is built here, from the spec", show.indexOf("spec3dPage(whole)") > -1, true);
+  const voice = grab("wbVoice");
+  t("asking for something not in the tray builds it",
+    voice.indexOf("wbBuild(asked || want") > -1, true);
+  t("and the article is kept, so it reads properly",
+    voice.indexOf("asked = s.replace") > -1, true);
+  t("just naming a thing builds it too", voice.indexOf("wbBuild(s,") > -1, true);
+  t("clearing takes the built things away as well",
+    grab("wbWipe").indexOf("wb.built = []") > -1, true);
+  t("a tap inside what was built is heard", has("built.contentWindow"), true);
 }
 
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " model tests passed");

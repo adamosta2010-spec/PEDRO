@@ -667,6 +667,11 @@
     border-radius:12px;touch-action:none;overflow:hidden;display:block;
     background:radial-gradient(circle at 1px 1px,
       color-mix(in srgb,var(--hud) 16%,transparent) 1px, transparent 0) 0 0/22px 22px, #080a0f}
+  /* what has been built stands over the parts board, and goes away again */
+  #wbBuilt{display:none;flex:1;width:100%;border:1px solid color-mix(in srgb,var(--hud) 26%,transparent);
+    border-radius:12px;background:#080a0f}
+  #wb.built #wbBuilt{display:block}
+  #wb.built #wbBoard{display:none}
   #wbRead{margin-top:6px;font-size:12.5px;line-height:1.45;color:var(--tx2);
     min-height:2.8em;max-height:17vh;overflow-y:auto}
   #wbRead b{color:var(--hud);font-weight:600}
@@ -1324,6 +1329,8 @@
     <button class="icobtn" id="wbClose" aria-label="Close"><svg><use href="#i-x"/></svg></button>
   </div>
   <svg id="wbBoard" aria-label="Circuit board"></svg>
+  <iframe id="wbBuilt" sandbox="allow-scripts" referrerpolicy="no-referrer"
+          title="What you have built"></iframe>
   <div id="wbRead"></div>
   <div id="wbTray"></div>
 </div>
@@ -4580,8 +4587,10 @@ function spec3dKnown(about){
 /* tapping a part tells you what it is - the frame cannot reach the app, so it
    sends a message and the app does the talking */
 window.addEventListener("message", function(ev){
-  var frame = $("orbViz");
-  if(!frame || ev.source !== frame.contentWindow) return;   /* only from ours */
+  var frame = $("orbViz"), built = $("wbBuilt");
+  var mine = (frame && ev.source === frame.contentWindow) ||
+             (built && ev.source === built.contentWindow);
+  if(!mine) return;                                          /* only from ours */
   var d = ev.data || {};
   if(!d.pedroPart) return;
   var line = String(d.pedroPart) + (d.note ? ". " + d.note : "");
@@ -5208,12 +5217,95 @@ function wbClose(){
   return true;
 }
 function wbWipe(){
+  wb.built = [];
+  var frame = $("wbBuilt");
+  if(frame) frame.srcdoc = "";
+  var el = $("wb");
+  if(el) el.classList.remove("built");
   wb.parts = [];
   wb.wires = [];
   wb.sel = null;
   wb.seq = 0;
   wbDraw();
 }
+
+/* ---- things he is asked to build ----
+   The same describing that the simulations use: he says what it is made of and
+   the app stands it up. They stack, so asking for a second thing puts it next
+   to the first rather than replacing it. */
+function wbShowBuilt(){
+  var el = $("wb"), frame = $("wbBuilt");
+  if(!el || !frame) return;
+  if(!wb.built || !wb.built.length){
+    el.classList.remove("built");
+    frame.srcdoc = "";
+    wbDraw();
+    return;
+  }
+  var whole = wb.built.length === 1 ? wb.built[0] : spec3dMerge(wb.built.slice());
+  el.classList.add("built");
+  frame.srcdoc = vizPage(spec3dPage(whole));
+  var lines = wb.built.map(function(s){
+    return "<b>" + esc(s.name) + "</b> " + s.parts.length + " parts";
+  });
+  lines.push("Tap a part to hear what it is for. Say clear to start again.");
+  var read = $("wbRead");
+  if(read) read.innerHTML = lines.join("<br>");
+}
+
+function wbBuiltAdd(spec){
+  wb.built = wb.built || [];
+  if(wb.built.length >= 4) wb.built.shift();     /* four abreast is the limit */
+  wb.built.push(spec);
+  wbShowBuilt();
+}
+
+/* Ask for anything. What he knows already goes up at once; the rest he works
+   out, and it goes up when it arrives. */
+function wbBuild(what, onDone){
+  var known = spec3dKnownAll(what);
+  if(known){
+    wbBuiltAdd(known);
+    if(onDone) onDone("Here's " + what + ". Tap a part to hear what it does.");
+    return;
+  }
+  if(!apiKeyNow() || isDevice()){
+    if(onDone) onDone("I need the online model to work out what " + what + " is made of.");
+    return;
+  }
+  var read = $("wbRead");
+  if(read) read.innerHTML = "Working out what <b>" + esc(what) + "</b> is made of&hellip;";
+  var wasVoice = voiceMode;
+  voiceMode = false;
+  fastMode = true;
+  var only = { messages: [{ role:"user", content: spec3dAsk(what), t:Date.now() }] };
+  wbSeen = "";
+  askStream(only, function(acc){
+    wbSeen = acc;
+    /* stop as soon as the model is whole - the rest is politeness */
+    if(acc.indexOf("{") > -1 && acc.lastIndexOf("}") > acc.indexOf("{")){
+      var maybe = spec3dRead(acc);
+      if(maybe && maybe.parts.length >= 4){
+        try{ if(abortCtl) abortCtl.abort(); }catch(e){}
+      }
+    }
+  }).then(function(text){
+    voiceMode = wasVoice; fastMode = false;
+    var spec = spec3dRead(text);
+    if(!spec){ if(onDone) onDone("I could not work out what " + what + " is made of."); return; }
+    wbBuiltAdd(spec);
+    if(onDone) onDone("Here's " + what + ". Tap a part to hear what it does.");
+  }).catch(function(){
+    voiceMode = wasVoice; fastMode = false;
+    /* aborted on purpose, or it fell over - either way use what arrived */
+    var spec = spec3dRead(seenLast());
+    if(spec){ wbBuiltAdd(spec); if(onDone) onDone("Here's " + what + "."); return; }
+    if(onDone) onDone("I could not get " + what + " built.");
+  });
+}
+/* what the stream had got to when it was stopped */
+var wbSeen = "";
+function seenLast(){ return wbSeen; }
 
 /* ---- what he says about it ---- */
 function wbSpoken(){
@@ -5293,6 +5385,16 @@ function wbVoice(q){
       wbAdd(kind);
       return "Added " + wbAnArt(kind) + " " + wbSaid(kind) + ".";
     }
+    /* not one of the parts in the tray - so work out what it is and build it.
+       The phrase keeps its article, so it reads as "here's an engine". */
+    var asked = s.replace(/^(?:add|put|drop|give me|i want|place|stick)\s+(?:me\s+)?/, "").trim();
+    wbBuild(asked || want, function(line){ carryOn(line); });
+    return "";
+  }
+  /* just the name of a thing, with nothing else: build that */
+  if(/^[a-z0-9][a-z0-9 '-]{1,40}$/.test(s) && s.split(" ").length <= 5){
+    wbBuild(s, function(line){ carryOn(line); });
+    return "";
   }
   return null;
 }
@@ -7860,7 +7962,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.69";
+var BUILD = "2026-08-21.70";
 
 function banner(kind, html){
   var b = $("banner");
