@@ -144,5 +144,25 @@ const has = s => src.indexOf(s) > -1;
   }
 }
 
+/* ---------------- the native half of stop ---------------- */
+{
+  const sw = fs.readFileSync("native/PedroNative.swift", "utf8");
+  t("the microphone can keep listening while he talks",
+    sw.indexOf("if echoFree && wantListening { return }") > -1, true);
+  t("because his own voice is taken out of what it hears",
+    sw.indexOf("setVoiceProcessingEnabled(true)") > -1, true);
+  t("it is turned on wherever listening starts",
+    sw.split("enableEchoCancelling(node)").length - 1, 2);
+  t("a device that will not do it carries on as before",
+    sw.indexOf("echoFree = false") > -1, true);
+  {
+    /* anchored at both ends, so a sentence of his own containing the word
+       "stop" cannot cut him off */
+    const line = src.slice(src.indexOf("var STOP_RE"), src.indexOf("var PAUSE_RE"));
+    t("the stop words are anchored at the front", line.indexOf("/^(?:") > -1, true);
+    t("and at the end", line.indexOf("$/i;") > -1, true);
+  }
+}
+
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " stop-and-simulate tests passed");
 process.exit(fail ? 1 : 0);

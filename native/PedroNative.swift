@@ -177,12 +177,29 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
         }
     }
 
+    /// Ask the input node to take our own output back out of what it hears.
+    /// It has to be done with the engine stopped, and not every device or
+    /// route will do it - if it will not, we simply carry on as before.
+    private func enableEchoCancelling(_ node: AVAudioInputNode) {
+        guard !echoFree else { return }
+        do {
+            try node.setVoiceProcessingEnabled(true)
+            echoFree = true
+        } catch {
+            echoFree = false
+        }
+    }
+
     /// Hold the audio session open so listening survives leaving the app.
     /// Without the audio background mode in Info.plist iOS suspends us anyway,
     /// so this is only half the story - the build adds the other half.
     private var keepAlive = false
     /// listening is meant to be happening, as opposed to merely running now
     private var wantListening = false
+    /// true once the input node is cancelling our own speech out of the
+    /// microphone. Until then the microphone has to close while he talks, or
+    /// he hears himself and answers his own voice.
+    private var echoFree = false
 
     /// Hand a URL to iOS so it opens whatever app owns that scheme - maps,
     /// music, a phone number, or one of their own Shortcuts. iOS decides what
@@ -381,6 +398,7 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
             try session.setActive(true, options: .notifyOthersOnDeactivation)
 
             let node = engine.inputNode
+            enableEchoCancelling(node)
             node.removeTap(onBus: 0)
             node.installTap(onBus: 0, bufferSize: 1024, format: node.outputFormat(forBus: 0)) { buffer, _ in
                 req.append(buffer)
@@ -438,6 +456,10 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
     /// difference between a pause and a decision, and the reason background
     /// listening used to die after the first answer.
     private func pauseForSpeech() {
+        // With his own voice cancelled out of the microphone he can be
+        // interrupted: "stop" said over the top of him is heard. Without it the
+        // microphone must close, or he answers himself.
+        if echoFree && wantListening { return }
         if engine.isRunning {
             engine.stop()
             engine.inputNode.removeTap(onBus: 0)
@@ -462,6 +484,7 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
         request = req
         do {
             let node = engine.inputNode
+            enableEchoCancelling(node)
             node.removeTap(onBus: 0)
             node.installTap(onBus: 0, bufferSize: 1024, format: node.outputFormat(forBus: 0)) { buffer, _ in
                 req.append(buffer)
