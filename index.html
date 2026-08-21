@@ -740,23 +740,56 @@
   #camView{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
   /* a frame, so it reads as something looking rather than a photo app */
   #camBoxes{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
-  #camFrame{position:absolute;inset:18px;pointer-events:none;border-radius:14px;
-    box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--hud) 35%,transparent)}
-  #camFrame::before,#camFrame::after{content:"";position:absolute;width:26px;height:26px;
-    border:2px solid var(--hud)}
-  #camFrame::before{top:-1px;left:-1px;border-right:0;border-bottom:0;border-radius:14px 0 0 0}
-  #camFrame::after{bottom:-1px;right:-1px;border-left:0;border-top:0;border-radius:0 0 14px 0}
+  /* four corner brackets - it read as a photo app with two */
+  #camFrame{position:absolute;inset:16px;pointer-events:none;border-radius:16px;overflow:hidden}
+  #camFrame i{position:absolute;width:28px;height:28px;border:2px solid var(--hud);
+    opacity:.9;filter:drop-shadow(0 0 6px color-mix(in srgb,var(--hud) 60%,transparent))}
+  #camFrame i:nth-child(1){top:0;left:0;border-right:0;border-bottom:0;border-radius:14px 0 0 0}
+  #camFrame i:nth-child(2){top:0;right:0;border-left:0;border-bottom:0;border-radius:0 14px 0 0}
+  #camFrame i:nth-child(3){bottom:0;left:0;border-right:0;border-top:0;border-radius:0 0 0 14px}
+  #camFrame i:nth-child(4){bottom:0;right:0;border-left:0;border-top:0;border-radius:0 0 14px 0}
+  /* a line that sweeps down it while he is looking - only while he is */
+  #camScan{position:absolute;left:0;right:0;top:0;height:2px;display:none;
+    background:linear-gradient(90deg,transparent,var(--hud),transparent);
+    box-shadow:0 0 14px 2px color-mix(in srgb,var(--hud) 70%,transparent)}
+  #cam.busy #camScan{display:block;animation:camSweep 1.6s ease-in-out infinite}
+  @keyframes camSweep{0%{transform:translateY(0);opacity:0}
+    12%{opacity:1} 88%{opacity:1}
+    100%{transform:translateY(calc(100vh - 40px));opacity:0}}
+  /* the moment it takes the picture, so you know it did */
+  #camFlash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
+  #camFlash.go{animation:camFlash .32s ease-out}
+  @keyframes camFlash{0%{opacity:.62} 100%{opacity:0}}
+
   #camTop{position:absolute;top:calc(var(--safe-t) + 26px);left:0;right:0;text-align:center;
     font-size:11.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--hud);
     text-shadow:0 1px 6px #000}
-  #camSaid{position:absolute;left:24px;right:24px;bottom:calc(var(--safe-b) + 104px);
-    color:#fff;font-size:16.5px;line-height:1.5;text-align:center;text-shadow:0 1px 8px #000}
+  /* A card, not white text over a bright room. It was unreadable pointed at
+     anything in daylight, which is most of what a camera gets pointed at. */
+  #camSaid{position:absolute;left:16px;right:16px;bottom:calc(var(--safe-b) + 108px);
+    max-height:38vh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+    color:#fff;font-size:16.5px;line-height:1.5;text-align:left;
+    padding:0;border-radius:16px;background:transparent;transition:padding .18s ease}
+  #camSaid:not(:empty){padding:14px 16px;background:rgba(10,14,26,.82);
+    border:1px solid color-mix(in srgb,var(--hud) 26%,transparent);
+    box-shadow:0 10px 30px rgba(0,0,0,.5)}
+
   #camBar{position:absolute;left:0;right:0;bottom:calc(var(--safe-b) + 26px);
-    display:flex;align-items:center;justify-content:center;gap:14px}
+    display:flex;align-items:center;justify-content:center;gap:18px}
   #camBar .icobtn{background:#0009;border:1px solid color-mix(in srgb,var(--hud) 35%,transparent)}
-  #cam.busy #camFrame{animation:camScan 1.2s ease-in-out infinite}
-  @keyframes camScan{0%,100%{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--hud) 30%,transparent)}
-    50%{box-shadow:inset 0 0 0 2px var(--hud)}}
+  #camBar .icobtn.rec{border-color:var(--danger);background:#3a0d16cc}
+  /* the shutter: the one thing you will reach for, so it is the big round one */
+  .camshot{width:74px;height:74px;border-radius:50%;flex:none;cursor:pointer;
+    background:transparent;border:3px solid #fff;padding:0;
+    display:grid;place-items:center;
+    box-shadow:0 0 0 1px rgba(0,0,0,.4), 0 6px 20px rgba(0,0,0,.45)}
+  .camshot span{width:58px;height:58px;border-radius:50%;background:#fff;
+    transition:transform .12s ease, background .12s ease}
+  .camshot:active span{transform:scale(.88)}
+  #cam.busy .camshot{pointer-events:none}
+  #cam.busy .camshot span{background:color-mix(in srgb,var(--hud) 70%,#fff);
+    animation:camThink 1s ease-in-out infinite}
+  @keyframes camThink{0%,100%{transform:scale(.82)}50%{transform:scale(1)}}
 
   /* ============ lock + lightbox ============ */
   #lock{position:fixed;inset:0;z-index:80;background:var(--bg);display:none;flex-direction:column;
@@ -1360,14 +1393,16 @@
 <div id="cam">
   <video id="camView" playsinline muted autoplay></video>
   <canvas id="camBoxes"></canvas>
-  <div id="camFrame"></div>
+  <div id="camFrame"><i></i><i></i><i></i><i></i><b id="camScan"></b></div>
+  <div id="camFlash"></div>
   <div id="camTop">
-    <span id="camState">Point it at something and ask</span>
+    <span id="camState">Point it at something</span>
   </div>
   <div id="camSaid"></div>
   <div id="camBar">
     <button class="icobtn" id="camFlip" aria-label="Flip camera"><svg><use href="#i-flip"/></svg></button>
-    <button class="btn" id="camAsk">Ask about this</button>
+    <button class="camshot" id="camAsk" aria-label="Look at this"><span></span></button>
+    <button class="icobtn" id="camSpeak" aria-label="Ask a question out loud"><svg><use href="#i-speak"/></svg></button>
     <button class="icobtn" id="camClose" aria-label="Close"><svg><use href="#i-x"/></svg></button>
   </div>
 </div>
@@ -6780,7 +6815,7 @@ function camOpen(){
   camEl = camEl || $('cam');
   cam.open = true;
   camEl.classList.add('on');
-  camSet('Point it at something and ask');
+  camSet('Point it at something');
   $('camSaid').textContent = '';
   keepAwake(true);
   camStart().catch(function(e){
@@ -6794,6 +6829,7 @@ function camOpen(){
 
 function camClose(){
   camClearBoxes();
+  if(typeof camListenStop === "function") camListenStop(false);
   cam.open = false;
   camStop();
   if(camEl) camEl.classList.remove('on');
@@ -7103,18 +7139,70 @@ $("dockBg").addEventListener("click", function(){
 });
 $('camFlip').addEventListener('click', camFlip);
 $('camClose').addEventListener('click', camClose);
+/* The shutter. It looks NOW - no microphone, no waiting, nothing that can be
+   lost. This used to start the microphone and rely on its done callback to ask
+   the question afterwards; nativeMicStop clears that callback before it stops,
+   so tapping this did nothing at all, six seconds later. */
 $('camAsk').addEventListener('click', function(){
-  if(nativeMicSupported() && !hf.on){
-    /* ask out loud - the picture is taken when you finish speaking */
-    camSet('Listening…');
-    var said = '';
-    nativeMicStart(function(text){ said = text; camSet(text || 'Listening…'); },
-      function(){ camAsk(said); });
-    setTimeout(function(){ nativeMicStop(); }, 6000);
-    return;
-  }
+  camFlashNow();
   camAsk('');
 });
+
+/* Asking a question out loud is its own button. It ends when you stop talking
+   rather than after a fixed six seconds, and the question is asked from here
+   rather than from a callback that gets cleared. */
+var camHearing = null;
+function camListenStop(ask){
+  if(!camHearing) return;
+  var said = camHearing.said;
+  clearTimeout(camHearing.settle);
+  clearTimeout(camHearing.cap);
+  camHearing = null;
+  $('camSpeak').classList.remove('rec');
+  nativeMicStop();
+  if(ask){
+    camFlashNow();
+    camAsk(said);
+  } else {
+    camSet('Point it at something');
+  }
+}
+$('camSpeak').addEventListener('click', function(){
+  if(camHearing){ camListenStop(true); return; }     /* tap again to finish now */
+  if(!nativeMicSupported()){
+    camSet('Ask by tapping the button');
+    camFlashNow();
+    camAsk('');
+    return;
+  }
+  camSet('Listening…');
+  this.classList.add('rec');
+  camHearing = { said:'', settle:null, cap:null };
+  camHearing.cap = setTimeout(function(){ camListenStop(true); }, 12000);
+  nativeMicStart(function(text){
+    if(!camHearing) return;
+    camHearing.said = text || camHearing.said;
+    camSet(text || 'Listening…');
+    /* a second of quiet after words means you have finished */
+    clearTimeout(camHearing.settle);
+    camHearing.settle = setTimeout(function(){ camListenStop(true); }, 1000);
+  }, function(){
+    /* if the microphone does end by itself, use it - but nothing depends on it */
+    camListenStop(true);
+  }).catch(function(){
+    camListenStop(false);
+    camSet('The microphone would not start');
+  });
+});
+
+/* the moment it takes the picture, so you know it did */
+function camFlashNow(){
+  var f = $('camFlash');
+  if(!f) return;
+  f.classList.remove('go');
+  void f.offsetWidth;              /* so it plays again on the next tap */
+  f.classList.add('go');
+}
 
 /* ==================== photos in, pictures out ====================
    Images are shrunk on-device before they're sent (smaller = faster = cheaper),
@@ -10026,7 +10114,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.85";
+var BUILD = "2026-08-21.86";
 
 function banner(kind, html){
   var b = $("banner");

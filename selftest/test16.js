@@ -450,5 +450,59 @@ const has = s => src.indexOf(s) > -1;
 }
 
 
+/* ---------- the camera ---------- */
+{
+  const page = fs.readFileSync("index.html", "utf8");
+  const inPage = s => page.indexOf(s) > -1;
+
+  /* Why it did nothing: the one button started the microphone and relied on
+     its done callback to ask the question six seconds later. nativeMicStop
+     clears micHandlers.done before stopping - on purpose, so nothing stale
+     fires - so that callback was destroyed every single time. */
+  t("the microphone's done callback is cleared when it stops",
+    grab("nativeMicStop").indexOf("micHandlers.done = null") > -1, true);
+  t("so nothing in the camera depends on it",
+    src.indexOf("function(){ camAsk(said); });") > -1, false);
+  t("and the six second wait is gone", src.indexOf("}, 6000);") > -1, false);
+
+  /* the shutter looks now - no microphone, nothing that can be lost */
+  t("there is a shutter", inPage('id="camAsk"'), true);
+  t("and it looks straight away", src.indexOf("camFlashNow();\n  camAsk('');") > -1, true);
+  t("asking out loud is its own button", inPage('id="camSpeak"'), true);
+  t("which ends when you stop talking, not on a timer",
+    src.indexOf("a second of quiet after words means you have finished") > -1, true);
+  t("and asks from there rather than from a callback that gets cleared",
+    grab("camListenStop").indexOf("camAsk(said)") > -1, true);
+  t("tapping it again finishes at once",
+    src.indexOf("if(camHearing){ camListenStop(true); return; }") > -1, true);
+  t("there is still a cap, in case the quiet never comes",
+    grab("camListenStop").indexOf("clearTimeout(camHearing.cap)") > -1, true);
+  t("a microphone that will not start says so, and still looks",
+    src.indexOf("The microphone would not start") > -1, true);
+  t("closing the camera stops it listening",
+    grab("camClose").indexOf("camListenStop(false)") > -1, true);
+  t("and a phone with no microphone still gets an answer",
+    src.indexOf("Ask by tapping the button") > -1, true);
+
+  /* and it looks like something looking */
+  t("four corners, not two", (page.match(/#camFrame i:nth-child/g) || []).length, 4);
+  t("a line sweeps while he is thinking", inPage("#cam.busy #camScan"), true);
+  t("but only while he is", inPage("#camScan{position:absolute") &&
+    /#camScan\{[^}]*display:none/.test(page), true);
+  t("it flashes when it takes the picture", inPage("function camFlashNow"), true);
+  t("and flashes again on the next tap, not only the first",
+    grab("camFlashNow").indexOf("void f.offsetWidth") > -1, true);
+  /* white text over a bright room is unreadable, and a camera gets pointed at
+     bright rooms */
+  t("the answer sits on a card", inPage("#camSaid:not(:empty){padding:14px 16px"), true);
+  t("which is not there when there is nothing to say",
+    /#camSaid\{[^}]*background:transparent/.test(page), true);
+  t("and a long answer can be scrolled", /#camSaid\{[^}]*overflow-y:auto/.test(page), true);
+  t("the shutter is the big round one", inPage(".camshot{width:74px"), true);
+  t("and cannot be pressed while he is already looking",
+    inPage("#cam.busy .camshot{pointer-events:none}"), true);
+}
+
+
 console.log(fail ? NL + fail + " FAILURES" : NL + "All " + pass + " JARVIS tests passed");
 process.exit(fail ? 1 : 0);
