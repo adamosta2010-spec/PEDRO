@@ -621,8 +621,13 @@ function nativeFrom(cap, exp){
   t("two sentences come back together", whole("One. Two. Three"), "One. Two.");
   t("what is spoken is queued, not overlapped", inSrc("function sayNext"), true);
   t("stopping empties the queue", inSrc("function sayStop"), true);
-  t("spoken answers ask for less", inSrc("maxOutputTokens: 320"), true);
-  t("and stop it thinking first", inSrc("thinkingConfig: { thinkingBudget: 0 }"), true);
+  /* thinking was switched off entirely for speed, and that is what made him
+     get things wrong - he gets a small budget now, and room to finish a
+     sentence rather than being cut off at 320 tokens */
+  t("spoken answers are still kept short", inSrc("maxOutputTokens: 700"), true);
+  t("but he is allowed to check himself first",
+    inSrc("thinkingBudget: 512"), true);
+  t("and the quick paths think a little too", inSrc("thinkingBudget: 256"), true);
   t("talking uses the quick model", inSrc("(voiceMode || fastMode) ? fastGeminiModel()"), true);
   t("it gives up rather than hanging", inSrc("No answer came back in time"), true);
   t("a half answer says so", inSrc("That answer stopped halfway"), true);
