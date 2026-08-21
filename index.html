@@ -273,7 +273,8 @@
     #voiceBar, #voiceBar *{animation:none !important}
     .vwave i{transform:scaleY(.63)}
     /* the reactor still glows, it just stops spinning */
-    #hfOrb .disc, #hfOrb .disc .sheen, #hfOrb .disc .glow{animation:none !important}
+    #hfOrb .disc, #hfOrb .disc .sheen, #hfOrb .disc .glow,
+    #holoImg, #holo .lines, #holo .sweep{animation:none !important}
   }
 
   /* ============ panels ============ */
@@ -531,6 +532,51 @@
   @keyframes breathe{0%,100%{transform:scale(1);opacity:.85}50%{transform:scale(1.06);opacity:1}}
   @keyframes hudTalk{from{transform:scale(.94);opacity:.8}to{transform:scale(1.08);opacity:1}}
   @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ============ the hologram ============
+     A real photograph of the actual thing, turned to light: cyan, floating,
+     scan lines across it, edges bleeding. The picture is real - the treatment
+     is what makes it a hologram. Everything that moves is a transform. */
+  #holo{position:absolute;inset:0;z-index:3;display:none;
+    align-items:center;justify-content:center;pointer-events:none;overflow:hidden}
+  #hfOrb.holo #holo{display:flex}
+  #holoImg{max-width:88%;max-height:78%;object-fit:contain;
+    /* grey, then tinted: sepia gives something to hue-rotate onto cyan */
+    filter:grayscale(1) brightness(1.35) contrast(1.15)
+           sepia(1) hue-rotate(150deg) saturate(4.5)
+           drop-shadow(0 0 14px color-mix(in srgb,var(--hud) 75%,transparent))
+           drop-shadow(0 0 42px color-mix(in srgb,var(--hud) 45%,transparent));
+    opacity:.92;
+    animation:holoFloat 6s ease-in-out infinite;
+    will-change:transform}
+  /* the lines that make it read as projected rather than printed */
+  #holo .lines{position:absolute;inset:0;pointer-events:none;opacity:.5;
+    background:repeating-linear-gradient(0deg,
+      color-mix(in srgb,var(--hud) 22%,transparent) 0 1px,
+      transparent 1px 4px);
+    animation:holoLines 7s linear infinite;
+    will-change:transform}
+  /* one band travelling down it, like something scanning */
+  #holo .sweep{position:absolute;left:0;right:0;top:0;height:26%;pointer-events:none;
+    background:linear-gradient(180deg, transparent,
+      color-mix(in srgb,var(--hud) 26%,transparent), transparent);
+    animation:holoSweep 3.6s ease-in-out infinite;
+    will-change:transform}
+  #holoName{position:absolute;left:0;right:0;bottom:6%;text-align:center;
+    color:var(--hud);font-size:11.5px;letter-spacing:.26em;text-transform:uppercase;
+    text-shadow:0 0 12px color-mix(in srgb,var(--hud) 70%,transparent)}
+  @keyframes holoFloat{
+    0%,100%{transform:translateY(0) scale(1)}
+    50%    {transform:translateY(-2.5%) scale(1.015)}}
+  @keyframes holoLines{to{transform:translateY(8px)}}
+  @keyframes holoSweep{
+    0%{transform:translateY(-30%);opacity:0}
+    15%{opacity:1} 85%{opacity:1}
+    100%{transform:translateY(390%);opacity:0}}
+  /* while it is up, the ball is out of the way */
+  #hfOrb.holo .disc{display:none}
+  /* off screen or reduced motion, it is still there - it simply stops moving */
+  #hfOrb.holo #holoImg, #hfOrb.holo .lines, #hfOrb.holo .sweep{ }
 
   /* a small card over the simulation, for questions about what is playing */
   #orbInfo{position:absolute;left:50%;top:calc(50% + 4px);transform:translate(-50%,0) scale(.96);
@@ -1131,6 +1177,18 @@
       <div class="sw" id="swManner"></div>
     </div>
     <div class="field">
+      <label for="setClaps">Clap to wake him</label>
+      <select id="setClaps">
+        <option value="0">Off</option>
+        <option value="2">Two claps</option>
+        <option value="1">One clap</option>
+        <option value="3">Three claps</option>
+      </select>
+      <div class="hint">Two is the sensible one. A single sharp sound is a door, a
+        dropped fork or a car outside; two together is somebody meaning it.
+        Only works while he is listening, so it needs the app.</div>
+    </div>
+    <div class="field">
       <label for="setPatience">How long he waits before answering</label>
       <select id="setPatience">
         <option value="quick">Quick &mdash; answers almost at once</option>
@@ -1317,6 +1375,12 @@
         <span class="disc"><i class="sheen a"></i><i class="sheen b"></i><i class="glow"></i></span>
         <span class="wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
         <iframe id="orbViz" sandbox="allow-scripts" referrerpolicy="no-referrer" title="Explanation"></iframe>
+        <div id="holo" aria-hidden="true">
+          <img id="holoImg" alt="" referrerpolicy="no-referrer">
+          <i class="lines"></i>
+          <i class="sweep"></i>
+          <b id="holoName"></b>
+        </div>
       </div>
       <div id="orbInfo"><b id="orbInfoTitle"></b><span id="orbInfoText"></span></div>
       <div id="hfWords">
@@ -1479,6 +1543,7 @@ var DEF = {
   home:null,       /* where he is: {lat, lon, name, country, byHand} */
   manner:"jarvis", /* "jarvis" - composed, British, brief - or "plain" */
   patience:"normal", /* how long a silence means you have finished talking */
+  claps:2,         /* how many claps wake him; 0 is off */
   headsUp:15,      /* minutes before something starts that he says so; 0 = never */
   elevenKey:"",    /* an ElevenLabs key of your own, if you want their voice */
   /* The voice Adam picked and asked for by id. It is from his own account, so
@@ -2032,6 +2097,7 @@ function fillSettings(){
   sw($("swManner"), s.manner !== "plain");
   $("setHeadsUp").value = String(s.headsUp === undefined ? 15 : s.headsUp);
   $("setPatience").value = s.patience || "normal";
+  $("setClaps").value = String(s.claps === undefined ? 2 : s.claps);
   sw($("swFail"), s.autoFailover !== false);
   $("setEffort").value = s.effort;
   $("setAiName").value = s.aiName || "Pedro";
@@ -2427,6 +2493,11 @@ $("swManner").addEventListener("click", function(){
   toast(on ? "Plainer, friendlier." : "Composed, British, brief.");
 });
 bindInput("setPatience", "patience");
+bindInput("setClaps", "claps", function(){
+  store.settings.claps = parseInt(store.settings.claps, 10) || 0;
+  save();
+  applyClaps();
+});
 bindInput("setHeadsUp", "headsUp", function(){
   store.settings.headsUp = parseInt(store.settings.headsUp, 10) || 0;
   save();
@@ -4192,6 +4263,20 @@ function wireNativeMic(){
   /* A phone call, Siri, headphones, the audio daemon restarting: each of these
      used to leave him deaf with nothing to show for it. The phone reports them
      now, so they end up in the trouble log. */
+  /* Two claps wake him. The microphone is already open and already handing
+     every buffer to the recogniser, so the phone checks the same buffers - it
+     costs a pass over a thousand floats and nothing else. */
+  natListen("pedroClap", function(){
+    if(!store.settings.claps) return;
+    hudLog("you", "(clap)", false);
+    if(hf.on && hfEl && hfEl.classList.contains("on")){
+      /* already looking at him - treat it as saying his name */
+      if(hf.phase === "wait" || hf.phase === "hear") hfWokenByClap();
+      return;
+    }
+    hfOpen();
+    setTimeout(hfWokenByClap, 260);
+  });
   natListen("pedroAudio", function(ev){
     var what = (ev && ev.what) || "something";
     if(what === "listening again"){
@@ -4228,7 +4313,10 @@ function nativeMicStart(onText, onDone){
   micHandlers.text = onText;
   micHandlers.done = onDone;
   micHeardAnything = false;
-  return nat("startListening").then(function(){ nativeListening = true; });
+  return nat("startListening").then(function(){
+    nativeListening = true;
+    applyClaps();          /* the phone forgets between sessions */
+  });
 }
 /* One way in to the app's native half. If it is not there, or that particular
    thing is not, this says so as a refused promise - it never throws, because a
@@ -4915,15 +5003,62 @@ function vizAsk(question){
    be worse than saying so. */
 var TOOLS = {
   "web.search": {
-    words: ["search", "google", "look up", "find out", "who is", "what happened"],
+    words: ["search", "google", "look up", "find out", "who is", "what happened",
+            "look it up", "check", "according to"],
     needs: "what to look up",
     hands: false,
-    tell: "search the web",
+    tell: "look something up on the web and read it",
     run: function(a){
       var q = String(a.q || a.query || a.text || "").trim();
       if(!q) return Promise.resolve({ ok:false, said:"there was nothing to look up" });
-      return openThing("https://duckduckgo.com/?q=" + encodeURIComponent(q))
-        .then(function(){ return { ok:true, said:"opened a search for " + q }; });
+      /* This used to open Safari and say it had "opened a search" - he never
+         saw a word of it, so he could not answer from it or check anything. */
+      return webLook(q, 2).then(function(found){
+        if(!found.length) return { ok:false, said:"I could not find anything on that" };
+        return { ok:true, said: found.map(function(f){
+          return f.title + ": " + f.said;
+        }).join(String.fromCharCode(10, 10)).slice(0, 3000) };
+      }).catch(function(e){
+        return { ok:false, said:"the web would not answer - " + String(e && e.message || e) };
+      });
+    }
+  },
+  "web.compare": {
+    words: ["compare", "difference between", "versus", "vs", "better than",
+            "which is better", "or"],
+    needs: "two or more things, as a list",
+    hands: false,
+    tell: "look several things up and set them side by side",
+    run: function(a){
+      var raw = a.things || a.items || a.q || a.query || "";
+      var list = Array.isArray(raw) ? raw
+        : String(raw).split(/\s+(?:vs\.?|versus|and|or)\s+|,\s*/i);
+      list = list.map(function(x){ return String(x).trim(); })
+                 .filter(function(x){ return x.length > 1; }).slice(0, 4);
+      if(list.length < 2) return Promise.resolve({ ok:false, said:"I need two things to compare" });
+      return Promise.all(list.map(function(one){
+        return webLook(one, 1).then(function(f){
+          return f.length ? one + ": " + f[0].said : one + ": nothing found";
+        }).catch(function(){ return one + ": nothing found"; });
+      })).then(function(all){
+        return { ok:true, said: all.join(String.fromCharCode(10, 10)).slice(0, 4000) };
+      });
+    }
+  },
+  "web.read": {
+    words: ["read this page", "what does this page say", "read the article",
+            "what is on this site"],
+    needs: "a web address",
+    hands: false,
+    tell: "read a page and say what is on it",
+    run: function(a){
+      var url = String(a.url || a.q || a.address || "").trim();
+      if(!url) return Promise.resolve({ ok:false, said:"there was no address" });
+      return pageRead(url, 6000).then(function(t){
+        return { ok:true, said: t.slice(0, 4000) };
+      }).catch(function(e){
+        return { ok:false, said:String(e && e.message || e) };
+      });
     }
   },
   "web.open": {
@@ -8051,6 +8186,150 @@ function rememberHarder(said){
   }).catch(function(){ voiceMode = was; });
 }
 
+/* ==================== a hologram of the thing itself ====================
+   Not a generated picture - a real photograph of the actual thing, found on
+   the web, and then treated until it reads as light rather than paper. */
+/* "hologram of the moon" used to come out as "of the moon", and "show me my
+   calendar" was taken as a request for a picture of a calendar - the bare
+   "show me X" branch is greedy, so the things that are his own are kept out
+   of it by name. */
+var HOLO_NOT = "me|my|our|the (?:calendar|diary|time|clock|weather|battery|transcript|memory|memories|settings|camera|systems|brain)|calendar|diary|settings|transcript|memory|memories|camera|systems";
+var HOLO_RE = new RegExp(
+  "^(?:can you |could you |please )?" +
+  "(?:show|see|view|display|pull up|bring up)\\s+(?:me\\s+)?" +
+  "(?:an?\\s+|the\\s+)?(?:image|picture|photo|photograph|hologram|render|view)" +
+  "\\s+of\\s+(?:an?\\s+|the\\s+)?(.{2,60})$" +
+  "|^what\\s+(?:does|do)\\s+(?:an?\\s+|the\\s+)?(.{2,60}?)\\s+look\\s+like\\??$" +
+  "|^(?:show|hologram|holo)\\s+(?:me\\s+)?(?:a\\s+hologram\\s+)?(?:of\\s+)?" +
+  "(?!(?:" + HOLO_NOT + ")\\b)(?:an?\\s+|the\\s+)?(.{2,60})$", "i");
+
+function holoOf(said){
+  var m = String(said || "").trim().replace(/[.?!]+$/, "").match(HOLO_RE);
+  if(!m) return null;
+  var what = (m[1] || m[2] || m[3] || "").trim();
+  return what.length > 1 ? what : null;
+}
+
+function holoHide(){
+  var orb = $("hfOrb");
+  if(orb) orb.classList.remove("holo");
+  var img = $("holoImg");
+  if(img) img.removeAttribute("src");
+}
+
+/* Find a real photograph of it, and put it up as light. */
+function holoShow(what){
+  hfSet("busy", "Finding it");
+  return webLook(what, 3).then(function(found){
+    var withPicture = found.filter(function(f){ return f.image; })[0];
+    if(!withPicture){
+      sayNow("I could not find a picture of " + what + ".");
+      return false;
+    }
+    return new Promise(function(done){
+      var img = $("holoImg"), orb = $("hfOrb");
+      if(!img || !orb){ done(false); return; }
+      img.onload = function(){
+        $("holoName").textContent = withPicture.title;
+        orb.classList.add("holo");
+        /* it is a picture, so say what it is rather than describing it back */
+        sayNow(withPicture.said
+          ? withPicture.title + ". " + withPicture.said.split(". ").slice(0, 2).join(". ")
+          : withPicture.title + ".");
+        done(true);
+      };
+      img.onerror = function(){
+        sayNow("I found " + withPicture.title + ", but the picture would not load.");
+        done(false);
+      };
+      img.src = withPicture.image;
+    });
+  }).catch(function(e){
+    sayNow("I could not look that up - " + String(e && e.message || e));
+    return false;
+  });
+}
+
+/* ==================== reading the web ====================
+   None of this needs a key or an account. Wikipedia and DuckDuckGo both send
+   CORS headers, and r.jina.ai returns a page as plain text - all three were
+   checked before being written in here. */
+
+/* the top few Wikipedia articles for some words */
+function wikiFind(q, howMany){
+  return fetch("https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=" +
+               encodeURIComponent(q) + "&srlimit=" + (howMany || 3) + "&format=json&origin=*")
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      return ((j.query && j.query.search) || []).map(function(hit){ return hit.title; });
+    });
+}
+
+/* one article, in a paragraph, with its picture if it has one */
+function wikiRead(title){
+  return fetch("https://en.wikipedia.org/api/rest_v1/page/summary/" +
+               encodeURIComponent(String(title).split(" ").join("_")))
+    .then(function(r){
+      if(!r.ok) throw new Error("no article for " + title);
+      return r.json();
+    })
+    .then(function(j){
+      return {
+        title: j.title || title,
+        said: j.extract || "",
+        note: j.description || "",
+        image: (j.originalimage && j.originalimage.source) ||
+               (j.thumbnail && j.thumbnail.source) || "",
+        link: (j.content_urls && j.content_urls.desktop && j.content_urls.desktop.page) || ""
+      };
+    });
+}
+
+/* DuckDuckGo's instant answer - definitions, people, quick facts */
+function duckRead(q){
+  return fetch("https://api.duckduckgo.com/?q=" + encodeURIComponent(q) +
+               "&format=json&no_html=1&skip_disambig=1")
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      var said = j.AbstractText || j.Answer || "";
+      if(!said && j.RelatedTopics && j.RelatedTopics.length){
+        said = (j.RelatedTopics[0] && j.RelatedTopics[0].Text) || "";
+      }
+      return said ? { title: j.Heading || q, said: said, image: j.Image
+        ? (/^https?:/.test(j.Image) ? j.Image : "https://duckduckgo.com" + j.Image) : "" } : null;
+    }).catch(function(){ return null; });
+}
+
+/* Whatever is at an address, as plain text. Capped, because a page can be
+   enormous and none of it is worth the wait past the first few thousand
+   characters. */
+function pageRead(url, most){
+  var clean = String(url || "").trim();
+  if(!/^https?:/i.test(clean)) clean = "https://" + clean;
+  return fetch("https://r.jina.ai/" + clean, { headers: { "x-respond-with": "text" } })
+    .then(function(r){
+      if(!r.ok) throw new Error("that page would not open (" + r.status + ")");
+      return r.text();
+    })
+    .then(function(t){ return String(t).slice(0, most || 6000); });
+}
+
+/* Search and actually read the results. What comes back is text for him to
+   answer from, not a tab for somebody else to read. */
+function webLook(q, howMany){
+  var want = howMany || 2;
+  return wikiFind(q, want).then(function(titles){
+    if(!titles.length) return duckRead(q).then(function(d){ return d ? [d] : []; });
+    return Promise.all(titles.slice(0, want).map(function(t){
+      return wikiRead(t).catch(function(){ return null; });
+    })).then(function(found){
+      var kept = found.filter(function(x){ return x && x.said; });
+      if(kept.length) return kept;
+      return duckRead(q).then(function(d){ return d ? [d] : []; });
+    });
+  });
+}
+
 /* ==================== keeping a note of trouble ====================
    An app that restarts by itself leaves nothing behind to look at. These two
    lists do: when it started, and what went wrong. Both are small, both are
@@ -9088,6 +9367,7 @@ function backupData(){
       effort:s.effort, tts:s.tts, voiceName:s.voiceName, voiceTalk:s.voiceTalk,
       volume:s.volume, rate:s.rate, elevenKey:s.elevenKey, elevenVoice:s.elevenVoice,
       manner:s.manner, headsUp:s.headsUp, mood:s.mood, home:s.home, patience:s.patience,
+      claps:s.claps,
       panelSpots:s.panelSpots, panelSizes:s.panelSizes,
       voiceByHand:s.voiceByHand, voiceMoved:s.voiceMoved,
       background:s.background, voiceFirst:s.voiceFirst, enterSends:s.enterSends,
@@ -9524,6 +9804,28 @@ document.addEventListener("visibilitychange", function(){
     hfWarn.textContent = "";
   }
 });
+
+/* Woken by a clap: the same as using his name, so it sounds the same and ends
+   in the same place - listening, with nothing half-set. */
+function hfWokenByClap(){
+  if(hf.answering || hf.talking) return;
+  hf.answering = true;
+  var yes = store.settings.manner === "plain" ? "Yeah?" : ANSWER_TO_NAME[
+    Math.floor(Math.random() * ANSWER_TO_NAME.length)];
+  hfSet("hear", yes);
+  hfHeard.textContent = "";
+  hfSpeak(yes, function(){
+    hf.answering = false;
+    hfSet("hear", "Listening…");
+    hfQuietTimer();
+  });
+}
+
+/* the phone only listens for claps when it is told to */
+function applyClaps(){
+  var n = parseInt(store.settings.claps, 10) || 0;
+  nat("setClap", { claps: n }).catch(function(){});
+}
 
 /* --- the listening loop --- */
 function hfListen(){
@@ -10095,6 +10397,15 @@ function hfAsk(question){
       : "Building mode. Say add a battery, add a lamp, then wire it up.");
     return;
   }
+  /* A picture of a thing: a real photograph of it, shown as light. This comes
+     before the 3D builder, or "show me a picture of a plane" builds one. */
+  var toHolo = holoOf(question);
+  if(toHolo){
+    handedBack = true;
+    holoShow(toHolo);
+    return;
+  }
+
 
   /* The ones that need no model at all. Some of them answer through sayNow,
      which hands the microphone back itself - doing it again here is what broke
@@ -10430,7 +10741,8 @@ hfOrb.addEventListener("dblclick", function(){
   fillSettings(); openPanel(settings);
 });
 hfOrb.addEventListener("click", function(){
-  if(vizStop()) return;              /* a simulation is running - put the globe back */
+  if($("hfOrb").classList.contains("holo")){ holoHide(); return; }
+  if(vizStop()) return;              /* a simulation is running - put the circle back */
   if(!hf.on) return;
   if(hf.talking || (window.speechSynthesis && speechSynthesis.speaking)){
     speechSynthesis.cancel();
@@ -10489,7 +10801,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.90";
+var BUILD = "2026-08-21.91";
 
 function banner(kind, html){
   var b = $("banner");

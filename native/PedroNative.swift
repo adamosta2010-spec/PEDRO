@@ -45,7 +45,8 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
         CAPPluginMethod(name: "contactFind",    returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "readFile",       returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "calendarNext",   returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "batteryLevel",   returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "batteryLevel",   returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setClap",        returnType: CAPPluginReturnPromise)
     ]
 
     // MARK: - on-device model
@@ -215,6 +216,70 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
     private var watchingAudio = false
     /// several notifications can arrive for one event - one rebuild is enough
     private var comingBack = false
+
+    // MARK: - clapping
+
+    /// how many claps mean "wake up"; 0 is off
+    private var clapsWanted = 0
+    /// the running level of the room, so a clap is judged against the quiet
+    /// around it rather than an absolute number that is wrong in every room
+    private var roomLevel: Float = 0.01
+    /// when the claps in the current group happened
+    private var clapTimes: [TimeInterval] = []
+    /// so one clap is not counted several times as it decays
+    private var lastClapAt: TimeInterval = 0
+
+    @objc func setClap(_ call: CAPPluginCall) {
+        clapsWanted = max(0, min(3, call.getInt("claps") ?? 0))
+        clapTimes.removeAll()
+        call.resolve(["claps": clapsWanted])
+    }
+
+    /// Called for every buffer while listening. One pass over about a thousand
+    /// floats - the recogniser is already being handed the same buffer, so this
+    /// is the cheap part of what is happening here anyway.
+    private func hearClap(_ buffer: AVAudioPCMBuffer) {
+        guard clapsWanted > 0 else { return }
+        guard let data = buffer.floatChannelData?[0] else { return }
+        let n = Int(buffer.frameLength)
+        guard n > 0 else { return }
+
+        var peak: Float = 0
+        var sum: Float = 0
+        for i in 0..<n {
+            let v = abs(data[i])
+            if v > peak { peak = v }
+            sum += v * v
+        }
+        let rms = sqrt(sum / Float(n))
+
+        // The room, followed slowly, so a clap cannot drag it up with it.
+        roomLevel = roomLevel * 0.97 + rms * 0.03
+        if roomLevel < 0.0005 { roomLevel = 0.0005 }
+
+        // A clap is loud against the room AND concentrated in a moment. Speech
+        // is loud too, but its energy is spread across the whole buffer, so the
+        // peak sits much closer to the rms.
+        let loud = peak > 0.14 && peak > roomLevel * 9
+        let sharp = rms > 0 && peak / rms > 4.5
+        guard loud && sharp else { return }
+
+        let now = Date().timeIntervalSince1970
+        // one clap rings on for a while - do not count its own tail
+        guard now - lastClapAt > 0.12 else { return }
+        lastClapAt = now
+
+        // anything older than three quarters of a second is a different event
+        clapTimes = clapTimes.filter { now - $0 < 0.75 }
+        clapTimes.append(now)
+
+        if clapTimes.count >= clapsWanted {
+            clapTimes.removeAll()
+            DispatchQueue.main.async { [weak self] in
+                self?.notifyListeners("pedroClap", data: ["claps": self?.clapsWanted ?? 0])
+            }
+        }
+    }
 
     /// A phone call, Siri, an alarm, headphones, the audio daemon restarting -
     /// every one of these stops the engine, and none of them were watched for.
@@ -727,8 +792,9 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
             let node = engine.inputNode
             enableEchoCancelling(node)
             node.removeTap(onBus: 0)
-            node.installTap(onBus: 0, bufferSize: 1024, format: node.outputFormat(forBus: 0)) { buffer, _ in
+            node.installTap(onBus: 0, bufferSize: 1024, format: node.outputFormat(forBus: 0)) { [weak self] buffer, _ in
                 req.append(buffer)
+                self?.hearClap(buffer)
             }
             engine.prepare()
             try engine.start()
@@ -822,8 +888,9 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
             let node = engine.inputNode
             enableEchoCancelling(node)
             node.removeTap(onBus: 0)
-            node.installTap(onBus: 0, bufferSize: 1024, format: node.outputFormat(forBus: 0)) { buffer, _ in
+            node.installTap(onBus: 0, bufferSize: 1024, format: node.outputFormat(forBus: 0)) { [weak self] buffer, _ in
                 req.append(buffer)
+                self?.hearClap(buffer)
             }
             engine.prepare()
             try engine.start()

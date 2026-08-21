@@ -16,6 +16,7 @@ const t = (n, g, w) => {
   else { pass++; console.log("ok   " + n); }
 };
 const has = s => src.indexOf(s) > -1;
+const TOOLSRC = decl("TOOLS");
 
 /* ---------- how he speaks ---------- */
 {
@@ -717,6 +718,99 @@ const has = s => src.indexOf(s) > -1;
     on.indexOf("hf.turns = 0;") > -1, true);
   t("and with a fresh microphone, so nothing said over him carries over",
     on.indexOf("hfFreshMic();              /* nothing heard over him") > -1, true);
+}
+
+
+/* ---------- clapping, the web, and holograms ---------- */
+{
+  const page = fs.readFileSync("index.html", "utf8");
+  const inPage = s => page.indexOf(s) > -1;
+  const sw = fs.readFileSync("native/PedroNative.swift", "utf8");
+
+  /* ---- clapping ---- */
+  t("the phone listens for claps", sw.indexOf("private func hearClap") > -1, true);
+  t("on the buffers the recogniser already gets",
+    sw.indexOf("self?.hearClap(buffer)") > -1, true);
+  t("in both places the tap is installed",
+    (sw.match(/self\?\.hearClap\(buffer\)/g) || []).length, 2);
+  t("a clap is loud against the room, not against a fixed number",
+    sw.indexOf("peak > roomLevel * 9") > -1, true);
+  t("and sharp - which is what a shout is not",
+    sw.indexOf("peak / rms > 4.5") > -1, true);
+  t("the room level cannot be dragged up by the clap itself",
+    sw.indexOf("roomLevel * 0.97") > -1, true);
+  t("one clap is not counted twice as it rings out",
+    sw.indexOf("now - lastClapAt > 0.12") > -1, true);
+  t("claps more than a moment apart are different events",
+    sw.indexOf("now - $0 < 0.75") > -1, true);
+  t("it is off unless asked for", sw.indexOf("private var clapsWanted = 0") > -1, true);
+  t("the page can turn it on", sw.indexOf("@objc func setClap") > -1, true);
+  t("two is what it starts at - one sharp sound is a door",
+    has("claps:2,"), true);
+  t("the page hears the clap", has('natListen("pedroClap"'), true);
+  t("and it ends where using his name ends", has("function hfWokenByClap"), true);
+  t("it is turned on again with the microphone",
+    grab("nativeMicStart").indexOf("applyClaps()") > -1, true);
+  t("there is somewhere to change it", inPage('id="setClaps"'), true);
+
+  /* ---- the web ---- */
+  /* web.search only ever opened Safari and said it had "opened a search" - he
+     never saw a word of it, so he could not compare or check anything. */
+  t("he reads the web rather than opening a tab at it",
+    grab("webLook").indexOf("wikiFind") > -1, true);
+  t("and web.search uses it", TOOLSRC.indexOf("return webLook(q, 2)") > -1, true);
+  t("it no longer just opens a tab and looks away",
+    TOOLSRC.indexOf('opened a search for " + q') > -1, false);
+  t("Wikipedia is asked properly, with CORS", has("format=json&origin=*"), true);
+  t("and read a summary at a time", has("api/rest_v1/page/summary/"), true);
+  t("DuckDuckGo covers what Wikipedia does not", has("api.duckduckgo.com"), true);
+  t("and a page can be read as plain text", has("r.jina.ai"), true);
+  t("none of it needs a key", grab("wikiRead").indexOf("apiKeyNow") === -1, true);
+  t("comparing several things is its own tool", TOOLSRC.indexOf('"web.compare"') > -1, true);
+  t("which splits them on vs, and, or a comma",
+    TOOLSRC.indexOf("versus|and|or") > -1, true);
+  t("and stops at four, because a spoken answer cannot hold more",
+    TOOLSRC.indexOf(".slice(0, 4)") > -1, true);
+  t("a page that will not open says so rather than hanging",
+    grab("pageRead").indexOf("that page would not open") > -1, true);
+  t("and what comes back is capped", grab("pageRead").indexOf("most || 6000") > -1, true);
+
+  /* ---- holograms ---- */
+  /* not a generated picture - a real photograph, treated until it reads as
+     light. He is a voice assistant; making pictures went. */
+  t("there is somewhere to put one", inPage('id="holo"'), true);
+  t("it is a real photograph, found on the web",
+    grab("holoShow").indexOf("webLook(what, 3)") > -1, true);
+  t("and one with a picture is the one used",
+    grab("holoShow").indexOf("f.image") > -1, true);
+  t("nothing is generated", has("function drawPicture"), false);
+  t("it is turned to light rather than shown as a photo",
+    inPage("hue-rotate(150deg)") && inPage("drop-shadow(0 0 14px"), true);
+  t("with lines across it", inPage("#holo .lines{"), true);
+  t("and something sweeping down it", inPage("@keyframes holoSweep"), true);
+  t("it floats", inPage("@keyframes holoFloat"), true);
+  t("everything that moves is a transform, as everywhere else",
+    /@keyframes holoFloat\{[^@]*transform:/.test(page), true);
+  t("the ball gets out of the way", inPage("#hfOrb.holo .disc{display:none}"), true);
+  t("no picture found is said, not left blank",
+    grab("holoShow").indexOf("I could not find a picture of") > -1, true);
+  t("a picture that will not load is said too",
+    grab("holoShow").indexOf("the picture would not load") > -1, true);
+  t("tapping it puts it away", grab("holoHide").indexOf("classList.remove(\"holo\")") > -1, true);
+
+  const holoOf = new Function("HOLO_NOT", "HOLO_RE",
+    decl("HOLO_NOT") + decl("HOLO_RE") + grab("holoOf") + " return holoOf;")();
+  [["show me a picture of the Eiffel Tower", "Eiffel Tower"],
+   ["show me an image of a lion", "lion"],
+   ["what does a pangolin look like", "pangolin"],
+   ["show me a hologram of Saturn", "Saturn"],
+   ["hologram of the moon", "moon"],
+   ["show me the Colosseum", "Colosseum"]]
+    .forEach(([q, want]) => t('"' + q + '" asks for one', holoOf(q), want));
+  /* "show me X" is greedy, so the things that are his own are kept out by name */
+  ["show me my calendar", "show me the weather", "show me the time",
+   "show me settings", "show me the transcript", "what is the capital of france"]
+    .forEach(q => t('"' + q + '" does not', holoOf(q), null));
 }
 
 
