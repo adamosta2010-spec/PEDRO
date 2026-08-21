@@ -4010,6 +4010,24 @@ function vizBuild(about){
   $('orbViz').srcdoc = vizPage(vizWaiting(about));
   $('hfOrb').classList.add('showing');
 
+  /* A model of the thing, built from what it is made of. This is the way
+     round that works: a short piece of JSON he can write quickly, and a
+     renderer here that cannot be broken by what he sends. */
+  var spec = spec3dKnownAll(about);
+  if(spec && !apiKeyNow()){ show3d(about, spec); return; }
+
+  function show3d(what, made){
+    voiceMode = wasVoice;
+    fastMode = false;
+    viz.busy = false;
+    var page = spec3dPage(made);
+    simKeep(what, page, '');
+    vizShow(what, page, '');
+    var names = made.parts.slice(0, 4).map(function(p){ return p.n.toLowerCase(); });
+    carryOn("Here's " + what + ". Tap a part to hear what it does - " +
+      names.join(", ") + ", and more.");
+  }
+
   var ask = 'Show ' + about + ' as a small animation that runs by itself.' +
     ' One short sentence in plain speech, then one fenced html block: a complete' +
     ' self-contained page, no external files, no network, no images, no libraries.' +
@@ -4023,10 +4041,12 @@ function vizBuild(about){
   voiceMode = false;
   fastMode = true;
 
-  var seen = '', enough = false, lines = 0, tries = 0;
+  var seen = '', enough = false, lines = 0, tries = 0, lastPrompt = '';
 
   /* drawn here rather than by the model - offline, or the model would not */
   function fallBack(){
+    var known = spec3dKnownAll(about);
+    if(known){ show3d(about, known); return; }   /* one he knows by heart */
     voiceMode = wasVoice;
     fastMode = false;
     viz.busy = false;
@@ -4036,7 +4056,16 @@ function vizBuild(about){
     carryOn("Here's " + about + ". Drawn it myself - ask again for a better one.");
   }
 
+  /* the model of it, if he sent one back */
+  function done3d(text){
+    var made = spec3dRead(text);
+    if(!made) return false;
+    show3d(about, made);
+    return true;
+  }
+
   function done(text){
+    if(done3d(text)) return;             /* it came back as a model */
     var parts = vizExtract(text);
     if(!parts.html){
       /* "Sure, here's the code" with no code. Ask once more, plainly, and
@@ -4065,6 +4094,7 @@ function vizBuild(about){
   /* one runner, used for the first ask and for the plainer second one */
   function run(prompt){
     var one = { messages: [{ role:'user', content: prompt, t:Date.now() }] };
+    lastPrompt = prompt;
     askStream(one, function(acc){
       seen = acc;
       var n = (acc.match(/\n/g) || []).length;
@@ -4072,6 +4102,17 @@ function vizBuild(about){
       /* the code block has closed: everything after it is chatter we do not
          need. An empty block does not count - stopping on one of those is how
          you end up showing a blank page. */
+      /* a model comes back as JSON, and it is finished when the brace closes */
+      if(lastPrompt.indexOf('as JSON') > -1){
+        var open = acc.indexOf('{');
+        if(open > -1 && acc.lastIndexOf('}') > open && !enough){
+          var maybe = spec3dRead(acc);
+          if(maybe && maybe.parts.length >= 4){
+            enough = true;
+            try{ if(abortCtl) abortCtl.abort(); }catch(e){}
+          }
+        }
+      }
       var first = acc.indexOf('```');
       if(first > -1 && !enough){
         var close = acc.indexOf('```', first + 3);
@@ -4085,7 +4126,8 @@ function vizBuild(about){
       fallBack();      /* no signal, no key, or it fell over - draw it here */
     });
   }
-  run(ask);
+  /* the model of it first - shorter to write and it cannot break anything */
+  run(spec3dAsk(about));
 }
 
 /* Something to look at while he writes it - drawn here, not by him, so it
@@ -4311,6 +4353,242 @@ function vizAsk(question){
     });
 }
 
+
+/* ==================== the 3D model ====================
+   A spec is a list of parts: what shape each one is, how big, where it sits,
+   what colour, and a line about what it does. This turns one into a page that
+   draws it, turns it, and lets it be taken apart with a finger. Written and
+   checked outside the app first, then brought in whole. */
+var VIZ3D_RENDER = "\nvar SPEC = __SPEC__;\nvar c = document.getElementById(\"c\"), g = c.getContext(\"2d\");\nfunction fit(){\n  var r = Math.min(window.innerWidth, window.innerHeight);\n  var dpr = Math.min(2, window.devicePixelRatio || 1);\n  c.width = Math.round(r * dpr); c.height = Math.round(r * dpr);\n  c.style.width = r + \"px\"; c.style.height = r + \"px\";\n}\naddEventListener(\"resize\", fit); fit();\n\n/* ---- the shapes every part is made of ---- */\nfunction box(){\n  var v = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]];\n  return { v: v, f: [[0,1,2,3],[5,4,7,6],[4,0,3,7],[1,5,6,2],[4,5,1,0],[3,2,6,7]] };\n}\nfunction tube(n, topR){\n  var v = [], f = [], i;\n  if(topR === undefined) topR = 1;\n  for(i = 0; i < n; i++){\n    var a = i / n * Math.PI * 2;\n    v.push([Math.cos(a), -1, Math.sin(a)]);\n    v.push([Math.cos(a) * topR, 1, Math.sin(a) * topR]);\n  }\n  for(i = 0; i < n; i++){\n    var j = (i + 1) % n;\n    f.push([i * 2, j * 2, j * 2 + 1, i * 2 + 1]);\n  }\n  var bottom = [], top = [];\n  for(i = 0; i < n; i++){ bottom.push(i * 2); top.push((n - 1 - i) * 2 + 1); }\n  f.push(bottom); f.push(top);\n  return { v: v, f: f };\n}\nfunction ball(rows, cols){\n  var v = [], f = [], i, j;\n  for(i = 0; i <= rows; i++){\n    var th = i / rows * Math.PI;\n    for(j = 0; j < cols; j++){\n      var ph = j / cols * Math.PI * 2;\n      v.push([Math.sin(th) * Math.cos(ph), Math.cos(th), Math.sin(th) * Math.sin(ph)]);\n    }\n  }\n  for(i = 0; i < rows; i++){\n    for(j = 0; j < cols; j++){\n      var a = i * cols + j, b = i * cols + (j + 1) % cols;\n      f.push([a, b, b + cols, a + cols]);\n    }\n  }\n  return { v: v, f: f };\n}\nvar SHAPES = {\n  box: box(), plate: box(), cyl: tube(12), cone: tube(12, 0.02),\n  ball: ball(7, 12), wedge: tube(3)\n};\n\n/* ---- turning a part into faces in the world ---- */\nfunction radians(d){ return (d || 0) * Math.PI / 180; }\nfunction spin(p, rx, ry, rz){\n  var x = p[0], y = p[1], z = p[2], s, k;\n  s = Math.sin(rx); k = Math.cos(rx); var y1 = y * k - z * s, z1 = y * s + z * k;\n  s = Math.sin(ry); k = Math.cos(ry); var x1 = x * k + z1 * s, z2 = -x * s + z1 * k;\n  s = Math.sin(rz); k = Math.cos(rz); var x2 = x1 * k - y1 * s, y2 = x1 * s + y1 * k;\n  return [x2, y2, z2];\n}\nvar FACES = [];\n(SPEC.parts || []).forEach(function(part, idx){\n  var shape = SHAPES[part.s] || SHAPES.box;\n  var d = part.d || [1, 1, 1], p = part.p || [0, 0, 0], r = part.r || [0, 0, 0];\n  var pts = shape.v.map(function(v){\n    var q = [v[0] * (d[0] || 1) / 2, v[1] * (d[1] || 1) / 2, v[2] * (d[2] || 1) / 2];\n    q = spin(q, radians(r[0]), radians(r[1]), radians(r[2]));\n    return [q[0] + p[0], q[1] + p[1], q[2] + p[2]];\n  });\n  shape.f.forEach(function(face){\n    FACES.push({ pts: face.map(function(i){ return pts[i]; }), c: part.c || \"#8fd8ff\",\n                 part: idx, spin: part.spin, at: p });\n  });\n});\n\n/* everything is scaled to fit whatever it is drawn into */\nvar far = 0.001;\nFACES.forEach(function(f){ f.pts.forEach(function(p){\n  far = Math.max(far, Math.hypot(p[0], p[1], p[2]));\n}); });\nvar UNIT = 1 / far;\n\n/* ---- the ball it starts as ---- */\nFACES.forEach(function(f){\n  f.from = f.pts.map(function(p){\n    var len = Math.hypot(p[0], p[1], p[2]) || 1;\n    return [p[0] / len * far * 0.72, p[1] / len * far * 0.72, p[2] / len * far * 0.72];\n  });\n});\n\n/* ---- looking at it ---- */\nvar view = { ry: 0.5, rx: -0.25, zoom: 1, t: 0, morph: 0, spun: 0 };\nvar touch = null;\nc.addEventListener(\"pointerdown\", function(e){ touch = { x: e.clientX, y: e.clientY, moved: false }; });\nc.addEventListener(\"pointermove\", function(e){\n  if(!touch) return;\n  view.ry += (e.clientX - touch.x) * 0.01;\n  view.rx += (e.clientY - touch.y) * 0.01;\n  view.rx = Math.max(-1.4, Math.min(1.4, view.rx));\n  touch.x = e.clientX; touch.y = e.clientY; touch.moved = true;\n});\nc.addEventListener(\"pointerup\", function(e){ if(touch && !touch.moved) tap(e); touch = null; });\n\nvar LABEL = null, LABEL_UNTIL = 0;\nfunction tap(e){\n  var r = c.getBoundingClientRect();\n  var x = (e.clientX - r.left) / r.width * c.width, y = (e.clientY - r.top) / r.height * c.height;\n  var best = null;\n  drawn.forEach(function(f){\n    if(!inside(f.flat, x, y)) return;\n    if(!best || f.depth < best.depth) best = f;\n  });\n  if(best){\n    var part = (SPEC.parts || [])[best.part] || {};\n    LABEL = { name: part.n || \"part\", note: part.note || \"\" };\n    LABEL_UNTIL = Date.now() + 4200;\n    parent.postMessage({ pedroPart: part.n || \"\", note: part.note || \"\" }, \"*\");\n  }\n}\nfunction inside(pts, x, y){\n  var hit = false;\n  for(var i = 0, j = pts.length - 1; i < pts.length; j = i++){\n    var a = pts[i], b = pts[j];\n    if(((a[1] > y) !== (b[1] > y)) &&\n       (x < (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0])) hit = !hit;\n  }\n  return hit;\n}\n\n/* ---- drawing ---- */\nvar drawn = [];\nfunction shade(hex, light){\n  var n = parseInt(String(hex).replace(\"#\", \"\"), 16);\n  if(isNaN(n)) n = 0x8fd8ff;\n  var r = (n >> 16) & 255, gg = (n >> 8) & 255, b = n & 255;\n  var k = 0.35 + 0.65 * Math.max(0, light);\n  return \"rgb(\" + Math.round(r * k) + \",\" + Math.round(gg * k) + \",\" + Math.round(b * k) + \")\";\n}\nfunction frame(){\n  var W = c.width, H = c.height, mid = Math.min(W, H) / 2;\n  g.clearRect(0, 0, W, H);\n  view.t += 0.016;\n  if(view.morph < 1) view.morph = Math.min(1, view.morph + 0.022);\n  var ease = view.morph < 1 ? 1 - Math.pow(1 - view.morph, 3) : 1;\n  if(!touch) view.ry += 0.004;\n  view.spun += 0.14;\n\n  var cosY = Math.cos(view.ry), sinY = Math.sin(view.ry);\n  var cosX = Math.cos(view.rx), sinX = Math.sin(view.rx);\n  drawn = [];\n  for(var i = 0; i < FACES.length; i++){\n    var f = FACES[i], flat = [], depth = 0, ok = true;\n    for(var k = 0; k < f.pts.length; k++){\n      var a = f.pts[k], b = f.from[k];\n      var x = (b[0] + (a[0] - b[0]) * ease) * UNIT;\n      var y = (b[1] + (a[1] - b[1]) * ease) * UNIT;\n      var z = (b[2] + (a[2] - b[2]) * ease) * UNIT;\n      if(f.spin){                       /* propellers, wheels, anything told to turn */\n        var ax = (f.at || [0,0,0]);\n        var dx = x - ax[0] * UNIT, dy = y - ax[1] * UNIT, dz = z - ax[2] * UNIT;\n        var s = Math.sin(view.spun), cq = Math.cos(view.spun);\n        if(f.spin === \"y\"){ var nx = dx * cq + dz * s; dz = -dx * s + dz * cq; dx = nx; }\n        else if(f.spin === \"x\"){ var ny = dy * cq - dz * s; dz = dy * s + dz * cq; dy = ny; }\n        else { var mx = dx * cq - dy * s; dy = dx * s + dy * cq; dx = mx; }\n        x = ax[0] * UNIT + dx; y = ax[1] * UNIT + dy; z = ax[2] * UNIT + dz;\n      }\n      var x1 = x * cosY + z * sinY, z1 = -x * sinY + z * cosY;\n      var y1 = y * cosX - z1 * sinX, z2 = y * sinX + z1 * cosX;\n      var persp = 2.6 / (2.6 + z2 * 0.9);\n      flat.push([W / 2 + x1 * mid * 0.78 * persp * view.zoom,\n                 H / 2 - y1 * mid * 0.78 * persp * view.zoom]);\n      depth += z2;\n    }\n    if(!ok) continue;\n    /* which way the face is pointing, for the light and for hiding its back */\n    var ax2 = flat[1][0] - flat[0][0], ay2 = flat[1][1] - flat[0][1];\n    var bx2 = flat[2][0] - flat[0][0], by2 = flat[2][1] - flat[0][1];\n    var cross = ax2 * by2 - ay2 * bx2;\n    if(cross >= 0) continue;                       /* facing away - skip it */\n    drawn.push({ flat: flat, depth: depth / f.pts.length, c: f.c, part: f.part,\n                 light: Math.min(1, Math.abs(cross) / (mid * mid * 0.06)) });\n  }\n  drawn.sort(function(a, b){ return b.depth - a.depth; });\n  for(var d = 0; d < drawn.length; d++){\n    var q = drawn[d];\n    g.beginPath();\n    g.moveTo(q.flat[0][0], q.flat[0][1]);\n    for(var m = 1; m < q.flat.length; m++) g.lineTo(q.flat[m][0], q.flat[m][1]);\n    g.closePath();\n    g.fillStyle = shade(q.c, 0.35 + q.light);\n    g.fill();\n    g.strokeStyle = \"rgba(56,225,240,.30)\";\n    g.lineWidth = Math.max(1, c.width / 500);\n    g.stroke();\n  }\n  /* the name of whatever was tapped */\n  if(LABEL && Date.now() < LABEL_UNTIL){\n    var pad = c.width * 0.035;\n    g.font = \"600 \" + Math.round(c.width / 26) + \"px -apple-system,sans-serif\";\n    g.textAlign = \"center\";\n    g.fillStyle = \"#38e1f0\";\n    g.fillText(LABEL.name, W / 2, H - pad * 2.1);\n    if(LABEL.note){\n      g.font = Math.round(c.width / 34) + \"px -apple-system,sans-serif\";\n      g.fillStyle = \"rgba(231,233,238,.75)\";\n      var words = String(LABEL.note).split(\" \"), line = \"\", lines = [];\n      for(var w = 0; w < words.length; w++){\n        var test = line ? line + \" \" + words[w] : words[w];\n        if(g.measureText(test).width > W * 0.8){ lines.push(line); line = words[w]; }\n        else line = test;\n      }\n      if(line) lines.push(line);\n      lines.slice(-2).forEach(function(l, n){\n        g.fillText(l, W / 2, H - pad * 1.1 + n * (c.width / 30));\n      });\n    }\n  } else if(SPEC.name){\n    g.font = \"600 \" + Math.round(c.width / 30) + \"px -apple-system,sans-serif\";\n    g.textAlign = \"center\";\n    g.fillStyle = \"rgba(56,225,240,.62)\";\n    g.fillText(SPEC.name, W / 2, H - c.width * 0.045);\n  }\n  requestAnimationFrame(frame);\n}\nframe();\n";
+
+function spec3dPage(spec){
+  return '<canvas id="c"></canvas><script>' +
+    VIZ3D_RENDER.split("__SPEC__").join(JSON.stringify(spec)) +
+    "<" + "/script>";
+}
+
+/* One thing, or several. "a phone and an ipad" is two models side by side, so
+   they can be looked at together and told apart. */
+/* Words that describe a thing rather than being one. If a piece of what was
+   asked for is only one of these, the "and" was joining a description, not two
+   separate things: "black and white", "salt and pepper", "nuts and bolts". */
+var NOT_A_THING = ("black white red blue green yellow orange purple pink brown grey gray " +
+  "silver gold big small large tiny huge old new young hot cold warm cool fast slow " +
+  "long short tall wide thin thick heavy light dark bright dull soft hard rough smooth " +
+  "wet dry clean dirty full empty open closed left right front back top bottom inside " +
+  "outside upper lower inner outer").split(" ");
+
+function spec3dThings(about){
+  var s = String(about || "").trim();
+  var bits = s.split(/\s*,\s*|\s+and\s+|\s+vs\.?\s+|\s+versus\s+/i)
+    .map(function(x){ return x.trim(); })
+    .filter(function(x){ return x.length > 1; });
+  if(bits.length < 2) return [s];
+  /* strip the article off each piece and see whether what is left is a thing */
+  for(var i = 0; i < bits.length; i++){
+    var words = bits[i].toLowerCase().replace(/^(?:a|an|the)\s+/, "").split(/\s+/);
+    if(words.length === 1 && NOT_A_THING.indexOf(words[0]) > -1) return [s];
+  }
+  return bits.slice(0, 4);        /* four abreast is as many as fits */
+}
+
+/* Put several models side by side, spaced so they do not sit inside each
+   other, with each part still saying which one it belongs to. */
+function spec3dMerge(specs, names){
+  var kept = [], widest = 0;
+  specs.forEach(function(spec){
+    var far = 0;
+    spec.parts.forEach(function(p){
+      far = Math.max(far, Math.abs(p.p[0]) + Math.abs(p.d[0]) / 2);
+    });
+    widest = Math.max(widest, far);
+  });
+  var step = Math.max(2.2, widest * 2.3);
+  var left = -step * (specs.length - 1) / 2;
+  specs.forEach(function(spec, i){
+    var shift = left + step * i;
+    spec.parts.forEach(function(p){
+      kept.push({
+        n: (specs.length > 1 ? spec.name + ": " : "") + p.n,
+        s: p.s,
+        p: [p.p[0] + shift, p.p[1], p.p[2]],
+        d: p.d, r: p.r, c: p.c, note: p.note, spin: p.spin
+      });
+    });
+  });
+  return { name: (names || specs.map(function(s){ return s.name; })).join(" and "),
+           parts: kept.slice(0, 40) };
+}
+
+/* What he is asked for. Short keys because every character is time. */
+function spec3dAsk(about){
+  var things = spec3dThings(about);
+  if(things.length > 1) return spec3dAskMany(things);
+  return 'Describe ' + about + ' as a simple 3D model, as JSON and nothing else.' +
+    ' {"name":"short name","parts":[{"n":"part name","s":"box|cyl|cone|ball|plate",' +
+    '"p":[x,y,z],"d":[w,h,d],"r":[rx,ry,rz],"c":"#rrggbb","note":"one short line on' +
+    ' what this part does","spin":"y"}]}' +
+    ' Between 6 and 14 parts, the important ones, each named the way a person would' +
+    ' name it. Centre the whole thing on 0,0,0 and keep it about 4 units across.' +
+    ' r is degrees and may be left out. spin only for parts that really turn.' +
+    ' Colours light and distinct so the parts can be told apart. No words outside' +
+    ' the JSON.';
+}
+
+/* Two or more things at once: one answer, laid out side by side, each part
+   saying which thing it belongs to. */
+function spec3dAskMany(things){
+  return 'Describe each of these as a simple 3D model, all in one JSON object' +
+    ' and nothing else: ' + things.join(", ") + '.' +
+    ' {"name":"short name for the lot","parts":[{"n":"Thing: part name",' +
+    '"s":"box|cyl|cone|ball|plate","p":[x,y,z],"d":[w,h,d],"r":[rx,ry,rz],' +
+    '"c":"#rrggbb","note":"one short line on what this part does"}]}' +
+    ' Start every part name with which thing it belongs to and a colon.' +
+    ' Give each thing 4 to 7 parts, and stand them side by side along x, about' +
+    ' 3 units apart, so they do not overlap. Keep the whole lot about 8 units' +
+    ' across. Colours light and distinct. No words outside the JSON.';
+}
+
+/* Anything he sends is treated as untrusted: pulled apart, checked, clamped,
+   and rebuilt. Nothing from the model reaches the page as code. */
+function spec3dRead(text){
+  var s = String(text || "");
+  var open = s.indexOf("{"), close = s.lastIndexOf("}");
+  if(open < 0 || close < open) return null;
+  var raw;
+  try{ raw = JSON.parse(s.slice(open, close + 1)); }
+  catch(e){ return null; }
+  if(!raw || !raw.parts || !raw.parts.length) return null;
+
+  function num(v, lo, hi, fallback){
+    var n = parseFloat(v);
+    if(!isFinite(n)) return fallback;
+    return Math.max(lo, Math.min(hi, n));
+  }
+  function three(v, lo, hi, fallback){
+    if(!v || !v.length) return fallback.slice();
+    return [num(v[0], lo, hi, fallback[0]), num(v[1], lo, hi, fallback[1]),
+            num(v[2], lo, hi, fallback[2])];
+  }
+  function words(v, max){
+    return String(v == null ? "" : v).replace(/[<>&"\\]/g, "").slice(0, max);
+  }
+  var shapes = { box:1, cyl:1, cone:1, ball:1, plate:1, wedge:1 };
+  var out = { name: words(raw.name, 40), parts: [] };
+  for(var i = 0; i < raw.parts.length && out.parts.length < 24; i++){
+    var p = raw.parts[i] || {};
+    var shape = shapes[p.s] ? p.s : "box";
+    var colour = /^#[0-9a-f]{6}$/i.test(String(p.c)) ? p.c : "#9fd8ff";
+    out.parts.push({
+      n: words(p.n, 34) || "part",
+      s: shape,
+      p: three(p.p, -6, 6, [0, 0, 0]),
+      d: three(p.d, 0.02, 8, [1, 1, 1]),
+      r: three(p.r, -360, 360, [0, 0, 0]),
+      c: colour,
+      note: words(p.note, 120),
+      spin: (p.spin === "x" || p.spin === "y" || p.spin === "z") ? p.spin : undefined
+    });
+  }
+  return out.parts.length ? out : null;
+}
+
+/* A few he knows without asking, so it works with no signal at all. */
+var SPEC3D_KNOWN = {
+  plane: { words:["plane","aeroplane","airplane","jet","aircraft","airliner"], spec:{
+    name:"Passenger plane", parts:[
+    {n:"Fuselage",s:"cyl",p:[0,0,0],d:[0.62,3.4,0.62],r:[90,0,0],c:"#e8eefb",note:"The tube that carries the passengers and the cargo"},
+    {n:"Nose",s:"cone",p:[0,0,1.85],d:[0.62,0.7,0.62],r:[-90,0,0],c:"#dbe4f7",note:"Shaped to cut through the air, with the radar behind it"},
+    {n:"Left wing",s:"plate",p:[-1.35,-0.05,-0.1],d:[2.3,0.09,1],r:[0,8,3],c:"#c3d2ee",note:"Curved on top, so air over it moves faster and lifts the plane"},
+    {n:"Right wing",s:"plate",p:[1.35,-0.05,-0.1],d:[2.3,0.09,1],r:[0,-8,-3],c:"#c3d2ee",note:"Curved on top, so air over it moves faster and lifts the plane"},
+    {n:"Left engine",s:"cyl",p:[-1,-0.34,0.15],d:[0.42,0.8,0.42],r:[90,0,0],c:"#9fb4d8",note:"Sucks air in, burns fuel in it, and throws it out of the back"},
+    {n:"Right engine",s:"cyl",p:[1,-0.34,0.15],d:[0.42,0.8,0.42],r:[90,0,0],c:"#9fb4d8",note:"Sucks air in, burns fuel in it, and throws it out of the back"},
+    {n:"Tail fin",s:"plate",p:[0,0.62,-1.5],d:[0.08,1,0.8],c:"#c3d2ee",note:"Keeps the nose pointing where it is going"},
+    {n:"Left tailplane",s:"plate",p:[-0.5,0.16,-1.6],d:[0.9,0.07,0.42],c:"#c3d2ee",note:"The small wings that tip the nose up and down"},
+    {n:"Right tailplane",s:"plate",p:[0.5,0.16,-1.6],d:[0.9,0.07,0.42],c:"#c3d2ee",note:"The small wings that tip the nose up and down"},
+    {n:"Cockpit",s:"box",p:[0,0.24,1.35],d:[0.4,0.2,0.5],c:"#5f7fb8",note:"Where the pilots sit"}]} },
+  rocket: { words:["rocket","spacecraft","launcher","missile"], spec:{
+    name:"Rocket", parts:[
+    {n:"Body",s:"cyl",p:[0,0,0],d:[0.7,3,0.7],c:"#e8eefb",note:"Holds the fuel, which is most of what a rocket is"},
+    {n:"Nose cone",s:"cone",p:[0,1.8,0],d:[0.7,0.9,0.7],c:"#dbe4f7",note:"Carries what is being sent up, and cuts through the air"},
+    {n:"Engine bell",s:"cone",p:[0,-1.75,0],d:[0.6,0.7,0.6],r:[180,0,0],c:"#9fb4d8",note:"Burning gas rushes out of here and pushes the rocket up"},
+    {n:"Fin one",s:"plate",p:[0.5,-1.3,0],d:[0.7,0.7,0.06],c:"#c3d2ee",note:"Keeps it flying straight"},
+    {n:"Fin two",s:"plate",p:[-0.5,-1.3,0],d:[0.7,0.7,0.06],c:"#c3d2ee",note:"Keeps it flying straight"},
+    {n:"Fin three",s:"plate",p:[0,-1.3,0.5],d:[0.06,0.7,0.7],c:"#c3d2ee",note:"Keeps it flying straight"},
+    {n:"Fuel tank band",s:"cyl",p:[0,0.4,0],d:[0.74,0.12,0.74],c:"#7f97c4",note:"The line between the fuel and the oxygen tanks"}]} },
+  car: { words:["car","vehicle","automobile"], spec:{
+    name:"Car", parts:[
+    {n:"Body",s:"box",p:[0,0.1,0],d:[1.6,0.55,3.2],c:"#dbe4f7",note:"The shell everything else is attached to"},
+    {n:"Cabin",s:"box",p:[0,0.55,-0.15],d:[1.4,0.55,1.6],c:"#8fb0dd",note:"Where the people sit"},
+    {n:"Bonnet",s:"box",p:[0,0.2,1.35],d:[1.5,0.3,0.6],c:"#c3d2ee",note:"The lid over the engine"},
+    {n:"Front left wheel",s:"cyl",p:[-0.8,-0.28,1.05],d:[0.6,0.24,0.6],r:[0,0,90],c:"#33405a",note:"Turns to steer, and grips the road",spin:"x"},
+    {n:"Front right wheel",s:"cyl",p:[0.8,-0.28,1.05],d:[0.6,0.24,0.6],r:[0,0,90],c:"#33405a",note:"Turns to steer, and grips the road",spin:"x"},
+    {n:"Rear left wheel",s:"cyl",p:[-0.8,-0.28,-1.05],d:[0.6,0.24,0.6],r:[0,0,90],c:"#33405a",note:"Driven by the engine, pushing the car along",spin:"x"},
+    {n:"Rear right wheel",s:"cyl",p:[0.8,-0.28,-1.05],d:[0.6,0.24,0.6],r:[0,0,90],c:"#33405a",note:"Driven by the engine, pushing the car along",spin:"x"}]} },
+  house: { words:["house","home","building","cottage"], spec:{
+    name:"House", parts:[
+    {n:"Walls",s:"box",p:[0,0,0],d:[2.4,1.6,2],c:"#e3d9c8",note:"Hold the roof up and keep the weather out"},
+    {n:"Roof",s:"wedge",p:[0,1.2,0],d:[2.8,1,2.2],r:[0,90,0],c:"#a3503f",note:"Sloped so the rain runs off it"},
+    {n:"Door",s:"box",p:[0,-0.35,1.02],d:[0.5,0.9,0.08],c:"#6b4a2f",note:"The way in"},
+    {n:"Left window",s:"box",p:[-0.7,0.25,1.02],d:[0.5,0.5,0.06],c:"#8fc6e8",note:"Lets the light in"},
+    {n:"Right window",s:"box",p:[0.7,0.25,1.02],d:[0.5,0.5,0.06],c:"#8fc6e8",note:"Lets the light in"},
+    {n:"Chimney",s:"box",p:[0.7,1.7,-0.3],d:[0.35,0.9,0.35],c:"#9c8877",note:"Takes the smoke up and out"}]} },
+  engine: { words:["engine","motor","piston engine","combustion"], spec:{
+    name:"Engine", parts:[
+    {n:"Block",s:"box",p:[0,0,0],d:[1.8,1.2,1.4],c:"#9aa8c4",note:"The lump of metal everything else is built into"},
+    {n:"Cylinder one",s:"cyl",p:[-0.55,0.85,0],d:[0.5,0.6,0.5],c:"#c3d2ee",note:"Where the fuel burns and pushes the piston down"},
+    {n:"Cylinder two",s:"cyl",p:[0.55,0.85,0],d:[0.5,0.6,0.5],c:"#c3d2ee",note:"Where the fuel burns and pushes the piston down"},
+    {n:"Crankshaft",s:"cyl",p:[0,-0.75,0],d:[0.3,2.1,0.3],r:[0,0,90],c:"#7f97c4",note:"Turns the up and down of the pistons into going round",spin:"x"},
+    {n:"Flywheel",s:"cyl",p:[1.15,-0.75,0],d:[0.9,0.18,0.9],r:[0,0,90],c:"#6d82ad",note:"Heavy wheel that keeps it turning smoothly between bangs",spin:"x"},
+    {n:"Sump",s:"box",p:[0,-1.15,0],d:[1.6,0.45,1.2],c:"#7a879f",note:"The oil sits here and is pumped around everything that rubs"},
+    {n:"Intake",s:"cyl",p:[0,0.6,0.85],d:[0.35,0.9,0.35],r:[90,0,0],c:"#a8d8ef",note:"Air comes in this way"},
+    {n:"Exhaust",s:"cyl",p:[0,0.35,-0.9],d:[0.32,0.9,0.32],r:[90,0,0],c:"#b58686",note:"Burnt gas leaves this way"}]} },
+  atom: { words:["atom","molecule","nucleus","electron"], spec:{
+    name:"Atom", parts:[
+    {n:"Nucleus",s:"ball",p:[0,0,0],d:[0.9,0.9,0.9],c:"#ffd76a",note:"Protons and neutrons packed together in the middle"},
+    {n:"Electron one",s:"ball",p:[1.7,0,0],d:[0.28,0.28,0.28],c:"#8fd8ff",note:"Tiny and negative, kept near the nucleus by the pull of it"},
+    {n:"Electron two",s:"ball",p:[-1.2,1.1,0],d:[0.28,0.28,0.28],c:"#8fd8ff",note:"Tiny and negative, kept near the nucleus by the pull of it"},
+    {n:"Electron three",s:"ball",p:[-0.6,-1.4,0.8],d:[0.28,0.28,0.28],c:"#8fd8ff",note:"Tiny and negative, kept near the nucleus by the pull of it"},
+    {n:"Shell",s:"cyl",p:[0,0,0],d:[3.6,0.04,3.6],c:"#3f7fa0",note:"The path the electrons keep to"},
+    {n:"Second shell",s:"cyl",p:[0,0,0],d:[3.6,0.04,3.6],r:[70,0,0],c:"#3f7fa0",note:"Another path, tilted from the first"}]} }
+};
+/* every thing asked for, if they are all ones he knows */
+function spec3dKnownAll(about){
+  var things = spec3dThings(about);
+  if(things.length === 1) return spec3dKnown(things[0]);
+  var found = [];
+  for(var i = 0; i < things.length; i++){
+    var one = spec3dKnown(things[i]);
+    if(!one) return null;                 /* all or nothing - no half answers */
+    found.push(one);
+  }
+  return spec3dMerge(found);
+}
+
+function spec3dKnown(about){
+  var s = String(about || "").toLowerCase();
+  for(var key in SPEC3D_KNOWN){
+    if(!SPEC3D_KNOWN.hasOwnProperty(key)) continue;
+    var k = SPEC3D_KNOWN[key];
+    for(var i = 0; i < k.words.length; i++){
+      if(s.indexOf(k.words[i]) > -1) return k.spec;
+    }
+  }
+  return null;
+}
+
+/* tapping a part tells you what it is - the frame cannot reach the app, so it
+   sends a message and the app does the talking */
+window.addEventListener("message", function(ev){
+  var frame = $("orbViz");
+  if(!frame || ev.source !== frame.contentWindow) return;   /* only from ours */
+  var d = ev.data || {};
+  if(!d.pedroPart) return;
+  var line = String(d.pedroPart) + (d.note ? ". " + d.note : "");
+  hfSaid.textContent = line;
+  hudLog("him", line, false);
+  if(hf.on && !hf.talking) speak(line);
+});
 
 /* ==================== the workbench ====================
    Building mode. Parts go on a board, wires join them, and it is solved for
@@ -7582,7 +7860,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.68";
+var BUILD = "2026-08-21.69";
 
 function banner(kind, html){
   var b = $("banner");
