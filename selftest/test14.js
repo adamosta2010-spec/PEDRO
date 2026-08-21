@@ -62,6 +62,21 @@ const when = new Function(grab("whenIsThat") + " return whenIsThat;")();
   t("and so are yes and no", odd.args.b, true);
 }
 
+/* ---- sums, worked out here rather than in his head ---- */
+{
+  const sum = new Function(grab("sumUp") + " return sumUp;")();
+  [["2+2","4"],["(12+8)*3","60"],["2^10","1024"],["1,250 + 750","2000"],
+   ["5 - 3 * 2","-1"],["17% of 340","57.8"],["20 percent of 50","10"],
+   ["15% off 80","12"],["100/4","25"]]
+    .forEach(([q,want]) => t('"' + q + '" comes out right', sum(q), want));
+  t("dividing by nothing is said, not crashed", sum("5/0"), "that does not divide");
+  /* nothing is ever run - it is read into numbers and added up */
+  ["rm -rf /", "alert(1)", "process.exit()", "fetch('http://x')", "1+1; alert(1)"]
+    .forEach(q => t('"' + q + '" is refused outright', sum(q), null));
+  t("and the working is not done with eval",
+    grab("sumUp").indexOf("eval") === -1, true);
+}
+
 /* ---- when is that ---- */
 {
   t("a proper date is understood", !!when("2026-08-22T15:00"), true);

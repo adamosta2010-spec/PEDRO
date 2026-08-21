@@ -4690,6 +4690,9 @@ var TOOLS = {
    sum is read into numbers and operators and then added up. */
 function sumUp(text){
   var s = String(text || "")
+    /* the way people say it: "17 percent of 340", "20% off 50" */
+    .replace(/\bpercent\b/gi, "%")
+    .replace(/%\s*(?:of|off)\b/gi, "%*")
     .replace(/[x×]/gi, "*").replace(/[÷]/g, "/")
     .replace(/,/g, "").replace(/\s+/g, "");
   if(!s || !/^[-+*/^().0-9%]+$/.test(s)) return null;
@@ -8653,7 +8656,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.72";
+var BUILD = "2026-08-21.73";
 
 function banner(kind, html){
   var b = $("banner");
