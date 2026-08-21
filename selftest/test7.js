@@ -482,7 +482,7 @@ function nativeFrom(cap, exp){
 
   const el = grab("elevenSpeak");
   t("the better voice is used when there is a key", grab("speak").indexOf("elevenReady()") > -1, true);
-  t("it asks for that particular voice", inSrc("wDsJlOXPqcvIUKdLXjDs"), true);
+  t("it asks for that particular voice", inSrc("IKne3meq5aSn9XLyUdCD"), true);
   t("a refused key falls back rather than going silent",
     grab("speak").indexOf("speak(text, onEnd);") > -1, true);
   t("it stops trying after a failure", inSrc("elevenFailed = true"), true);
@@ -558,9 +558,12 @@ function nativeFrom(cap, exp){
   t("and a way to the rest", inSrc('$("dockMore")'), true);
 
   t("the pause before he answers is shorter", inSrc("}, 900);"), true);
-  t("the new voice is the default", inSrc('elevenVoice:"Pno1sSZ9LihyDUpvtooA"'), true);
-  t("and anyone on the old one is moved across",
-    inSrc('store.settings.elevenVoice === "wDsJlOXPqcvIUKdLXjDs"'), true);
+  t("the new voice is the default", inSrc('elevenVoice:"IKne3meq5aSn9XLyUdCD"'), true);
+  /* every older voice is moved across now, not just the one */
+  t("and anyone on an older one is moved across",
+    inSrc("elevenVoice !== "), true);
+  t("and none of the old ids are left behind",
+    !inSrc("Pno1sSZ9LihyDUpvtooA") && !inSrc("wDsJlOXPqcvIUKdLXjDs"), true);
 }
 
 

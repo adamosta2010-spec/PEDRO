@@ -60,16 +60,20 @@ t("an empty question matches nothing", fits(keyOf("something here"), ""), false)
 function canDraft(text, world){
   world = world || {};
   const fn = new Function(
+    "appNamed",
     "DRAFT_WORDS", "isDevice", "isGemini", "apiKeyNow", "hf", "wb", "cam", "viz",
     "VIZ_RE", "VIZ_HINT_RE", "BUILD_MODE_RE", "STUDY_RE", "UNSTUDY_RE", "EDIT_RE", "UNDO_RE",
     "OPEN_RE", "CLOSE_RE", "HIDE_RE", "STOP_RE", "PAUSE_RE", "RESUME_RE", "TIMER_RE",
     "COIN_RE", "DICE_RE", "CAM_RE", "DRAW_RE", "REMEMBER_RE", "FORGET_RE", "HIGHLIGHT_RE",
     declOf("HF_FILLER") + "\n" + declOf("HF_SHORT_ASK") + "\n" +
+    declOf("PEDRO_PANELS") + "\n" +
+    grab("isACommand") + "\n" +
     grab("worthAnswering") + "\n" + grab("draftKey") + grab("draftable") +
     " return draftable;");
   const pat = n => new Function(src.match(new RegExp("var " + n + "\\s*=[\\s\\S]*?;\\s*(?:\\r?\\n)"))[0] +
     " return " + n + ";")();
   return fn(
+    function(){ return null; },
     3,
     () => !!world.device, () => world.gemini !== false, () => world.key !== false,
     Object.assign({ answering:false, talking:false }, world.hf || {}),

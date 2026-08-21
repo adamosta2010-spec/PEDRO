@@ -3,28 +3,10 @@
    said Adam I have got a problem my phone is broken" came from exactly that. */
 const fs = require("fs");
 const src = fs.readFileSync(process.argv[2], "utf8");
-function grab(name){
-  const i = src.indexOf("function " + name + "(");
-  if(i < 0) throw new Error("no such function: " + name);
-  let d = 0;
-  for(let k = src.indexOf("{", i); k < src.length; k++){
-    if(src[k] === "{") d++;
-    else if(src[k] === "}"){ d--; if(!d) return src.slice(i, k + 1); }
-  }
-}
-function decl(name){
-  const i = src.indexOf("var " + name + " =");
-  if(i < 0) throw new Error("no such declaration: " + name);
-  /* to the semicolon that ends the statement, across however many lines */
-  let depth = 0;
-  for(let k = i; k < src.length; k++){
-    const ch = src[k];
-    if(ch === "(") depth++;
-    else if(ch === ")") depth--;
-    else if(ch === ";" && depth === 0) return src.slice(i, k + 1);
-  }
-  throw new Error("unterminated: " + name);
-}
+/* braces live inside strings and regexes, so the shared reader asks the
+   JavaScript engine which slice is whole rather than guessing */
+const { grab, decl } = require("./lib").reader(src);
+
 let fail = 0, pass = 0;
 const t = (n, g, w) => {
   const ok = JSON.stringify(g) === JSON.stringify(w);
@@ -32,9 +14,18 @@ const t = (n, g, w) => {
   else { pass++; console.log("ok   " + n); }
 };
 
-const worth = new Function(
-  decl("HF_FILLER") + "\n" + decl("HF_SHORT_ASK") + "\n" + grab("worthAnswering") +
-  "\n return worthAnswering;")();
+/* worthAnswering asks isACommand first, and that reads every command pattern,
+   so the harness has to carry all of them */
+const COMMAND_PATTERNS = ["BUILD_MODE_RE", "OPEN_RE", "CLOSE_RE", "HIDE_RE", "STOP_RE",
+  "PAUSE_RE", "RESUME_RE", "VIZ_RE", "VIZ_HINT_RE", "STUDY_RE", "UNSTUDY_RE", "EDIT_RE",
+  "UNDO_RE", "TIMER_RE", "COIN_RE", "DICE_RE", "CAM_RE", "DRAW_RE", "REMEMBER_RE",
+  "FORGET_RE", "HIGHLIGHT_RE"];
+const worth = new Function("appNamed",
+  COMMAND_PATTERNS.map(decl).join("\n") + "\n" +
+  decl("PEDRO_PANELS") + "\n" +
+  decl("HF_FILLER") + "\n" + decl("HF_SHORT_ASK") + "\n" +
+  grab("isACommand") + "\n" + grab("worthAnswering") +
+  "\n return worthAnswering;")(function(){ return null; });
 
 /* things actually said to him */
 [["what is the capital of france"], ["tell me a joke"], ["how does an engine work"],
@@ -72,6 +63,53 @@ t("so does a one word answer to his question", worth("yes"), true);
     has("say you did not catch that and stop"), true);
   t("and told not to make something up instead",
     has("Never invent a situation"), true);
+}
+
+/* ---- a command is never noise, however short ---- */
+{
+  /* these were all being thrown away as if they were ums */
+  ["build", "settings", "open settings", "building mode", "teach", "workbench",
+   "stop", "pause", "close", "undo that change", "flip a coin"]
+    .forEach(c => t('"' + c + '" is a command, not noise', worth(c), true));
+  ["um yeah", "the", "uh", "ok so like", ""]
+    .forEach(c => t('"' + c + '" is still let go', worth(c), false));
+}
+
+/* ---- his own screens, not the phone's ---- */
+{
+  const has = x => src.indexOf(x) > -1;
+  t("settings means his settings", has('settings:"settings", setting:"settings"'), true);
+  t("and they are actually opened", src.indexOf("openPanel(panel)") > -1, true);
+  t("the phone's own settings are not attempted",
+    src.indexOf('return "App-Prefs:"') === -1, true);
+  t("because Apple does not allow it, and that is written down",
+    has("App-Prefs: is private"), true);
+}
+
+/* ---- one voice ---- */
+{
+  const { decl: declIt } = require("./lib").reader(src);
+  const voices = new Function(declIt("ELEVEN_VOICES") + " return ELEVEN_VOICES;")();
+  t("there is one voice", voices.length, 1);
+  t("and it is the new one", voices[0].id, "IKne3meq5aSn9XLyUdCD");
+  t("none of the old ones are left",
+    src.indexOf("Pno1sSZ9LihyDUpvtooA") === -1 && src.indexOf("wDsJlOXPqcvIUKdLXjDs") === -1, true);
+  t("a phone with an older one saved is moved across",
+    src.indexOf('store.settings.elevenVoice !== "IKne3meq5aSn9XLyUdCD"') > -1, true);
+}
+
+/* ---- typing instead of speaking ---- */
+{
+  const has = x => src.indexOf(x) > -1;
+  t("there is a box to type in", has('id="hfTypeBox"'), true);
+  t("it sits at the bottom", has("#hfType{position:fixed"), true);
+  t("its text is big enough that the phone does not zoom in on it",
+    has("#hfTypeBox{") && /#hfTypeBox{[^}]*font-size:16px/.test(src), true);
+  t("what is typed goes where what is heard goes", has("hfAsk(said)"), true);
+  t("and is never mistaken for a noise picked up", has("typing is deliberate"), true);
+  t("the microphone stands down while you type", has("if(hf.phase === ") && has("hfPause()"), true);
+  t("the transcript is no longer on the dashboard",
+    /data-panel="transcript" hidden/.test(src), true);
 }
 
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " misheard-speech tests passed");
