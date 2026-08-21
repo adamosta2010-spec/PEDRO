@@ -275,7 +275,8 @@
     /* the reactor still glows, it just stops spinning */
     #hfOrb .disc, #hfOrb .disc .sheen, #hfOrb .disc .glow,
     #holoImg, #holo .lines, #holo .sweep,
-    #partyLights i{animation:none !important}
+    #partyLights i, #partyLights .bulbs s,
+    #hfOrb.party .hat, #hfOrb.party .hat .pom{animation:none !important}
   }
 
   /* ============ panels ============ */
@@ -584,22 +585,70 @@
   #partyLights{position:absolute;inset:0;z-index:0;display:none;
     pointer-events:none;overflow:hidden}
   #hf.party #partyLights{display:block}
-  #partyLights i{position:absolute;top:-6%;left:50%;width:34vw;height:132vh;
-    margin-left:-17vw;transform-origin:50% 0;opacity:.5;
-    clip-path:polygon(46% 0, 54% 0, 100% 100%, 0 100%);
+  /* They hung from one point in the middle, so most of their length ran down
+     the centre where the ball already is. Four rigs spread across the top, and
+     bright - a beam you have to look for is not a beam. */
+  #partyLights i{position:absolute;top:-4%;width:40vw;height:140vh;
+    margin-left:-20vw;transform-origin:50% 0;opacity:1;
+    clip-path:polygon(47% 0, 53% 0, 100% 100%, 0 100%);
     will-change:transform}
-  #partyLights i:nth-child(1){
-    background:linear-gradient(180deg, rgba(255,32,80,.85), rgba(255,32,80,.10) 58%, transparent 78%);
+  #partyLights i:nth-child(1){left:16%;
+    background:linear-gradient(180deg, rgba(255,40,90,1), rgba(255,40,90,.34) 46%, transparent 76%);
     animation:beamA 5.2s ease-in-out infinite}
-  #partyLights i:nth-child(2){
-    background:linear-gradient(180deg, rgba(50,255,120,.80), rgba(50,255,120,.10) 58%, transparent 78%);
+  #partyLights i:nth-child(2){left:38%;
+    background:linear-gradient(180deg, rgba(60,255,130,.96), rgba(60,255,130,.30) 46%, transparent 76%);
     animation:beamB 6.8s ease-in-out infinite}
-  #partyLights i:nth-child(3){
-    background:linear-gradient(180deg, rgba(60,120,255,.85), rgba(60,120,255,.10) 58%, transparent 78%);
+  #partyLights i:nth-child(3){left:62%;
+    background:linear-gradient(180deg, rgba(70,130,255,1), rgba(70,130,255,.34) 46%, transparent 76%);
     animation:beamC 4.4s ease-in-out infinite}
-  #partyLights i:nth-child(4){
-    background:linear-gradient(180deg, rgba(190,60,255,.75), rgba(190,60,255,.10) 58%, transparent 78%);
+  #partyLights i:nth-child(4){left:84%;
+    background:linear-gradient(180deg, rgba(205,70,255,.94), rgba(205,70,255,.30) 46%, transparent 76%);
     animation:beamD 7.6s ease-in-out infinite}
+
+  /* the string of bulbs along the top */
+  #partyLights .bulbs{position:absolute;top:0;left:0;right:0;height:44px;
+    display:flex;align-items:flex-start;justify-content:space-around;
+    padding:0 4vw;pointer-events:none}
+  #partyLights .bulbs s{width:11px;height:11px;border-radius:50%;text-decoration:none;
+    margin-top:10px;opacity:.35;will-change:opacity}
+  #partyLights .bulbs s:nth-child(3n+1){background:#ff2f5a;box-shadow:0 0 14px 3px rgba(255,47,90,.9)}
+  #partyLights .bulbs s:nth-child(3n+2){background:#3cff82;box-shadow:0 0 14px 3px rgba(60,255,130,.9)}
+  #partyLights .bulbs s:nth-child(3n+3){background:#4a86ff;box-shadow:0 0 14px 3px rgba(74,134,255,.9)}
+  #partyLights .bulbs s{animation:bulb 1.1s ease-in-out infinite}
+  #partyLights .bulbs s:nth-child(2){animation-delay:.12s}
+  #partyLights .bulbs s:nth-child(3){animation-delay:.24s}
+  #partyLights .bulbs s:nth-child(4){animation-delay:.36s}
+  #partyLights .bulbs s:nth-child(5){animation-delay:.48s}
+  #partyLights .bulbs s:nth-child(6){animation-delay:.60s}
+  #partyLights .bulbs s:nth-child(7){animation-delay:.72s}
+  #partyLights .bulbs s:nth-child(8){animation-delay:.84s}
+  #partyLights .bulbs s:nth-child(9){animation-delay:.96s}
+  @keyframes bulb{0%,100%{opacity:.28}50%{opacity:1}}
+
+  /* ---- the hat ----
+     A striped cone with a pompom, sitting on the ball, tilted, bobbing in time
+     with it. All clip-path and gradients: nothing to load, nothing to draw
+     twice, and it disappears the moment party mode is off. */
+  #hfOrb .hat{display:none}
+  #hfOrb.party .hat{
+    display:block; position:absolute; left:50%; top:-6%;
+    width:34%; height:34%; margin-left:-17%;
+    clip-path:polygon(50% 0, 100% 100%, 0 100%);
+    background:repeating-linear-gradient(58deg,
+      #ff2f5a 0 14%, #ffd23c 14% 28%, #3cff82 28% 42%, #4a86ff 42% 56%, #c74aff 56% 70%);
+    transform-origin:50% 100%;
+    transform:rotate(-13deg);
+    animation:hatBob 1.1s ease-in-out infinite;
+    filter:drop-shadow(0 3px 10px rgba(0,0,0,.45));
+    z-index:2; pointer-events:none}
+  #hfOrb.party .hat .pom{
+    position:absolute; left:50%; top:-9%; width:26%; height:26%;
+    margin-left:-13%; border-radius:50%; background:#fff;
+    box-shadow:0 0 16px 5px rgba(255,255,255,.85);
+    animation:bulb 1.1s ease-in-out infinite}
+  @keyframes hatBob{
+    0%,100%{transform:rotate(-13deg) translateY(0)}
+    50%    {transform:rotate(-9deg) translateY(-6%)}}
   @keyframes beamA{0%,100%{transform:rotate(-34deg)}50%{transform:rotate(16deg)}}
   @keyframes beamB{0%,100%{transform:rotate(26deg)}50%{transform:rotate(-20deg)}}
   @keyframes beamC{0%,100%{transform:rotate(-12deg)}50%{transform:rotate(38deg)}}
@@ -1452,9 +1501,12 @@
     </div>
 
     <div class="hudcentre">
-      <div id="partyLights" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      <div id="partyLights" aria-hidden="true"><i></i><i></i><i></i><i></i>
+        <b class="bulbs"><s></s><s></s><s></s><s></s><s></s><s></s><s></s><s></s><s></s></b>
+      </div>
       <div id="hfOrb" class="wait">
         <span class="disc"><i class="sheen a"></i><i class="sheen b"></i><i class="glow"></i></span>
+        <span class="hat" aria-hidden="true"><i class="pom"></i></span>
         <span class="wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
         <iframe id="orbViz" sandbox="allow-scripts" referrerpolicy="no-referrer" title="Explanation"></iframe>
         <div id="holo" aria-hidden="true">
@@ -5938,10 +5990,23 @@ function toolRun(call){
    what colour, and a line about what it does. This turns one into a page that
    draws it, turns it, and lets it be taken apart with a finger. Written and
    checked outside the app first, then brought in whole. */
-var VIZ3D_RENDER = "\nvar SPEC = __SPEC__;\nvar c = document.getElementById(\"c\"), g = c.getContext(\"2d\");\nfunction fit(){\n  var r = Math.min(window.innerWidth, window.innerHeight);\n  var dpr = Math.min(2, window.devicePixelRatio || 1);\n  c.width = Math.round(r * dpr); c.height = Math.round(r * dpr);\n  c.style.width = r + \"px\"; c.style.height = r + \"px\";\n}\naddEventListener(\"resize\", fit); fit();\n\n/* ---- the shapes every part is made of ---- */\nfunction box(){\n  var v = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]];\n  return { v: v, f: [[0,1,2,3],[5,4,7,6],[4,0,3,7],[1,5,6,2],[4,5,1,0],[3,2,6,7]] };\n}\nfunction tube(n, topR){\n  var v = [], f = [], i;\n  if(topR === undefined) topR = 1;\n  for(i = 0; i < n; i++){\n    var a = i / n * Math.PI * 2;\n    v.push([Math.cos(a), -1, Math.sin(a)]);\n    v.push([Math.cos(a) * topR, 1, Math.sin(a) * topR]);\n  }\n  for(i = 0; i < n; i++){\n    var j = (i + 1) % n;\n    f.push([i * 2, j * 2, j * 2 + 1, i * 2 + 1]);\n  }\n  var bottom = [], top = [];\n  for(i = 0; i < n; i++){ bottom.push(i * 2); top.push((n - 1 - i) * 2 + 1); }\n  f.push(bottom); f.push(top);\n  return { v: v, f: f };\n}\nfunction ball(rows, cols){\n  var v = [], f = [], i, j;\n  for(i = 0; i <= rows; i++){\n    var th = i / rows * Math.PI;\n    for(j = 0; j < cols; j++){\n      var ph = j / cols * Math.PI * 2;\n      v.push([Math.sin(th) * Math.cos(ph), Math.cos(th), Math.sin(th) * Math.sin(ph)]);\n    }\n  }\n  for(i = 0; i < rows; i++){\n    for(j = 0; j < cols; j++){\n      var a = i * cols + j, b = i * cols + (j + 1) % cols;\n      f.push([a, b, b + cols, a + cols]);\n    }\n  }\n  return { v: v, f: f };\n}\nvar SHAPES = {\n  box: box(), plate: box(), cyl: tube(12), cone: tube(12, 0.02),\n  ball: ball(7, 12), wedge: tube(3)\n};\n\n/* ---- turning a part into faces in the world ---- */\nfunction radians(d){ return (d || 0) * Math.PI / 180; }\nfunction spin(p, rx, ry, rz){\n  var x = p[0], y = p[1], z = p[2], s, k;\n  s = Math.sin(rx); k = Math.cos(rx); var y1 = y * k - z * s, z1 = y * s + z * k;\n  s = Math.sin(ry); k = Math.cos(ry); var x1 = x * k + z1 * s, z2 = -x * s + z1 * k;\n  s = Math.sin(rz); k = Math.cos(rz); var x2 = x1 * k - y1 * s, y2 = x1 * s + y1 * k;\n  return [x2, y2, z2];\n}\nvar FACES = [];\n(SPEC.parts || []).forEach(function(part, idx){\n  var shape = SHAPES[part.s] || SHAPES.box;\n  var d = part.d || [1, 1, 1], p = part.p || [0, 0, 0], r = part.r || [0, 0, 0];\n  var pts = shape.v.map(function(v){\n    var q = [v[0] * (d[0] || 1) / 2, v[1] * (d[1] || 1) / 2, v[2] * (d[2] || 1) / 2];\n    q = spin(q, radians(r[0]), radians(r[1]), radians(r[2]));\n    return [q[0] + p[0], q[1] + p[1], q[2] + p[2]];\n  });\n  shape.f.forEach(function(face){\n    FACES.push({ pts: face.map(function(i){ return pts[i]; }), c: part.c || \"#8fd8ff\",\n                 part: idx, spin: part.spin, at: p });\n  });\n});\n\n/* everything is scaled to fit whatever it is drawn into */\nvar far = 0.001;\nFACES.forEach(function(f){ f.pts.forEach(function(p){\n  far = Math.max(far, Math.hypot(p[0], p[1], p[2]));\n}); });\nvar UNIT = 1 / far;\n\n/* ---- the ball it starts as ---- */\nFACES.forEach(function(f){\n  f.from = f.pts.map(function(p){\n    var len = Math.hypot(p[0], p[1], p[2]) || 1;\n    return [p[0] / len * far * 0.72, p[1] / len * far * 0.72, p[2] / len * far * 0.72];\n  });\n});\n\n/* ---- looking at it ---- */\nvar view = { ry: 0.5, rx: -0.25, zoom: 1, px: 0, py: 0, t: 0, morph: 0, spun: 0 };\nvar HOME = { ry: 0.5, rx: -0.25, zoom: 1, px: 0, py: 0 };\n\n/* One finger turns it on both axes. Two move it and pinch it bigger or\n   smaller. A double tap puts it back where it started, because it is very easy\n   to push a thing off the side of a phone and not know how to get it back. */\nvar touch = null, fingers = {}, pinch = null, lastTapAt = 0;\n\nfunction fingerCount(){ var n = 0; for(var k in fingers) if(fingers.hasOwnProperty(k)) n++; return n; }\nfunction middleOf(){\n  var x = 0, y = 0, n = 0;\n  for(var k in fingers){ if(!fingers.hasOwnProperty(k)) continue; x += fingers[k].x; y += fingers[k].y; n++; }\n  return n ? { x: x / n, y: y / n } : { x: 0, y: 0 };\n}\nfunction spreadOf(){\n  var all = [];\n  for(var k in fingers) if(fingers.hasOwnProperty(k)) all.push(fingers[k]);\n  if(all.length < 2) return 0;\n  return Math.hypot(all[0].x - all[1].x, all[0].y - all[1].y);\n}\n\nc.addEventListener(\"pointerdown\", function(e){\n  fingers[e.pointerId] = { x: e.clientX, y: e.clientY };\n  try{ c.setPointerCapture(e.pointerId); }catch(err){}\n  if(fingerCount() >= 2){\n    pinch = { spread: spreadOf(), zoom: view.zoom,\n              mid: middleOf(), px: view.px, py: view.py };\n    touch = null;                      /* it stopped being a turn */\n  } else {\n    touch = { x: e.clientX, y: e.clientY, moved: false };\n  }\n});\nc.addEventListener(\"pointermove\", function(e){\n  if(!fingers[e.pointerId]) return;\n  fingers[e.pointerId] = { x: e.clientX, y: e.clientY };\n  if(pinch && fingerCount() >= 2){\n    var spread = spreadOf();\n    if(pinch.spread > 12 && spread > 12){\n      view.zoom = Math.max(0.35, Math.min(4, pinch.zoom * (spread / pinch.spread)));\n    }\n    var mid = middleOf();\n    view.px = pinch.px + (mid.x - pinch.mid.x);\n    view.py = pinch.py + (mid.y - pinch.mid.y);\n    return;\n  }\n  if(!touch) return;\n  view.ry += (e.clientX - touch.x) * 0.01;\n  view.rx += (e.clientY - touch.y) * 0.01;\n  view.rx = Math.max(-1.4, Math.min(1.4, view.rx));\n  touch.x = e.clientX; touch.y = e.clientY; touch.moved = true;\n});\nfunction letGo(e){\n  if(fingers[e.pointerId]) delete fingers[e.pointerId];\n  if(fingerCount() < 2) pinch = null;\n  if(fingerCount() === 0){\n    if(touch && !touch.moved){\n      var now = Date.now();\n      if(now - lastTapAt < 320){        /* double tap - put it back */\n        view.ry = HOME.ry; view.rx = HOME.rx;\n        view.zoom = HOME.zoom; view.px = HOME.px; view.py = HOME.py;\n        lastTapAt = 0;\n      } else {\n        lastTapAt = now;\n        tap(e);\n      }\n    }\n    touch = null;\n  }\n}\nc.addEventListener(\"pointerup\", letGo);\nc.addEventListener(\"pointercancel\", letGo);\n\nvar LABEL = null, LABEL_UNTIL = 0;\nfunction tap(e){\n  var r = c.getBoundingClientRect();\n  var x = (e.clientX - r.left) / r.width * c.width, y = (e.clientY - r.top) / r.height * c.height;\n  var best = null;\n  drawn.forEach(function(f){\n    if(!inside(f.flat, x, y)) return;\n    if(!best || f.depth < best.depth) best = f;\n  });\n  if(best){\n    var part = (SPEC.parts || [])[best.part] || {};\n    LABEL = { name: part.n || \"part\", note: part.note || \"\" };\n    LABEL_UNTIL = Date.now() + 4200;\n    parent.postMessage({ pedroPart: part.n || \"\", note: part.note || \"\" }, \"*\");\n  }\n}\nfunction inside(pts, x, y){\n  var hit = false;\n  for(var i = 0, j = pts.length - 1; i < pts.length; j = i++){\n    var a = pts[i], b = pts[j];\n    if(((a[1] > y) !== (b[1] > y)) &&\n       (x < (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0])) hit = !hit;\n  }\n  return hit;\n}\n\n/* ---- drawing ---- */\nvar drawn = [];\nfunction shade(hex, light){\n  var n = parseInt(String(hex).replace(\"#\", \"\"), 16);\n  if(isNaN(n)) n = 0x8fd8ff;\n  var r = (n >> 16) & 255, gg = (n >> 8) & 255, b = n & 255;\n  var k = 0.35 + 0.65 * Math.max(0, light);\n  return \"rgb(\" + Math.round(r * k) + \",\" + Math.round(gg * k) + \",\" + Math.round(b * k) + \")\";\n}\nfunction frame(){\n  var W = c.width, H = c.height, mid = Math.min(W, H) / 2;\n  g.clearRect(0, 0, W, H);\n  view.t += 0.016;\n  if(view.morph < 1) view.morph = Math.min(1, view.morph + 0.022);\n  var ease = view.morph < 1 ? 1 - Math.pow(1 - view.morph, 3) : 1;\n  if(!touch && !pinch) view.ry += 0.004;\n  view.spun += 0.14;\n\n  var cosY = Math.cos(view.ry), sinY = Math.sin(view.ry);\n  var cosX = Math.cos(view.rx), sinX = Math.sin(view.rx);\n  drawn = [];\n  for(var i = 0; i < FACES.length; i++){\n    var f = FACES[i], flat = [], depth = 0, ok = true;\n    for(var k = 0; k < f.pts.length; k++){\n      var a = f.pts[k], b = f.from[k];\n      var x = (b[0] + (a[0] - b[0]) * ease) * UNIT;\n      var y = (b[1] + (a[1] - b[1]) * ease) * UNIT;\n      var z = (b[2] + (a[2] - b[2]) * ease) * UNIT;\n      if(f.spin){                       /* propellers, wheels, anything told to turn */\n        var ax = (f.at || [0,0,0]);\n        var dx = x - ax[0] * UNIT, dy = y - ax[1] * UNIT, dz = z - ax[2] * UNIT;\n        var s = Math.sin(view.spun), cq = Math.cos(view.spun);\n        if(f.spin === \"y\"){ var nx = dx * cq + dz * s; dz = -dx * s + dz * cq; dx = nx; }\n        else if(f.spin === \"x\"){ var ny = dy * cq - dz * s; dz = dy * s + dz * cq; dy = ny; }\n        else { var mx = dx * cq - dy * s; dy = dx * s + dy * cq; dx = mx; }\n        x = ax[0] * UNIT + dx; y = ax[1] * UNIT + dy; z = ax[2] * UNIT + dz;\n      }\n      var x1 = x * cosY + z * sinY, z1 = -x * sinY + z * cosY;\n      var y1 = y * cosX - z1 * sinX, z2 = y * sinX + z1 * cosX;\n      var persp = 2.6 / (2.6 + z2 * 0.9);\n      /* px and py are in screen pixels, so they are scaled the same way the\n         canvas is - otherwise dragging it moves it half as far on a retina */\n      var dpr = c.width / (c.getBoundingClientRect().width || c.width);\n      flat.push([W / 2 + view.px * dpr + x1 * mid * 0.78 * persp * view.zoom,\n                 H / 2 + view.py * dpr - y1 * mid * 0.78 * persp * view.zoom]);\n      depth += z2;\n    }\n    if(!ok) continue;\n    /* which way the face is pointing, for the light and for hiding its back */\n    var ax2 = flat[1][0] - flat[0][0], ay2 = flat[1][1] - flat[0][1];\n    var bx2 = flat[2][0] - flat[0][0], by2 = flat[2][1] - flat[0][1];\n    var cross = ax2 * by2 - ay2 * bx2;\n    if(cross >= 0) continue;                       /* facing away - skip it */\n    drawn.push({ flat: flat, depth: depth / f.pts.length, c: f.c, part: f.part,\n                 light: Math.min(1, Math.abs(cross) / (mid * mid * 0.06)) });\n  }\n  drawn.sort(function(a, b){ return b.depth - a.depth; });\n  for(var d = 0; d < drawn.length; d++){\n    var q = drawn[d];\n    g.beginPath();\n    g.moveTo(q.flat[0][0], q.flat[0][1]);\n    for(var m = 1; m < q.flat.length; m++) g.lineTo(q.flat[m][0], q.flat[m][1]);\n    g.closePath();\n    g.fillStyle = shade(q.c, 0.35 + q.light);\n    g.fill();\n    g.strokeStyle = \"rgba(56,225,240,.30)\";\n    g.lineWidth = Math.max(1, c.width / 500);\n    g.stroke();\n  }\n  /* the name of whatever was tapped */\n  if(LABEL && Date.now() < LABEL_UNTIL){\n    var pad = c.width * 0.035;\n    g.font = \"600 \" + Math.round(c.width / 26) + \"px -apple-system,sans-serif\";\n    g.textAlign = \"center\";\n    g.fillStyle = \"#38e1f0\";\n    g.fillText(LABEL.name, W / 2, H - pad * 2.1);\n    if(LABEL.note){\n      g.font = Math.round(c.width / 34) + \"px -apple-system,sans-serif\";\n      g.fillStyle = \"rgba(231,233,238,.75)\";\n      var words = String(LABEL.note).split(\" \"), line = \"\", lines = [];\n      for(var w = 0; w < words.length; w++){\n        var test = line ? line + \" \" + words[w] : words[w];\n        if(g.measureText(test).width > W * 0.8){ lines.push(line); line = words[w]; }\n        else line = test;\n      }\n      if(line) lines.push(line);\n      lines.slice(-2).forEach(function(l, n){\n        g.fillText(l, W / 2, H - pad * 1.1 + n * (c.width / 30));\n      });\n    }\n  } else if(SPEC.name){\n    g.font = \"600 \" + Math.round(c.width / 30) + \"px -apple-system,sans-serif\";\n    g.textAlign = \"center\";\n    g.fillStyle = \"rgba(56,225,240,.62)\";\n    g.fillText(SPEC.name, W / 2, H - c.width * 0.045);\n  }\n  requestAnimationFrame(frame);\n}\nframe();\n";
+var VIZ3D_RENDER = "\nvar SPEC = __SPEC__;\nvar c = document.getElementById(\"c\"), g = c.getContext(\"2d\");\nfunction fit(){\n  /* It used to be square, at the size of the shorter side - which on a tall\n     phone is a box sitting in the middle of a dark rectangle. It fills what it\n     is given now. */\n  var w = window.innerWidth, hh = window.innerHeight;\n  var dpr = Math.min(2, window.devicePixelRatio || 1);\n  c.width = Math.round(w * dpr); c.height = Math.round(hh * dpr);\n  c.style.width = w + \"px\"; c.style.height = hh + \"px\";\n}\naddEventListener(\"resize\", fit); fit();\n\n/* ---- the shapes every part is made of ---- */\nfunction box(){\n  var v = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]];\n  return { v: v, f: [[0,1,2,3],[5,4,7,6],[4,0,3,7],[1,5,6,2],[4,5,1,0],[3,2,6,7]] };\n}\nfunction tube(n, topR){\n  var v = [], f = [], i;\n  if(topR === undefined) topR = 1;\n  for(i = 0; i < n; i++){\n    var a = i / n * Math.PI * 2;\n    v.push([Math.cos(a), -1, Math.sin(a)]);\n    v.push([Math.cos(a) * topR, 1, Math.sin(a) * topR]);\n  }\n  for(i = 0; i < n; i++){\n    var j = (i + 1) % n;\n    f.push([i * 2, j * 2, j * 2 + 1, i * 2 + 1]);\n  }\n  var bottom = [], top = [];\n  for(i = 0; i < n; i++){ bottom.push(i * 2); top.push((n - 1 - i) * 2 + 1); }\n  f.push(bottom); f.push(top);\n  return { v: v, f: f };\n}\nfunction ball(rows, cols){\n  var v = [], f = [], i, j;\n  for(i = 0; i <= rows; i++){\n    var th = i / rows * Math.PI;\n    for(j = 0; j < cols; j++){\n      var ph = j / cols * Math.PI * 2;\n      v.push([Math.sin(th) * Math.cos(ph), Math.cos(th), Math.sin(th) * Math.sin(ph)]);\n    }\n  }\n  for(i = 0; i < rows; i++){\n    for(j = 0; j < cols; j++){\n      var a = i * cols + j, b = i * cols + (j + 1) % cols;\n      f.push([a, b, b + cols, a + cols]);\n    }\n  }\n  return { v: v, f: f };\n}\nvar SHAPES = {\n  box: box(), plate: box(), cyl: tube(12), cone: tube(12, 0.02),\n  ball: ball(7, 12), wedge: tube(3)\n};\n\n/* ---- turning a part into faces in the world ---- */\nfunction radians(d){ return (d || 0) * Math.PI / 180; }\nfunction spin(p, rx, ry, rz){\n  var x = p[0], y = p[1], z = p[2], s, k;\n  s = Math.sin(rx); k = Math.cos(rx); var y1 = y * k - z * s, z1 = y * s + z * k;\n  s = Math.sin(ry); k = Math.cos(ry); var x1 = x * k + z1 * s, z2 = -x * s + z1 * k;\n  s = Math.sin(rz); k = Math.cos(rz); var x2 = x1 * k - y1 * s, y2 = x1 * s + y1 * k;\n  return [x2, y2, z2];\n}\nvar FACES = [];\n(SPEC.parts || []).forEach(function(part, idx){\n  var shape = SHAPES[part.s] || SHAPES.box;\n  var d = part.d || [1, 1, 1], p = part.p || [0, 0, 0], r = part.r || [0, 0, 0];\n  var pts = shape.v.map(function(v){\n    var q = [v[0] * (d[0] || 1) / 2, v[1] * (d[1] || 1) / 2, v[2] * (d[2] || 1) / 2];\n    q = spin(q, radians(r[0]), radians(r[1]), radians(r[2]));\n    return [q[0] + p[0], q[1] + p[1], q[2] + p[2]];\n  });\n  shape.f.forEach(function(face){\n    FACES.push({ pts: face.map(function(i){ return pts[i]; }), c: part.c || \"#8fd8ff\",\n                 part: idx, spin: part.spin, at: p });\n  });\n});\n\n/* everything is scaled to fit whatever it is drawn into */\nvar far = 0.001;\nFACES.forEach(function(f){ f.pts.forEach(function(p){\n  far = Math.max(far, Math.hypot(p[0], p[1], p[2]));\n}); });\nvar UNIT = 1 / far;\n\n/* ---- the ball it starts as ---- */\nFACES.forEach(function(f){\n  f.from = f.pts.map(function(p){\n    var len = Math.hypot(p[0], p[1], p[2]) || 1;\n    return [p[0] / len * far * 0.72, p[1] / len * far * 0.72, p[2] / len * far * 0.72];\n  });\n});\n\n/* ---- looking at it ---- */\nvar view = { ry: 0.5, rx: -0.25, zoom: 1, px: 0, py: 0, t: 0, morph: 0, spun: 0 };\nvar HOME = { ry: 0.5, rx: -0.25, zoom: 1, px: 0, py: 0 };\n\n/* One finger turns it on both axes. Two move it and pinch it bigger or\n   smaller. A double tap puts it back where it started, because it is very easy\n   to push a thing off the side of a phone and not know how to get it back. */\nvar touch = null, fingers = {}, pinch = null, lastTapAt = 0;\n\nfunction fingerCount(){ var n = 0; for(var k in fingers) if(fingers.hasOwnProperty(k)) n++; return n; }\nfunction middleOf(){\n  var x = 0, y = 0, n = 0;\n  for(var k in fingers){ if(!fingers.hasOwnProperty(k)) continue; x += fingers[k].x; y += fingers[k].y; n++; }\n  return n ? { x: x / n, y: y / n } : { x: 0, y: 0 };\n}\nfunction spreadOf(){\n  var all = [];\n  for(var k in fingers) if(fingers.hasOwnProperty(k)) all.push(fingers[k]);\n  if(all.length < 2) return 0;\n  return Math.hypot(all[0].x - all[1].x, all[0].y - all[1].y);\n}\n\nc.addEventListener(\"pointerdown\", function(e){\n  fingers[e.pointerId] = { x: e.clientX, y: e.clientY };\n  try{ c.setPointerCapture(e.pointerId); }catch(err){}\n  if(fingerCount() >= 2){\n    pinch = { spread: spreadOf(), zoom: view.zoom,\n              mid: middleOf(), px: view.px, py: view.py };\n    touch = null;                      /* it stopped being a turn */\n  } else {\n    touch = { x: e.clientX, y: e.clientY, moved: false };\n  }\n});\nc.addEventListener(\"pointermove\", function(e){\n  if(!fingers[e.pointerId]) return;\n  fingers[e.pointerId] = { x: e.clientX, y: e.clientY };\n  if(pinch && fingerCount() >= 2){\n    var spread = spreadOf();\n    if(pinch.spread > 12 && spread > 12){\n      view.zoom = Math.max(0.35, Math.min(4, pinch.zoom * (spread / pinch.spread)));\n    }\n    var mid = middleOf();\n    view.px = pinch.px + (mid.x - pinch.mid.x);\n    view.py = pinch.py + (mid.y - pinch.mid.y);\n    return;\n  }\n  if(!touch) return;\n  view.ry += (e.clientX - touch.x) * 0.01;\n  view.rx += (e.clientY - touch.y) * 0.01;\n  view.rx = Math.max(-1.4, Math.min(1.4, view.rx));\n  touch.x = e.clientX; touch.y = e.clientY; touch.moved = true;\n});\nfunction letGo(e){\n  if(fingers[e.pointerId]) delete fingers[e.pointerId];\n  if(fingerCount() < 2) pinch = null;\n  if(fingerCount() === 0){\n    if(touch && !touch.moved){\n      var now = Date.now();\n      if(now - lastTapAt < 320){        /* double tap - put it back */\n        view.ry = HOME.ry; view.rx = HOME.rx;\n        view.zoom = HOME.zoom; view.px = HOME.px; view.py = HOME.py;\n        lastTapAt = 0;\n      } else {\n        lastTapAt = now;\n        tap(e);\n      }\n    }\n    touch = null;\n  }\n}\nc.addEventListener(\"pointerup\", letGo);\nc.addEventListener(\"pointercancel\", letGo);\n\n/* Tapping a single part to hear its name is gone. Asking what a thing is made\n   of names all of them at once, on the model, which is what you actually want\n   when you ask that. */\nvar LABELS_ON = false;\nfunction tap(e){ /* nothing - a tap is for turning it, not for picking at it */ }\naddEventListener(\"message\", function(ev){\n  if(!ev.data || typeof ev.data !== \"object\") return;\n  if(ev.data.pedroLabels !== undefined) LABELS_ON = !!ev.data.pedroLabels;\n});\n\n/* ---- drawing ---- */\nvar drawn = [];\n/* A hologram is mostly edges. The face is a wash you can see through, so the\n   parts behind show; the line is what you actually read the shape from. And\n   every colour is pulled two thirds of the way to cyan - enough that it is all\n   one light, enough of its own colour left to tell the parts apart. */\nfunction parts3(hex){\n  var n = parseInt(String(hex).replace(\"#\", \"\"), 16);\n  if(isNaN(n)) n = 0x8fd8ff;\n  var r = (n >> 16) & 255, g2 = (n >> 8) & 255, b = n & 255;\n  /* towards #38e1f0 */\n  var m = 0.62;\n  return [Math.round(r + (0x38 - r) * m),\n          Math.round(g2 + (0xe1 - g2) * m),\n          Math.round(b + (0xf0 - b) * m)];\n}\nfunction shade(hex, light, alpha){\n  var c3 = parts3(hex);\n  var k = 0.55 + 0.75 * Math.max(0, light);\n  return \"rgba(\" + Math.min(255, Math.round(c3[0] * k)) + \",\" +\n                   Math.min(255, Math.round(c3[1] * k)) + \",\" +\n                   Math.min(255, Math.round(c3[2] * k)) + \",\" + alpha + \")\";\n}\nfunction frame(){\n  var W = c.width, H = c.height, mid = Math.min(W, H) / 2;\n  var dpr2 = c.width / (c.getBoundingClientRect().width || c.width);\n  g.clearRect(0, 0, W, H);\n  view.t += 0.016;\n  if(view.morph < 1) view.morph = Math.min(1, view.morph + 0.022);\n  var ease = view.morph < 1 ? 1 - Math.pow(1 - view.morph, 3) : 1;\n  if(!touch && !pinch) view.ry += 0.004;\n  view.spun += 0.14;\n\n  var cosY = Math.cos(view.ry), sinY = Math.sin(view.ry);\n  var cosX = Math.cos(view.rx), sinX = Math.sin(view.rx);\n  drawn = [];\n  for(var i = 0; i < FACES.length; i++){\n    var f = FACES[i], flat = [], depth = 0, ok = true;\n    for(var k = 0; k < f.pts.length; k++){\n      var a = f.pts[k], b = f.from[k];\n      var x = (b[0] + (a[0] - b[0]) * ease) * UNIT;\n      var y = (b[1] + (a[1] - b[1]) * ease) * UNIT;\n      var z = (b[2] + (a[2] - b[2]) * ease) * UNIT;\n      if(f.spin){                       /* propellers, wheels, anything told to turn */\n        var ax = (f.at || [0,0,0]);\n        var dx = x - ax[0] * UNIT, dy = y - ax[1] * UNIT, dz = z - ax[2] * UNIT;\n        var s = Math.sin(view.spun), cq = Math.cos(view.spun);\n        if(f.spin === \"y\"){ var nx = dx * cq + dz * s; dz = -dx * s + dz * cq; dx = nx; }\n        else if(f.spin === \"x\"){ var ny = dy * cq - dz * s; dz = dy * s + dz * cq; dy = ny; }\n        else { var mx = dx * cq - dy * s; dy = dx * s + dy * cq; dx = mx; }\n        x = ax[0] * UNIT + dx; y = ax[1] * UNIT + dy; z = ax[2] * UNIT + dz;\n      }\n      var x1 = x * cosY + z * sinY, z1 = -x * sinY + z * cosY;\n      var y1 = y * cosX - z1 * sinX, z2 = y * sinX + z1 * cosX;\n      var persp = 2.6 / (2.6 + z2 * 0.9);\n      /* px and py are in screen pixels, so they are scaled the same way the\n         canvas is - otherwise dragging it moves it half as far on a retina */\n      flat.push([W / 2 + view.px * dpr2 + x1 * mid * 0.78 * persp * view.zoom,\n                 H / 2 + view.py * dpr2 - y1 * mid * 0.78 * persp * view.zoom]);\n      depth += z2;\n    }\n    if(!ok) continue;\n    /* which way the face is pointing, for the light and for hiding its back */\n    var ax2 = flat[1][0] - flat[0][0], ay2 = flat[1][1] - flat[0][1];\n    var bx2 = flat[2][0] - flat[0][0], by2 = flat[2][1] - flat[0][1];\n    var cross = ax2 * by2 - ay2 * bx2;\n    if(cross >= 0) continue;                       /* facing away - skip it */\n    drawn.push({ flat: flat, depth: depth / f.pts.length, c: f.c, part: f.part,\n                 light: Math.min(1, Math.abs(cross) / (mid * mid * 0.06)) });\n  }\n  drawn.sort(function(a, b){ return b.depth - a.depth; });\n\n  /* A grid under it. Without one it floats in the dark with no sense of size\n     or of which way up it is - which is most of why it looked like a toy. */\n  var floorY = H / 2 + view.py * dpr2 + mid * 0.62 * view.zoom;\n  g.lineWidth = Math.max(1, c.width / 1400);\n  for(var gl = 1; gl <= 7; gl++){\n    var t2 = gl / 7;\n    var yy = floorY + Math.pow(t2, 1.9) * mid * 0.55 * view.zoom;\n    if(yy > H) break;\n    g.strokeStyle = \"rgba(56,225,240,\" + (0.16 * (1 - t2)).toFixed(3) + \")\";\n    g.beginPath(); g.moveTo(0, yy); g.lineTo(W, yy); g.stroke();\n  }\n  for(var gv = -5; gv <= 5; gv++){\n    var xx = W / 2 + view.px * dpr2 + gv * mid * 0.20 * view.zoom;\n    g.strokeStyle = \"rgba(56,225,240,\" + (0.13 * (1 - Math.abs(gv) / 6)).toFixed(3) + \")\";\n    g.beginPath();\n    g.moveTo(W / 2 + view.px * dpr2 + gv * mid * 0.08 * view.zoom, floorY);\n    g.lineTo(xx, Math.min(H, floorY + mid * 0.55 * view.zoom));\n    g.stroke();\n  }\n  var wide = Math.max(2, c.width / 220);\n  var thin = Math.max(1, c.width / 900);\n  for(var d = 0; d < drawn.length; d++){\n    var q = drawn[d];\n    g.beginPath();\n    g.moveTo(q.flat[0][0], q.flat[0][1]);\n    for(var m = 1; m < q.flat.length; m++) g.lineTo(q.flat[m][0], q.flat[m][1]);\n    g.closePath();\n    /* a wash you can see through, so what is behind still shows */\n    g.fillStyle = shade(q.c, 0.35 + q.light, 0.13 + q.light * 0.10);\n    g.fill();\n    /* the glow, faked with a wide soft pass under a narrow bright one -\n       shadowBlur on sixty paths a frame is what makes a phone hot */\n    g.strokeStyle = shade(q.c, 1, 0.16);\n    g.lineWidth = wide;\n    g.stroke();\n    g.strokeStyle = shade(q.c, 1.2, 0.92);\n    g.lineWidth = thin;\n    g.stroke();\n  }\n  /* Every part named at once, each on its own part, with a line out to the\n     name so it does not sit on top of the thing it is naming. Only the parts\n     actually facing you, or the far side labels the near side. */\n  if(LABELS_ON){\n    var unit0 = Math.min(W, H);\n    var nearest = {};\n    drawn.forEach(function(f){\n      var seen = nearest[f.part];\n      if(!seen || f.depth < seen.depth) nearest[f.part] = f;\n    });\n    g.font = \"600 \" + Math.round(unit0 / 40) + \"px -apple-system,sans-serif\";\n    g.textAlign = \"left\";\n    var placed = [];\n    Object.keys(nearest).forEach(function(k){\n      var f = nearest[k];\n      var part = (SPEC.parts || [])[f.part];\n      if(!part || !part.n) return;\n      var cx = 0, cy = 0;\n      f.flat.forEach(function(pt){ cx += pt[0]; cy += pt[1]; });\n      cx /= f.flat.length; cy /= f.flat.length;\n      /* out to whichever side it is already on, so the lines do not cross */\n      var side = cx < W / 2 ? -1 : 1;\n      var tx = cx + side * unit0 * 0.13;\n      var ty = cy;\n      /* nudge apart anything that landed on top of something else */\n      for(var q = 0; q < placed.length; q++){\n        if(Math.abs(placed[q].y - ty) < unit0 * 0.045 &&\n           Math.abs(placed[q].x - tx) < unit0 * 0.30){ ty = placed[q].y + unit0 * 0.05; q = -1; }\n      }\n      placed.push({ x: tx, y: ty });\n      g.strokeStyle = \"rgba(56,225,240,.55)\";\n      g.lineWidth = Math.max(1, unit0 / 700);\n      g.beginPath(); g.moveTo(cx, cy); g.lineTo(tx, ty); g.stroke();\n      var text = part.n;\n      var wide2 = g.measureText(text).width;\n      var lx = side < 0 ? tx - wide2 : tx;\n      g.fillStyle = \"rgba(4,8,16,.72)\";\n      g.fillRect(lx - unit0 * 0.012, ty - unit0 * 0.028,\n                 wide2 + unit0 * 0.024, unit0 * 0.042);\n      g.fillStyle = \"#7ff0ff\";\n      g.fillText(text, lx, ty + unit0 * 0.005);\n    });\n  }\n  if(SPEC.name){\n    /* sized against the narrow side, or it is enormous on a tall screen */\n    var unit = Math.min(W, H);\n    g.font = \"600 \" + Math.round(unit / 26) + \"px -apple-system,sans-serif\";\n    g.textAlign = \"center\";\n    g.fillStyle = \"rgba(56,225,240,.62)\";\n    g.fillText(SPEC.name, W / 2, H - unit * 0.06);\n  }\n  requestAnimationFrame(frame);\n}\nframe();\n";
 
 function spec3dPage(spec){
-  return '<canvas id="c"></canvas><script>' +
+  /* Its own styling, because the shared wrapper sizes canvases to 100vmin -
+     a square, which is the box he was looking at. And the pieces that make it
+     read as projected rather than drawn: lines across it, and a darkening at
+     the edges so the middle is where the light is. */
+  return '<style>' +
+    'html,body{margin:0;height:100%;background:#05070d;overflow:hidden;display:block}' +
+    '#c{display:block;width:100vw;height:100vh;max-width:none;max-height:none;' +
+      'position:fixed;inset:0}' +
+    '#scan{position:fixed;inset:0;pointer-events:none;z-index:2;opacity:.35;' +
+      'background:repeating-linear-gradient(0deg,rgba(56,225,240,.16) 0 1px,transparent 1px 3px)}' +
+    '#vig{position:fixed;inset:0;pointer-events:none;z-index:1;' +
+      'background:radial-gradient(circle at 50% 46%,transparent 42%,rgba(3,5,10,.72) 100%)}' +
+    '</style>' +
+    '<canvas id="c"></canvas><div id="vig"></div><div id="scan"></div><script>' +
     VIZ3D_RENDER.split("__SPEC__").join(JSON.stringify(spec)) +
     "<" + "/script>";
 }
@@ -6000,6 +6065,55 @@ function spec3dMerge(specs, names){
 }
 
 /* What he is asked for. Short keys because every character is time. */
+/* A photograph of the thing, as data, so the model can look at it rather than
+   remember it. Wikipedia's images send access-control-allow-origin, so this
+   can be fetched here instead of described second-hand. */
+function refPhoto(about){
+  return webLook(about, 3).then(function(found){
+    var one = found.filter(function(f){ return f.image; })[0];
+    if(!one) return null;
+    return fetch(one.image).then(function(r){
+      if(!r.ok) throw new Error("no picture");
+      return r.blob();
+    }).then(function(blob){
+      if(blob.size > 3500000) throw new Error("too big to send");
+      return new Promise(function(done, fail){
+        var fr = new FileReader();
+        fr.onload = function(){
+          var s = String(fr.result);
+          done({ mime: blob.type || "image/jpeg",
+                 data: s.slice(s.indexOf(",") + 1),
+                 title: one.title });
+        };
+        fr.onerror = function(){ fail(new Error("could not read the picture")); };
+        fr.readAsDataURL(blob);
+      });
+    });
+  }).catch(function(){ return null; });
+}
+
+/* Build the model from the photograph rather than from memory. This is the
+   whole difference between something that looks like the thing and something
+   that looks like boxes: the model was being asked to picture it, so it
+   produced whatever it imagined and the proportions were nobody's. */
+function spec3dFromPhoto(about){
+  return refPhoto(about).then(function(shot){
+    if(!shot) return null;
+    var ask = "Look at this photograph. Build a 3D model of what is in it, " +
+      "matching the proportions and the arrangement you can actually see - " +
+      "not what you remember about " + about + ". " + spec3dAsk(about);
+    var only = { messages: [{ role:"user", t: Date.now(), content: ask,
+                              images: [{ mime: shot.mime, data: shot.data }] }] };
+    var work = withVision(function(){ return askOnce(only); });
+    if(!work) return null;
+    return work.then(function(answer){
+      var spec = spec3dRead(answer);
+      if(spec && !spec.name) spec.name = shot.title || about;
+      return spec;
+    }).catch(function(){ return null; });
+  });
+}
+
 function spec3dAsk(about){
   var things = spec3dThings(about);
   if(things.length > 1) return spec3dAskMany(things);
@@ -8207,6 +8321,21 @@ function rightNow(said){
     sayNow(was === now2 ? "That is already my name." : (now2 + ". Noted."));
     return true;
   }
+  /* asking what it is made of names every part at once, on the model */
+  if(PARTS_RE.test(q)){
+    if(!holoNow || !$("hfOrb").classList.contains("showing")){
+      sayNow("There is nothing up to take apart.");
+      return true;
+    }
+    holoLabels(true);
+    var names = holoNow.parts.filter(function(x){ return x; });
+    sayNow(names.length
+      ? "Labelled. " + names.slice(0, 8).join(", ") +
+        (names.length > 8 ? ", and " + (names.length - 8) + " more." : ".")
+      : "Labelled.");
+    return true;
+  }
+  if(PARTS_OFF_RE.test(q)){ holoLabels(false); sayNow("Labels off."); return true; }
   if(PARTY_ON_RE.test(q)){ partyStart(); return true; }
   if(PARTY_OFF_RE.test(q)){ partyStop(); return true; }
   if(NOW_RE.check.test(q)){
@@ -8274,6 +8403,12 @@ function rememberHarder(said){
 /* ==================== party mode ====================
    Colour, speed, a livelier voice, and an offer of music - which is the only
    part of a party a phone can actually supply. */
+var PARTS_RE = new RegExp("^(?:what|which)\\s+parts?(?:\\s+(?:is|are|does)[^?]*)?\\??$" +
+  "|^(?:label|name|show)\\s+(?:me\\s+)?(?:the\\s+)?parts?$" +
+  "|^what(?:\\'?s| is)\\s+it\\s+made\\s+(?:of|from)\\??$" +
+  "|^parts?$", "i");
+var PARTS_OFF_RE = new RegExp("^(?:labels?\\s+off|hide\\s+(?:the\\s+)?labels?" +
+  "|no\\s+labels?|unlabel)$", "i");
 var PARTY_ON_RE = /^(?:party|party time|party mode|let'?s party|start the party|it'?s a party)$/i;
 var PARTY_OFF_RE = /^(?:party(?:'?s)? over|stop the party|end the party|no more party|calm down|party off)$/i;
 
@@ -8371,6 +8506,7 @@ function holoOf(said){
 }
 
 function holoHide(){
+  holoNow = null;
   var screen = $("hf");
   if(screen) screen.classList.remove("bg");
   var orb = $("hfOrb");
@@ -8386,8 +8522,43 @@ function holoHide(){
 function holoShow(what){
   var screen = $("hf");
   if(screen) screen.classList.add("bg");
-  vizBuild(what);
-  return Promise.resolve(true);
+  hfSet("busy", "Looking at " + what);
+  $("orbViz").srcdoc = vizPage(vizWaiting(what));
+  $("hfOrb").classList.add("showing");
+  holoLabels(false);
+
+  /* Built from a photograph of the actual thing. Asked from memory, the model
+     produces whatever it imagines and the proportions are nobody's - which is
+     what made the old ones look like a pile of boxes. */
+  return spec3dFromPhoto(what).then(function(spec){
+    if(spec) return spec;
+    return spec3dKnownAll(what);        /* the handful it already knows */
+  }).then(function(spec){
+    if(!spec){
+      /* nothing to build from - a real photograph, treated, is still better
+         than a model of something it has not seen */
+      return holoPhoto(what);
+    }
+    var page = spec3dPage(spec);
+    simKeep(what, page, "");
+    vizShow(what, page, "");
+    holoNow = { what: what, parts: (spec.parts || []).map(function(x){ return x.n; }) };
+    carryOn("Here's " + what + ". Turn it with one finger, move it with two.");
+    return true;
+  }).catch(function(e){
+    sayNow("I could not build that - " + String(e && e.message || e));
+    return false;
+  });
+}
+
+/* what is up, so "what parts is it made of" has something to name */
+var holoNow = null;
+
+/* Every part named at once, on the model. Tapping one at a time is gone. */
+function holoLabels(on){
+  var frame = $("orbViz");
+  if(!frame || !frame.contentWindow) return;
+  try{ frame.contentWindow.postMessage({ pedroLabels: !!on }, "*"); }catch(e){}
 }
 
 /* A real photograph of it, treated until it reads as light. Kept for the
@@ -11007,7 +11178,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.93";
+var BUILD = "2026-08-21.94";
 
 function banner(kind, html){
   var b = $("banner");

@@ -147,7 +147,7 @@ const KNOWN = new Function(decl("SPEC3D_KNOWN") + " return SPEC3D_KNOWN;")();
   t("the spec is put in as data, not as code",
     grab("spec3dPage").indexOf("JSON.stringify(spec)") > -1, true);
   t("up is up", has("- y1 * mid * 0.78 * persp * view.zoom"), true);
-  t("and moving it does not flip that", has("H / 2 + view.py * dpr - y1 * mid"), true);
+  t("and moving it does not flip that", has("H / 2 + view.py * dpr2 - y1 * mid"), true);
   t("and the outside of a shape faces you", has("if(cross >= 0) continue;"), true);
   t("the ball turns into the thing", has("f.from = f.pts.map"), true);
   t("a tap tells the app which part it was", has("pedroPart"), true);

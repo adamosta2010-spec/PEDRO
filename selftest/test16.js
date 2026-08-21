@@ -913,13 +913,100 @@ const TOOLSRC = decl("TOOLS");
   t("and stay readable against whatever it is showing",
     /#hf\.bg #hfWords#hfWords\{[^}]*text-shadow/.test(page), true);
 
-  t("asking for a hologram builds one", grab("holoShow").indexOf("vizBuild(what)") > -1, true);
+  /* Asked from memory the model produces whatever it imagines and the
+     proportions are nobody's, which is what made the old ones look like a
+     pile of boxes. It is built from a photograph of the actual thing now. */
+  t("asking for a hologram builds one from a photograph",
+    grab("holoShow").indexOf("spec3dFromPhoto(what)") > -1, true);
+  t("and falls back to the ones it already knows",
+    grab("holoShow").indexOf("spec3dKnownAll(what)") > -1, true);
+  t("and to a real photograph when it cannot build anything",
+    grab("holoShow").indexOf("holoPhoto(what)") > -1, true);
   t("in the background", grab("holoShow").indexOf('classList.add("bg")') > -1, true);
   t("and leaving it puts the screen back", grab("holoHide").indexOf('classList.remove("bg")') > -1, true);
   /* a photograph is still the right answer for the things a model made of
      boxes and cylinders cannot be */
   t("a real photograph is still there for what a model cannot be",
     has("function holoPhoto"), true);
+}
+
+
+/* ---------- the hologram, rebuilt ---------- */
+{
+  const page = fs.readFileSync("index.html", "utf8");
+  const inPage = s => page.indexOf(s) > -1;
+  const code = new Function(decl("VIZ3D_RENDER") + " return VIZ3D_RENDER;")();
+
+  /* "It is in some kind of box." The wrapper sized every canvas to 100vmin -
+     a square the size of the shorter side, which on a tall phone is a box in
+     the middle of a dark rectangle. */
+  t("the canvas fills what it is given", code.indexOf("c.width = Math.round(w * dpr)") > -1, true);
+  t("and is no longer square", code.indexOf("Math.min(window.innerWidth, window.innerHeight)") > -1, false);
+  t("its page has no vmin in it", grab("spec3dPage").indexOf("height:100vmin") === -1, true);
+  t("and fills the viewport", grab("spec3dPage").indexOf("width:100vw;height:100vh") > -1, true);
+
+  /* "The design is very ugly." Flat solid polygons with a thin outline is a
+     low-poly toy. A hologram is mostly edges. */
+  t("the faces are a wash you can see through", code.indexOf("0.13 + q.light * 0.10") > -1, true);
+  t("and the edges are what you read the shape from",
+    code.indexOf("g.lineWidth = wide") > -1 && code.indexOf("g.lineWidth = thin") > -1, true);
+  t("the glow is faked, not blurred - sixty blurred paths a frame is what cooks a phone",
+    code.indexOf("g.shadowBlur") === -1, true);
+  t("every colour is pulled towards one light", code.indexOf("function parts3") > -1, true);
+  t("but not all the way, or the parts cannot be told apart",
+    code.indexOf("var m = 0.62;") > -1, true);
+  t("and it stands on something", code.indexOf("A grid under it") > -1, true);
+  t("with lines across it and darker edges",
+    grab("spec3dPage").indexOf("#scan") > -1 && grab("spec3dPage").indexOf("#vig") > -1, true);
+  t("the name is sized for the screen, not for a square",
+    code.indexOf("var unit = Math.min(W, H);") > -1, true);
+
+  /* built from a photograph rather than from memory */
+  t("a real photograph is fetched first", has("function refPhoto"), true);
+  t("Wikipedia's images allow it, so it is real data and not a description",
+    grab("refPhoto").indexOf("readAsDataURL") > -1, true);
+  t("an enormous one is refused rather than sent",
+    grab("refPhoto").indexOf("blob.size > 3500000") > -1, true);
+  t("and the model is asked to build what it can see",
+    grab("spec3dFromPhoto").indexOf("not what you remember about") > -1, true);
+  t("with no picture, it falls back rather than failing",
+    grab("spec3dFromPhoto").indexOf("if(!shot) return null") > -1, true);
+
+  /* tapping one part is gone; asking names them all */
+  t("tapping a part is gone", code.indexOf("pedroPart") === -1, true);
+  t("and a tap does nothing but turn it", code.indexOf("a tap is for turning it") > -1, true);
+  t("asking what it is made of names them all", code.indexOf("LABELS_ON") > -1, true);
+  t("each on its own part, with a line out to the name",
+    code.indexOf("g.lineTo(tx, ty); g.stroke();") > -1, true);
+  t("only the parts facing you, or the far side labels the near side",
+    code.indexOf("if(!seen || f.depth < seen.depth)") > -1, true);
+  t("and labels that land on each other are nudged apart",
+    code.indexOf("q = -1;") > -1, true);
+  t("the app can turn them on", grab("holoLabels").indexOf("pedroLabels") > -1, true);
+
+  const parts = new Function(decl("PARTS_RE") + " return PARTS_RE;")();
+  const off = new Function(decl("PARTS_OFF_RE") + " return PARTS_OFF_RE;")();
+  ["what parts", "what parts is it made of", "which parts are used",
+   "label the parts", "name the parts", "parts", "what is it made of"]
+    .forEach(q => t('"' + q + '" labels them', parts.test(q), true));
+  ["labels off", "hide the labels", "no labels"]
+    .forEach(q => t('"' + q + '" takes them off', off.test(q), true));
+  t("but an ordinary question does not", parts.test("what is the capital of france"), false);
+  t("and nothing up is said, not silently ignored",
+    grab("rightNow").indexOf("There is nothing up to take apart") > -1, true);
+
+  /* ---- the party hat and the lights ---- */
+  t("the ball gets a hat", inPage('<span class="hat"'), true);
+  t("which is a striped cone", /#hfOrb\.party \.hat\{[\s\S]*?repeating-linear-gradient/.test(page), true);
+  t("with a pompom", inPage("#hfOrb.party .hat .pom{"), true);
+  t("and it bobs", inPage("@keyframes hatBob"), true);
+  t("but only during a party", /#hfOrb \.hat\{display:none\}/.test(page), true);
+  t("there is a string of bulbs along the top", inPage("#partyLights .bulbs{"), true);
+  t("that blink out of step with each other", inPage("#partyLights .bulbs s:nth-child(9)"), true);
+  /* the beams hung from one point in the middle, which put their length down
+     the centre where the ball already is */
+  t("the beams are spread across the top", inPage("#partyLights i:nth-child(4){left:84%"), true);
+  t("and they are bright", /#partyLights i\{[^}]*opacity:1/.test(page), true);
 }
 
 
