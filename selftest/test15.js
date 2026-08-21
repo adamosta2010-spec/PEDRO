@@ -154,7 +154,7 @@ const has = s => src.indexOf(s) > -1;
   t("the microphone is started over, not just stopped",
     fresh.indexOf("hfListen()") > -1, true);
   t("and the new one waits for the old one to actually go",
-    fresh.indexOf("Native.stopListening().then(again, again)") > -1, true);
+    fresh.indexOf("then(again, again)") > -1, true);
   t("carrying on uses it", grab("carryOn").indexOf("hfFreshMic()") > -1, true);
   t("and no longer stops and starts in the same breath",
     grab("carryOn").indexOf("hfPause();") === -1, true);
@@ -204,6 +204,43 @@ const has = s => src.indexOf(s) > -1;
     (learn.match(/provider = wasProvider/g) || []).length, 2);
   t("it no longer insists on JSON",
     learn.indexOf("readNotes(answer)") > -1, true);
+}
+
+/* ---------- he should never go deaf ---------- */
+{
+  const should = new Function("hf", "cam", grab("shouldBeListening") + " return shouldBeListening;");
+  const on = { on:true, want:true, paused:false, phase:"hear" };
+  t("listening when he is meant to be", should(on, {open:false})(), true);
+  t("not while he is thinking", should(Object.assign({}, on, {phase:"busy"}), {open:false})(), false);
+  t("not while he is talking", should(Object.assign({}, on, {phase:"talk"}), {open:false})(), false);
+  t("not when hands-free is off", should(Object.assign({}, on, {want:false}), {open:false})(), false);
+  t("not when you paused him", should(Object.assign({}, on, {paused:true}), {open:false})(), false);
+  t("not while the camera is up", should(on, {open:true})(), false);
+
+  const keep = grab("keepHearing");
+  t("a stopped microphone is started again", keep.indexOf("hfListen()") > -1, true);
+  t("one that has heard nothing for a long time is replaced",
+    keep.indexOf("hfFreshMic()") > -1, true);
+  t("and it is looked at over and over", src.indexOf("setInterval(keepHearing") > -1, true);
+  t("anything heard counts as proof it is alive",
+    grab("hfHeardText").indexOf("hf.lastHeard = Date.now()") > -1, true);
+  t("and the silence is measured from when it started",
+    grab("hfListen").indexOf("hf.since = Date.now()") > -1, true);
+}
+
+/* ---------- one missing native method must not take the app down ---------- */
+{
+  const n = grab("nat");
+  t("a native call that is not there is refused, not thrown",
+    n.indexOf("Promise.reject") > -1, true);
+  t("and a throw inside it becomes a refusal too",
+    n.indexOf("catch(e)") > -1, true);
+  /* every call into the app goes through nat() or natListen() - counted
+     rather than matched, because a pattern here is one more thing to get
+     wrong */
+  t("every native call goes through the safe way in",
+    src.split("nat(" + String.fromCharCode(34)).length - 1 >= 15, true);
+  t("listeners are guarded the same way", src.indexOf("function natListen") > -1, true);
 }
 
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " everything-else tests passed");

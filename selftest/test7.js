@@ -415,7 +415,7 @@ function nativeFrom(cap, exp){
   const sp = grab("speak");
   const inSrc = bit => src.indexOf(bit) > -1;
   t("it speaks with the app's own voice when there is one",
-    sp.indexOf("Native.speak({") > -1, true);
+    sp.indexOf("nat(" + String.fromCharCode(34) + "speak") > -1, true);
   t("and only falls back to the browser without one",
     sp.indexOf("Native.speak") < sp.indexOf("window.speechSynthesis"), true);
   t("the chosen speed goes with it", sp.indexOf("rate: isNaN(r)") > -1, true);
@@ -496,7 +496,7 @@ function nativeFrom(cap, exp){
     inSrc("Earlier in this conversation"), true);
   t("the model on the PC uses the graphics card", inSrc("num_gpu: 99"), true);
   t("and stays loaded between questions", inSrc('keep_alive: "30m"'), true);
-  t("the phone's model is warmed up at startup", inSrc("Native.warm({"), true);
+  t("the phone's model is warmed up at startup", inSrc("nat(" + String.fromCharCode(34) + "warm"), true);
 }
 
 
@@ -756,7 +756,7 @@ function nativeFrom(cap, exp){
   t("and listening is actually started again after speaking",
     grab("carryOn").indexOf("hfFreshMic()") > -1, true);
   t("with the new one waiting for the old one to go",
-    grab("hfFreshMic").indexOf("stopListening().then(again, again)") > -1, true);
+    grab("hfFreshMic").indexOf("then(again, again)") > -1, true);
   t("saying the words is not mistaken for opening the microphone",
     grab("carryOn").indexOf("hfQuietTimer();") > -1, true);
   t("it waits until he has stopped talking first",

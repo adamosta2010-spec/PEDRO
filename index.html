@@ -2806,7 +2806,7 @@ function wireNativeSpeech(fn){
   whenSpoken = fn;
   if(speechWired || !Native || !Native.addListener) return;
   speechWired = true;
-  Native.addListener("pedroSpokeEnd", function(){
+  natListen("pedroSpokeEnd", function(){
     var f = whenSpoken;
     whenSpoken = null;
     if(f) f();
@@ -2905,7 +2905,7 @@ function speak(text, onEnd){
        web layer only needs to know it has finished */
     wireNativeSpeech(spoken);
     var spokeTimer = setTimeout(spoken, Math.min(90000, 2000 + saying.length * 75));
-    Native.speak({
+    nat("speak", {
       text: saying,
       rate: isNaN(r) ? 1 : Math.max(0.7, Math.min(1.3, r)),
       volume: isNaN(vol) ? 1 : Math.max(0, Math.min(1, vol)),
@@ -3860,7 +3860,7 @@ function fixStrandedProvider(){
 /* ask the phone whether it can answer offline */
 function checkDeviceModel(){
   if(!Native) return Promise.resolve(deviceModel);
-  return Native.available().then(function(r){
+  return nat("available").then(function(r){
     deviceModel = { checked:true, available:!!r.available, reason:r.reason || "" };
     if(deviceModel.available && !store.settings.deviceSeen){
       store.settings.deviceSeen = true; save();
@@ -3885,7 +3885,7 @@ function askDevice(msgs){
   var recent = msgs.slice(-6).filter(function(m){ return m.role === "assistant"; }).slice(-2);
   var carry = recent.map(function(m){ return "Earlier you said: " + m.content.slice(0, 300); }).join("\n");
 
-  return Native.ask({
+  return nat("ask", {
     prompt: question,
     system: systemPrompt() + (carry ? "\n\n" + carry : "")
   }).then(function(r){ return String(r.reply || "").trim(); });
@@ -3911,13 +3911,13 @@ function tellMicTheWords(){
   var words = [aiName()];
   if(store.settings.name) words.push(store.settings.name);
   studies().slice(-3).forEach(function(s){ words.push(s.topic); });
-  Native.setWords({ words: words.slice(0, 12) }).catch(function(){});
+  nat("setWords", { words: words.slice(0, 12) }).catch(function(){});
 }
 
 function wireNativeMic(){
   if(micWired || !Native || !Native.addListener) return;
   micWired = true;
-  Native.addListener("pedroSpeech", function(ev){
+  natListen("pedroSpeech", function(ev){
     micHeardAnything = true;
     var text = (ev && ev.text) || "";
     var final = !!(ev && ev.final);
@@ -3929,7 +3929,7 @@ function wireNativeMic(){
       if(d) d(null);
     }
   });
-  Native.addListener("pedroSpeechEnd", function(ev){
+  natListen("pedroSpeechEnd", function(ev){
     nativeListening = false;
     var d = micHandlers.done;
     micHandlers.done = null;
@@ -3944,8 +3944,27 @@ function nativeMicStart(onText, onDone){
   micHandlers.text = onText;
   micHandlers.done = onDone;
   micHeardAnything = false;
-  return Native.startListening().then(function(){ nativeListening = true; });
+  return nat("startListening").then(function(){ nativeListening = true; });
 }
+/* One way in to the app's native half. If it is not there, or that particular
+   thing is not, this says so as a refused promise - it never throws, because a
+   throw part-way through a chain leaves everything waiting on it stuck. */
+function nat(name, args){
+  if(!Native || typeof Native[name] !== "function"){
+    return Promise.reject(new Error("that part needs the app - " + name + " is not there"));
+  }
+  try{
+    return Promise.resolve(Native[name](args || {}));
+  }catch(e){
+    return Promise.reject(e instanceof Error ? e : new Error(String(e)));
+  }
+}
+/* and for the ones that hand back events rather than an answer */
+function natListen(event, fn){
+  if(!Native || typeof Native.addListener !== "function") return false;
+  try{ Native.addListener(event, fn); return true; }catch(e){ return false; }
+}
+
 function nativeMicStop(){
   nativeListening = false;
   micHandlers.text = null;
@@ -3954,7 +3973,7 @@ function nativeMicStop(){
      no-op while it is set - forgetting to clear it here is why the microphone
      never came back after an answer */
   if(hf.rec && hf.rec.native) hf.rec = null;
-  if(Native) Native.stopListening().catch(function(){});
+  nat("stopListening").catch(function(){});
 }
 
 /* ==================== doing things on the phone ====================
@@ -4106,7 +4125,7 @@ function runActions(list){
       toast("Opening apps only works in the installed app");
       return;
     }
-    Native.openURL({ url: a.url }).then(function(){
+    nat("openURL", { url: a.url }).then(function(){
       toast((a.kind === "shortcut" ? "Ran shortcut: " : "Opened ") + (a.arg || a.kind));
     }).catch(function(e){
       banner("warn", "<b>Couldn’t open " + esc(a.arg || a.kind) + ".</b> " +
@@ -4707,7 +4726,7 @@ var TOOLS = {
       }
       var when = whenIsThat(a.start || a.when || a.date);
       if(!when) return Promise.resolve({ ok:false, said:"I could not work out when that is" });
-      return Native.calendarAdd({
+      return nat("calendarAdd", {
         title: String(a.title || a.what || "Something"),
         start: when.iso,
         minutes: Math.max(5, Math.min(1440, parseInt(a.minutes, 10) || 60)),
@@ -4728,7 +4747,7 @@ var TOOLS = {
         return Promise.resolve({ ok:false, said:"reminders need the app, not the web page" });
       }
       var when = whenIsThat(a.when || a.due || a.date);
-      return Native.reminderAdd({
+      return nat("reminderAdd", {
         title: String(a.title || a.what || a.text || "Reminder"),
         due: when ? when.iso : "",
         notes: String(a.notes || "")
@@ -4750,7 +4769,7 @@ var TOOLS = {
       }
       var name = String(a.name || a.who || "").trim();
       if(!name) return Promise.resolve({ ok:false, said:"no name to look for" });
-      return Native.contactFind({ name: name }).then(function(r){
+      return nat("contactFind", { name: name }).then(function(r){
         var found = (r && r.matches) || [];
         if(!found.length) return { ok:false, said:"nobody called " + name + " in your contacts" };
         return { ok:true, said:found.map(function(m){
@@ -4858,7 +4877,7 @@ var TOOLS = {
       if(!(Native && Native.readFile)){
         return Promise.resolve({ ok:false, said:"reading a file needs the app, not the web page" });
       }
-      return Native.readFile({}).then(function(r){
+      return nat("readFile", {}).then(function(r){
         var text = String((r && r.text) || "").trim();
         if(!text) return { ok:false, said:"there was nothing readable in it" };
         lastFile = { name: (r && r.name) || "the file", text: text };
@@ -6626,7 +6645,7 @@ function visionProvider(){
    names things, reads text, and needs nothing at all - no key, no signal. */
 function lookOnDevice(shot){
   if(!Native || !Native.analyse) return Promise.reject(new Error("no camera support here"));
-  return Native.analyse({ image: shot.data }).then(function(r){
+  return nat("analyse", { image: shot.data }).then(function(r){
     var labels = (r && r.labels) || [];
     var words = (r && r.text) || [];
     var faces = (r && r.faces) || 0;
@@ -7484,7 +7503,7 @@ function itIsReallyYou(why){
   if(!Native || !Native.authenticate){
     return Promise.reject(new Error("changing his own code only works in the installed app"));
   }
-  return Native.authenticate({ reason: why || "to let Pedro change his own code" });
+  return nat("authenticate", { reason: why || "to let Pedro change his own code" });
 }
 
 /* Run the changes he has been allowed to keep. Guarded so that one that throws
@@ -8257,7 +8276,7 @@ function applyBackground(){
     return;
   }
   if(Native && Native.setBackground){
-    Native.setBackground({ enabled: on }).catch(function(e){
+    nat("setBackground", { enabled: on }).catch(function(e){
       banner("warn", "Couldn't set up background listening: " + esc(String(e && e.message || e)));
     });
   }
@@ -8379,6 +8398,7 @@ document.addEventListener("visibilitychange", function(){
 /* --- the listening loop --- */
 function hfListen(){
   if(!hf.want || hf.rec) return;
+  hf.since = Date.now();       /* listening from now - silence is measured from here */
   hfListenNative();
 }
 
@@ -8399,7 +8419,7 @@ function hfFreshMic(){
     micHandlers.text = null;
     micHandlers.done = null;
     if(Native && Native.stopListening){
-      Native.stopListening().then(again, again);   /* either way, then start */
+      nat("stopListening").then(again, again);   /* either way, then start */
       return;
     }
     again();
@@ -8515,6 +8535,7 @@ function hfSettle(text){
 
 function hfHeardText(live, finalTxt){
     finalTxt = finalTxt || "";
+    hf.lastHeard = Date.now();      /* proof the microphone is alive */
 
     /* While he is talking or thinking, the only words that mean anything are
        the ones that call him off. Everything else heard then is either the tail
@@ -8790,6 +8811,37 @@ function askAgainPlainly(c, question){
     carryOn("I did not catch that.");
   });
 }
+
+/* ==================== never deaf ====================
+   He should be listening whenever he is meant to be. Rather than trust that
+   every path leaves it running, this looks every few seconds and puts it right.
+   It is deliberately dull: no state of its own, nothing to get out of step. */
+var HEAR_CHECK = 4000;        /* how often to look */
+var HEAR_SILENCE = 90000;     /* listening this long with nothing at all is dead */
+
+function shouldBeListening(){
+  return !!(hf.on && hf.want && !hf.paused &&
+            hf.phase !== "busy" && hf.phase !== "talk" &&
+            !(typeof cam !== "undefined" && cam.open));
+}
+
+function keepHearing(){
+  if(!shouldBeListening()) return;
+
+  /* not listening at all - start */
+  if(!hf.rec){
+    hfListen();
+    return;
+  }
+  /* listening, but nothing has come through it for a long time. A recogniser
+     that has quietly died looks exactly like a quiet room, so replace it. */
+  var quietFor = Date.now() - (hf.lastHeard || hf.since || Date.now());
+  if(quietFor > HEAR_SILENCE){
+    hf.lastHeard = Date.now();
+    hfFreshMic();
+  }
+}
+setInterval(keepHearing, HEAR_CHECK);
 
 /* --- speak without hearing ourselves --- */
 function hfSpeak(text, done){
@@ -9227,7 +9279,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.76";
+var BUILD = "2026-08-21.77";
 
 function banner(kind, html){
   var b = $("banner");
@@ -9289,7 +9341,7 @@ if(inApp()){
   /* load the phone's model now, so the first question is not the slow one */
   if(Native && Native.warm){
     setTimeout(function(){
-      Native.warm({ system: systemPrompt() }).catch(function(){});
+      nat("warm", { system: systemPrompt() }).catch(function(){});
     }, 1200);
   }
 }
