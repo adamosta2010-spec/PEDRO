@@ -751,8 +751,12 @@ function nativeFrom(cap, exp){
   /* the bug that made him deaf after one answer */
   t("stopping the microphone clears the marker that blocks starting it",
     grab("nativeMicStop").indexOf("hf.rec = null") > -1, true);
+  /* it restarts the microphone rather than carrying on with it, so what it
+     heard while he was talking goes with it */
   t("and listening is actually started again after speaking",
-    grab("carryOn").indexOf("hfListen();") > -1, true);
+    grab("carryOn").indexOf("hfFreshMic()") > -1, true);
+  t("with the new one waiting for the old one to go",
+    grab("hfFreshMic").indexOf("stopListening().then(again, again)") > -1, true);
   t("saying the words is not mistaken for opening the microphone",
     grab("carryOn").indexOf("hfQuietTimer();") > -1, true);
   t("it waits until he has stopped talking first",

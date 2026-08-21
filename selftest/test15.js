@@ -136,5 +136,75 @@ const has = s => src.indexOf(s) > -1;
     src.indexOf("cannot go looking through their files") > -1, true);
 }
 
+/* ---------- the phone should not be dragged down ---------- */
+{
+  t("nothing animates while the dashboard is away",
+    has("#hf:not(.on) *,") && has("animation-play-state: paused"), true);
+  t("nor while the app is in the background", has("body.away *"), true);
+  t("and the page says when it is away", has('classList.toggle("away"'), true);
+  t("what is hidden behind a simulation stops drawing too",
+    has("#hfOrb.showing .wave i,"), true);
+  t("blurring what is behind is dropped on a phone",
+    has("backdrop-filter:none !important"), true);
+}
+
+/* ---------- he stops going deaf after one answer ---------- */
+{
+  const fresh = grab("hfFreshMic");
+  t("the microphone is started over, not just stopped",
+    fresh.indexOf("hfListen()") > -1, true);
+  t("and the new one waits for the old one to actually go",
+    fresh.indexOf("Native.stopListening().then(again, again)") > -1, true);
+  t("carrying on uses it", grab("carryOn").indexOf("hfFreshMic()") > -1, true);
+  t("and no longer stops and starts in the same breath",
+    grab("carryOn").indexOf("hfPause();") === -1, true);
+}
+
+/* ---------- he stops cutting in ---------- */
+{
+  const settle = grab("hfSettle");
+  t("a pause mid-sentence is no longer taken as the end",
+    settle.indexOf("380") === -1, true);
+  t("it waits a beat", settle.indexOf("620") > -1, true);
+  t("and much longer when the sentence is plainly unfinished",
+    settle.indexOf("1100") > -1, true);
+  const hanging = new Function(decl("HF_HANGING") + " return HF_HANGING;")();
+  t("there are plenty of words that mean he is still going", hanging.length > 60, true);
+  ["about", "into", "really", "want", "three"].forEach(w =>
+    t('"' + w + '" counts as still going', hanging.indexOf(w) > -1, true));
+}
+
+/* ---------- learning actually learns ---------- */
+{
+  const FENCE = String.fromCharCode(96, 96, 96);
+  const NEWLINE = String.fromCharCode(10);
+  const OPEN = String.fromCharCode(8220), SHUT = String.fromCharCode(8221);
+  const read = new Function(grab("readNotes") + " return readNotes;")();
+  const LIST = "[\"a fact about it here\",\"and another one\"]";
+
+  t("a clean list is read", read(LIST).length, 2);
+  t("a list in a fence is read",
+    read(FENCE + "json" + NEWLINE + LIST + NEWLINE + FENCE).length, 2);
+  t("a list with words in front of it is read",
+    read("Sure, here they are:" + NEWLINE + LIST).length, 2);
+  t("bullets are read",
+    read("- one fact about it here" + NEWLINE + "- two facts about it here").length, 2);
+  t("numbers are read",
+    read("1. one fact about it here" + NEWLINE + "2. two facts about it here").length, 2);
+  t("curly quotes are read too",
+    read("[" + OPEN + "one fact about it" + SHUT +
+         "," + OPEN + "two facts about it" + SHUT +
+         "]").length, 2);
+  t("and nothing useful gives nothing", read("").length, 0);
+
+  const learn = grab("learnAbout");
+  t("learning uses the online model, not the phone's",
+    learn.indexOf("store.settings.provider = \"gemini\"") > -1, true);
+  t("and puts the setting back whether it works or not",
+    (learn.match(/provider = wasProvider/g) || []).length, 2);
+  t("it no longer insists on JSON",
+    learn.indexOf("readNotes(answer)") > -1, true);
+}
+
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " everything-else tests passed");
 process.exit(fail ? 1 : 0);

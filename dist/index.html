@@ -677,6 +677,31 @@
     border:0;opacity:.45;transition:opacity .15s}
   #hfTypeGo.ready{opacity:1}
 
+  /* ============ not painting what nobody is looking at ============
+     Animation is cheap on a desktop and expensive on a phone, and none of it is
+     worth anything when it cannot be seen. */
+  #hf:not(.on) *,
+  body.away * { animation-play-state: paused !important }
+  /* hidden behind a simulation: opacity 0 still gets drawn every frame */
+  #hfOrb.showing .globe,
+  #hfOrb.showing .core,
+  #hfOrb.showing .ring,
+  #hfOrb.showing .pulse,
+  #hfOrb.showing .ticks,
+  #hfOrb.showing .spokes,
+  #hfOrb.showing .globe *,
+  #hfOrb.showing .wave,
+  #hfOrb.showing .wave i,
+  #hfOrb.showing .ball{ animation:none !important }
+  /* backdrop-filter re-blurs everything behind it every frame. On a phone, with
+     the ball turning underneath, that is the single most expensive thing here -
+     so on a phone it is a solid background instead, which looks near enough. */
+  @media(max-width:899px){
+    .side, .topbar, .scrim{ backdrop-filter:none !important; -webkit-backdrop-filter:none !important }
+    .side{ background:var(--bg1) }
+    .topbar{ background:color-mix(in srgb, var(--bg) 94%, transparent) }
+  }
+
   /* ============ the workbench ============ */
   #wb{position:fixed;inset:0;z-index:74;background:var(--bg);display:none;
     flex-direction:column;padding:calc(var(--safe-t) + 8px) 8px calc(var(--safe-b) + 8px)}
@@ -7589,6 +7614,38 @@ function saySeconds(ms){
   return 'about ' + m + (m === 1 ? ' minute' : ' minutes');
 }
 
+/* Eight short facts, however he chose to lay them out. Insisting on JSON and
+   throwing away anything else is why a topic sometimes came back empty. */
+function readNotes(answer){
+  /* Curly quotes are not JSON, and a model that uses them puts the whole
+     list on one line - so neither reading it as JSON nor as lines would
+     catch it. Straighten them first. */
+  var txt = String(answer || "")
+    .replace(/[\u201c\u201d]/g, "\"")
+    .replace(/[\u2018\u2019]/g, "'");
+  var out = [];
+  var a = txt.indexOf("["), z = txt.lastIndexOf("]");
+  if(a > -1 && z > a){
+    try{
+      JSON.parse(txt.slice(a, z + 1)).forEach(function(n){
+        if(typeof n === "string" && n.trim()) out.push(n.trim());
+        else if(n && typeof n === "object" && n.note) out.push(String(n.note).trim());
+      });
+    }catch(e){ /* fall through to reading it as a list */ }
+  }
+  if(!out.length){
+    txt.split(/\r?\n/).forEach(function(line){
+      var s = line.trim()
+        .replace(/^[-*\u2022]\s+/, "")        /* a bullet */
+        .replace(/^\d+[.)]\s+/, "")           /* a number */
+        .replace(/^["'\u201c]|["',\u201d]$/g, "")   /* quotes, and a trailing comma */
+        .trim();
+      if(s.length > 12 && s.length < 400 && !/^[{\[]/.test(s)) out.push(s);
+    });
+  }
+  return out.slice(0, 12);
+}
+
 function learnAbout(topic, onDone){
   topic = String(topic || '').replace(/[.?!]+$/, '').trim();
   if(!topic) return;
@@ -7622,26 +7679,24 @@ function learnAbout(topic, onDone){
     var wasVoice = voiceMode;
     voiceMode = false;
     fastMode = true;                 /* the quick model - this is groundwork, not prose */
+    /* The phone's own model does not give back a clean list, so learning goes
+       to the online one - the same reason building does. */
+    var wasProvider = store.settings.provider;
+    if(isDevice() && store.settings.geminiKey) store.settings.provider = "gemini";
     withTimeout(askOnce(only), 30000, 'That is taking too long. Ask me again in a moment.')
       .then(function(answer){
         voiceMode = wasVoice;
         fastMode = false;
+        store.settings.provider = wasProvider;
         learnPaceUpdate(Date.now() - passBegan);
-        try{
-          var txt = String(answer);
-          var a = txt.indexOf('['), z = txt.lastIndexOf(']');
-          if(a > -1 && z > a){
-            JSON.parse(txt.slice(a, z + 1)).forEach(function(n){
-              if(typeof n === 'string' && n.trim()) notes.push(n.trim());
-            });
-          }
-        }catch(e){}
+        readNotes(answer).forEach(function(n){ notes.push(n); });
         pass++;
         estimate = (Date.now() - began) + learnPace() * (LEARN_PASSES.length - pass);
         runPass();
       }, function(e){
         voiceMode = wasVoice;
         fastMode = false;
+        store.settings.provider = wasProvider;   /* whatever happens, put it back */
         stopTicking();
         var why = String(e && e.message || e);
         hudLog('him', why, false);
@@ -8309,6 +8364,9 @@ function keepAwake(want){
   }
 }
 document.addEventListener("visibilitychange", function(){
+  /* off screen: stop animating altogether. He can still listen and answer -
+     that is the audio session, not the drawing. */
+  document.body.classList.toggle("away", document.visibilityState === "hidden");
   if(document.visibilityState === "visible" && hf.on){ keepAwake(true); hfListen(); }
   /* Off screen with background listening on, he carries on hearing and
      answering out loud. The phone stays where it is - being answered should not
@@ -8322,6 +8380,33 @@ document.addEventListener("visibilitychange", function(){
 function hfListen(){
   if(!hf.want || hf.rec) return;
   hfListenNative();
+}
+
+/* Start the microphone over, so whatever it heard while he was talking goes
+   with it. Stopping does not happen the instant it is asked for, so the new
+   one only starts once the old one has actually gone - starting first is what
+   made him deaf after a single answer. */
+function hfFreshMic(){
+  clearTimeout(hf.restart);
+  clearTimeout(hf.settle);
+  var again = function(){
+    hf.rec = null;
+    if(hf.want) hfListen();
+  };
+  if(hf.rec && hf.rec.native){
+    hf.rec = null;
+    nativeListening = false;
+    micHandlers.text = null;
+    micHandlers.done = null;
+    if(Native && Native.stopListening){
+      Native.stopListening().then(again, again);   /* either way, then start */
+      return;
+    }
+    again();
+    return;
+  }
+  try{ if(hf.rec) hf.rec.stop(); }catch(e){}
+  again();
 }
 
 /* Inside the app there is no browser recogniser at all, so hands-free goes
@@ -8396,7 +8481,13 @@ function worthAnswering(text){
 /* A sentence that ends on one of these is not finished - someone is thinking
    mid-question, and answering there cuts them off. */
 var HF_HANGING = ("and but so or if the a an to of for with because that which " +
-  "is are was were do does did can could would should i you it my your um uh like").split(" ");
+  "is are was were do does did can could would should i you it my your um uh like " +
+  "about into onto from by at on in as than then when while where who whom whose " +
+  "what how why me him her them us its our their this these those there here " +
+  "just also even only really very quite maybe perhaps actually basically " +
+  "want need think know say tell give make take get go put let have has had " +
+  "will shall might must am be been being would've could've should've " +
+  "one two three four five six seven eight nine ten").split(" ");
 function stillGoing(text){
   var w = String(text || "").toLowerCase().replace(/[^a-z' ]+/g, " ").trim().split(/\s+/);
   var last = w[w.length - 1] || "";
@@ -8417,7 +8508,9 @@ function hfSettle(text){
     hfAsk(q);
     /* Straight in when you have clearly finished. He has usually started on the
        answer already, so this pause is the only thing left before he speaks. */
-  }, stillGoing(text) ? 900 : 380);
+    /* A pause in the middle of a sentence is often longer than a third of a
+       second, and cutting in there is worse than waiting a moment. */
+  }, stillGoing(text) ? 1100 : 620);
 }
 
 function hfHeardText(live, finalTxt){
@@ -8525,10 +8618,10 @@ function carryOn(line){
        running the whole time he was talking - listening for "stop" - and
        everything else it heard is still sitting in it. Picking that up as the
        next question is what made him answer things you said over the top of
-       him. A fresh start throws it away. */
-    hfPause();
-    clearTimeout(hf.settle);
-    hfListen();
+       him. A fresh start throws it away, and waits for the old one to go
+       before starting, which is what stopping and starting in the same breath
+       got wrong. */
+    hfFreshMic();
     hfQuietTimer();
   }
   if(!line){ back(); return; }
@@ -9134,7 +9227,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.75";
+var BUILD = "2026-08-21.76";
 
 function banner(kind, html){
   var b = $("banner");

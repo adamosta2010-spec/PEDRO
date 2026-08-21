@@ -41,9 +41,12 @@ const t = (n, g, w) => {
 
   const settle = grab("hfSettle");
   t("he no longer waits most of a second", settle.indexOf("}, 900);") === -1, true);
-  t("a finished sentence is answered almost at once",
-    settle.indexOf("stillGoing(text) ? 900 : 380") > -1, true);
-  t("but somebody mid-sentence is not cut off", settle.indexOf("900") > -1, true);
+  /* 380ms was too eager - a natural pause mid-sentence is often longer than
+     that, and cutting in there is worse than waiting a moment */
+  t("a finished sentence is answered promptly",
+    settle.indexOf("stillGoing(text) ? 1100 : 620") > -1, true);
+  t("but somebody mid-sentence is given much longer",
+    settle.indexOf("1100") > -1, true);
 }
 
 /* ---------- the ball stays put and changes pace ---------- */
