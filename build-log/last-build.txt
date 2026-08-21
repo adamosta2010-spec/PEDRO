@@ -7,7 +7,7 @@ pod    1.17.0
 ios dir present: no
 1.17.0
 
-added 92 packages, and audited 93 packages in 6s
+added 92 packages, and audited 93 packages in 4s
 
 11 packages are looking for funding
   run `npm fund` for details
@@ -21,35 +21,35 @@ pedro@1.0.0 /Users/runner/work/PEDRO/PEDRO
   └── @capacitor/core@7.6.8 deduped
 
 packaging:
-var BUILD = "2026-08-21.83"
-✔ Adding native Xcode project in ios in 21.40ms
-✔ add in 21.67ms
-✔ Copying web assets from dist to ios/App/App/public in 7.48ms
-✔ Creating capacitor.config.json in ios/App/App in 455.67μs
-✔ copy ios in 15.73ms
-✔ Updating iOS plugins in 322.83μs
-✔ Updating iOS native dependencies with pod install in 9.98s
-✔ update ios in 10.01s
+var BUILD = "2026-08-21.84"
+✔ Adding native Xcode project in ios in 19.09ms
+✔ add in 19.33ms
+✔ Copying web assets from dist to ios/App/App/public in 5.08ms
+✔ Creating capacitor.config.json in ios/App/App in 331.63μs
+✔ copy ios in 11.50ms
+✔ Updating iOS plugins in 261.08μs
+✔ Updating iOS native dependencies with pod install in 7.19s
+✔ update ios in 7.21s
 [success] ios platform added!
 Follow the Developer Workflow guide to get building:
 https://capacitorjs.com/docs/basics/workflow
-✔ Copying web assets from dist to ios/App/App/public in 85.00ms
-✔ Creating capacitor.config.json in ios/App/App in 1.11ms
-✔ copy ios in 98.04ms
-✔ Updating iOS plugins in 486.29μs
-✔ Updating iOS native dependencies with pod install in 6.50s
-✔ update ios in 6.55s
-[info] Sync finished in 6.747s
+✔ Copying web assets from dist to ios/App/App/public in 4.39ms
+✔ Creating capacitor.config.json in ios/App/App in 664.25μs
+✔ copy ios in 8.90ms
+✔ Updating iOS plugins in 286.17μs
+✔ Updating iOS native dependencies with pod install in 2.83s
+✔ update ios in 2.84s
+[info] Sync finished in 2.876s
 total 112
 -rw-r--r--   1 runner  staff   3031 Jul 14 17:35 AppDelegate.swift
-drwxr-xr-x   5 runner  staff    160 Aug 21 16:27 Assets.xcassets
-drwxr-xr-x   4 runner  staff    128 Aug 21 16:27 Base.lproj
--rw-r--r--   1 runner  staff    306 Aug 21 16:27 capacitor.config.json
--rw-r--r--   1 runner  staff    185 Aug 21 16:27 config.xml
--rw-r--r--   1 runner  staff   1609 Aug 21 16:27 Info.plist
--rw-r--r--   1 runner  staff    645 Aug 21 16:27 MainViewController.swift
--rw-r--r--   1 runner  staff  35246 Aug 21 16:27 PedroNative.swift
-drwxr-xr-x  12 runner  staff    384 Aug 21 16:27 public
+drwxr-xr-x   5 runner  staff    160 Aug 21 16:46 Assets.xcassets
+drwxr-xr-x   4 runner  staff    128 Aug 21 16:46 Base.lproj
+-rw-r--r--   1 runner  staff    306 Aug 21 16:46 capacitor.config.json
+-rw-r--r--   1 runner  staff    185 Aug 21 16:46 config.xml
+-rw-r--r--   1 runner  staff   1609 Aug 21 16:46 Info.plist
+-rw-r--r--   1 runner  staff    645 Aug 21 16:46 MainViewController.swift
+-rw-r--r--   1 runner  staff  35246 Aug 21 16:46 PedroNative.swift
+drwxr-xr-x  12 runner  staff    384 Aug 21 16:46 public
 Successfully installed xcodeproj-1.28.1
 1 gem installed
 added PedroNative.swift to the App target
@@ -72,14 +72,15 @@ Array {
     NSCameraUsageDescription = Pedro uses the camera when you take a photo to send it.
     NSCalendarsFullAccessUsageDescription = Pedro reads what is coming up so he can tell you before it starts.
     NSMicrophoneUsageDescription = Pedro listens when you tap the microphone.
-    NSRemindersFullAccessUsageDescription = Pedro sets reminders when you ask him to.
     NSFaceIDUsageDescription = Pedro asks for your face before changing his own code.
+    NSRemindersFullAccessUsageDescription = Pedro sets reminders when you ask him to.
     NSCalendarsWriteOnlyAccessUsageDescription = Pedro puts things in your calendar when you ask him to.
     NSRemindersUsageDescription = Pedro sets reminders when you ask him to.
     NSPhotoLibraryAddUsageDescription = Pedro saves pictures it makes for you.
     NSContactsUsageDescription = Pedro looks up a number when you ask him to call or message someone.
     NSPhotoLibraryUsageDescription = Pedro opens your photos when you attach one.
     NSSpeechRecognitionUsageDescription = Pedro turns what you say into text.
+    NSLocationWhenInUseUsageDescription = Pedro uses where you are to tell you the weather.
 checking ios/App/build/Build/Products/Release-iphoneos/App.app/App
   FOUND    PedroNative
   MISSING  FoundationModels
@@ -95,7 +96,8 @@ checking ios/App/build/Build/Products/Release-iphoneos/App.app/App
   declared NSCalendarsFullAccessUsageDescription
   declared NSRemindersUsageDescription
   declared NSContactsUsageDescription
--rw-r--r--  1 runner  staff   3.3M Aug 21 16:28 Pedro.ipa
+  declared NSLocationWhenInUseUsageDescription
+-rw-r--r--  1 runner  staff   3.3M Aug 21 16:46 Pedro.ipa
 
 === the end of the build output ===
 node   v20.20.2
@@ -106,7 +108,7 @@ pod    1.17.0
 ios dir present: no
 1.17.0
 
-added 92 packages, and audited 93 packages in 6s
+added 92 packages, and audited 93 packages in 4s
 
 11 packages are looking for funding
   run `npm fund` for details
@@ -120,35 +122,35 @@ pedro@1.0.0 /Users/runner/work/PEDRO/PEDRO
   └── @capacitor/core@7.6.8 deduped
 
 packaging:
-var BUILD = "2026-08-21.83"
-✔ Adding native Xcode project in ios in 21.40ms
-✔ add in 21.67ms
-✔ Copying web assets from dist to ios/App/App/public in 7.48ms
-✔ Creating capacitor.config.json in ios/App/App in 455.67μs
-✔ copy ios in 15.73ms
-✔ Updating iOS plugins in 322.83μs
-✔ Updating iOS native dependencies with pod install in 9.98s
-✔ update ios in 10.01s
+var BUILD = "2026-08-21.84"
+✔ Adding native Xcode project in ios in 19.09ms
+✔ add in 19.33ms
+✔ Copying web assets from dist to ios/App/App/public in 5.08ms
+✔ Creating capacitor.config.json in ios/App/App in 331.63μs
+✔ copy ios in 11.50ms
+✔ Updating iOS plugins in 261.08μs
+✔ Updating iOS native dependencies with pod install in 7.19s
+✔ update ios in 7.21s
 [success] ios platform added!
 Follow the Developer Workflow guide to get building:
 https://capacitorjs.com/docs/basics/workflow
-✔ Copying web assets from dist to ios/App/App/public in 85.00ms
-✔ Creating capacitor.config.json in ios/App/App in 1.11ms
-✔ copy ios in 98.04ms
-✔ Updating iOS plugins in 486.29μs
-✔ Updating iOS native dependencies with pod install in 6.50s
-✔ update ios in 6.55s
-[info] Sync finished in 6.747s
+✔ Copying web assets from dist to ios/App/App/public in 4.39ms
+✔ Creating capacitor.config.json in ios/App/App in 664.25μs
+✔ copy ios in 8.90ms
+✔ Updating iOS plugins in 286.17μs
+✔ Updating iOS native dependencies with pod install in 2.83s
+✔ update ios in 2.84s
+[info] Sync finished in 2.876s
 total 112
 -rw-r--r--   1 runner  staff   3031 Jul 14 17:35 AppDelegate.swift
-drwxr-xr-x   5 runner  staff    160 Aug 21 16:27 Assets.xcassets
-drwxr-xr-x   4 runner  staff    128 Aug 21 16:27 Base.lproj
--rw-r--r--   1 runner  staff    306 Aug 21 16:27 capacitor.config.json
--rw-r--r--   1 runner  staff    185 Aug 21 16:27 config.xml
--rw-r--r--   1 runner  staff   1609 Aug 21 16:27 Info.plist
--rw-r--r--   1 runner  staff    645 Aug 21 16:27 MainViewController.swift
--rw-r--r--   1 runner  staff  35246 Aug 21 16:27 PedroNative.swift
-drwxr-xr-x  12 runner  staff    384 Aug 21 16:27 public
+drwxr-xr-x   5 runner  staff    160 Aug 21 16:46 Assets.xcassets
+drwxr-xr-x   4 runner  staff    128 Aug 21 16:46 Base.lproj
+-rw-r--r--   1 runner  staff    306 Aug 21 16:46 capacitor.config.json
+-rw-r--r--   1 runner  staff    185 Aug 21 16:46 config.xml
+-rw-r--r--   1 runner  staff   1609 Aug 21 16:46 Info.plist
+-rw-r--r--   1 runner  staff    645 Aug 21 16:46 MainViewController.swift
+-rw-r--r--   1 runner  staff  35246 Aug 21 16:46 PedroNative.swift
+drwxr-xr-x  12 runner  staff    384 Aug 21 16:46 public
 Successfully installed xcodeproj-1.28.1
 1 gem installed
 added PedroNative.swift to the App target
@@ -171,18 +173,19 @@ Array {
     NSCameraUsageDescription = Pedro uses the camera when you take a photo to send it.
     NSCalendarsFullAccessUsageDescription = Pedro reads what is coming up so he can tell you before it starts.
     NSMicrophoneUsageDescription = Pedro listens when you tap the microphone.
-    NSRemindersFullAccessUsageDescription = Pedro sets reminders when you ask him to.
     NSFaceIDUsageDescription = Pedro asks for your face before changing his own code.
+    NSRemindersFullAccessUsageDescription = Pedro sets reminders when you ask him to.
     NSCalendarsWriteOnlyAccessUsageDescription = Pedro puts things in your calendar when you ask him to.
     NSRemindersUsageDescription = Pedro sets reminders when you ask him to.
     NSPhotoLibraryAddUsageDescription = Pedro saves pictures it makes for you.
     NSContactsUsageDescription = Pedro looks up a number when you ask him to call or message someone.
     NSPhotoLibraryUsageDescription = Pedro opens your photos when you attach one.
     NSSpeechRecognitionUsageDescription = Pedro turns what you say into text.
-2026-08-21 16:27:29.276 xcodebuild[5493:20165] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+    NSLocationWhenInUseUsageDescription = Pedro uses where you are to tell you the weather.
+2026-08-21 16:46:13.859 xcodebuild[4145:16565] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
 --- xcodebuild: WARNING: Using the first of multiple matching destinations:
 { platform:iOS, id:dvtdevice-DVTiPhonePlaceholder-iphoneos:placeholder, name:Any iOS Device }
-{ platform:macOS, arch:arm64, variant:Designed for [iPad,iPhone], id:4e109bd5a71f10e5b4e70e2e018083ba00a256e4, name:My Mac }
+{ platform:macOS, arch:arm64, variant:Designed for [iPad,iPhone], id:1223ac17be0eb4acb790ca6ab8574c21b021cea2, name:My Mac }
 { platform:iOS Simulator, id:dvtdevice-DVTiOSDeviceSimulatorPlaceholder-iphonesimulator:placeholder, name:Any iOS Simulator Device }
 { platform:visionOS Simulator, arch:arm64, variant:Designed for [iPad,iPhone], id:6FA89B0A-8E11-400F-AA9E-6E4A46FF1DCD, OS:2.3, name:Apple Vision Pro }
 { platform:visionOS Simulator, arch:arm64, variant:Designed for [iPad,iPhone], id:DAB4F4BD-EA77-4C53-9CAE-D57670A0290C, OS:2.4, name:Apple Vision Pro }
@@ -447,7 +450,7 @@ Array {
    |            `- note: 'WKProcessPool' has been explicitly marked deprecated here
 39 | @end
 40 | 
-ld: warning: search path '/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.3.7003.10.NRIJQW/Metal.xctoolchain/usr/lib/swift/iphoneos' not found
+ld: warning: search path '/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.3.7003.10.xcGeRr/Metal.xctoolchain/usr/lib/swift/iphoneos' not found
 <module-includes>:1:9: note: in file included from <module-includes>:1:
 1 | #import "Headers/CapacitorCordova.h"
   |         `- note: in file included from <module-includes>:1:
@@ -542,7 +545,7 @@ ld: warning: search path '/var/run/com.apple.security.cryptexd/mnt/com.apple.Mob
                                     options: [.duckOthers, .defaultToSpeaker, .allowBluetooth])
                                                                                ^~~~~~~~~~~~~~
                                                                                AVAudioSession.CategoryOptions.allowBluetoothHFP
-ld: warning: search path '/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.3.7003.10.NRIJQW/Metal.xctoolchain/usr/lib/swift/iphoneos' not found
+ld: warning: search path '/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.3.7003.10.xcGeRr/Metal.xctoolchain/usr/lib/swift/iphoneos' not found
 note: Using codesigning identity override: 
 warning: Run script build phase '[CP] Embed Pods Frameworks' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'App' from project 'App')
 checking ios/App/build/Build/Products/Release-iphoneos/App.app/App
@@ -560,6 +563,7 @@ checking ios/App/build/Build/Products/Release-iphoneos/App.app/App
   declared NSCalendarsFullAccessUsageDescription
   declared NSRemindersUsageDescription
   declared NSContactsUsageDescription
--rw-r--r--  1 runner  staff   3.3M Aug 21 16:28 Pedro.ipa
+  declared NSLocationWhenInUseUsageDescription
+-rw-r--r--  1 runner  staff   3.3M Aug 21 16:46 Pedro.ipa
 
-=== finished: success at Fri Aug 21 16:28:11 UTC 2026 ===
+=== finished: success at Fri Aug 21 16:46:54 UTC 2026 ===
