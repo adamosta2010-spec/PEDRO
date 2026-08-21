@@ -125,8 +125,11 @@ const when = new Function(grab("whenIsThat") + " return whenIsThat;")();
   /* The list is long, and it used to be sent with every single question - which
      is the one thing that should be quickest. It only goes when the words are
      asking for something to be done. */
-  const asksForDoing = new Function(decl("DOING_RE") + String.fromCharCode(10) +
-    grab("looksLikeDoing") + " return looksLikeDoing;")();
+  const asksForDoing = new Function("TOOLS",
+    decl("DOING_PLAIN") + String.fromCharCode(10) +
+    "var doingRe = null;" + String.fromCharCode(10) +
+    grab("doingPattern") + String.fromCharCode(10) +
+    grab("looksLikeDoing") + " return looksLikeDoing;")(TOOLS);
   ["text mum I am late", "call dad", "open safari", "put the dentist in my calendar",
    "remind me to take the bins out", "set a timer for five minutes",
    "search for train times", "play some music", "email the school",
@@ -137,6 +140,51 @@ const when = new Function(grab("whenIsThat") + " return whenIsThat;")();
     .forEach(x => t('"' + x + '" does not need them', asksForDoing(x), false));
   t("and the list is only built when it is wanted",
     grab("toolsBlock").indexOf("if(arguments.length && !looksLikeDoing(text)) return") > -1, true);
+}
+
+/* ---- every tool can actually be reached ---- */
+{
+  /* "What is the weather in the UAE" got 28 degrees when it was 44 there - he
+     never called the tool, because the words that offer him the tools were
+     hand-written and had no weather in them. They come from the tools now. */
+  const reach = new Function("TOOLS",
+    decl("DOING_PLAIN") + "\n" +
+    "var doingRe = null;\n" +
+    grab("doingPattern") + grab("looksLikeDoing") + " return looksLikeDoing;")(TOOLS);
+
+  const reachable = [
+    ["weather", "what is the weather in the uae"],
+    ["weather", "how hot is it outside"],
+    ["weather", "will it rain today"],
+    ["maths", "what is 17 percent of 340"],
+    ["maths", "whats 45 times 12"],
+    ["convert", "how many km is 5 miles"],
+    ["convert", "convert 10 kg to pounds"],
+    ["notes", "what are my notes"],
+    ["file", "read this file"],
+    ["code", "what does this javascript do"],
+    ["contact", "what is mums number"],
+    ["directions", "how do i get to the station"],
+    ["search", "search for train times"],
+    ["calendar", "put the dentist in my calendar"],
+    ["timer", "set a timer for five minutes"],
+    ["call", "call dad"],
+    ["text", "text mum i am late"],
+    ["remind", "remind me to take the bins out"]
+  ];
+  reachable.forEach(function(pair){
+    t(pair[0] + " can be reached by asking plainly", reach(pair[1]), true);
+  });
+
+  t("and a plain question still costs nothing extra",
+    ["why is the sky blue", "who wrote hamlet", "what is a diode"]
+      .every(function(q){ return !reach(q); }), true);
+
+  /* the thing that made this possible to get wrong: a hand-written list */
+  t("every tool says what words reach it",
+    Object.keys(TOOLS).every(function(k){ return TOOLS[k].words && TOOLS[k].words.length; }), true);
+  t("and the pattern is built from them, not written by hand",
+    grab("doingPattern").indexOf("TOOLS[name].words") > -1, true);
 }
 
 /* ---- the phone's side ---- */

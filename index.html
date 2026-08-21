@@ -4636,6 +4636,7 @@ function vizAsk(question){
    be worse than saying so. */
 var TOOLS = {
   "web.search": {
+    words: ["search", "google", "look up", "find out", "who is", "what happened"],
     needs: "what to look up",
     hands: false,
     tell: "search the web",
@@ -4647,6 +4648,7 @@ var TOOLS = {
     }
   },
   "web.open": {
+    words: ["open", "website", "web page", "go to"],
     needs: "a web address",
     hands: false,
     tell: "open a page",
@@ -4660,6 +4662,7 @@ var TOOLS = {
     }
   },
   "maps.directions": {
+    words: ["directions", "navigate", "take me", "get to", "route", "map", "how far is"],
     needs: "where to",
     hands: false,
     tell: "get directions",
@@ -4671,6 +4674,7 @@ var TOOLS = {
     }
   },
   "app.open": {
+    words: ["open", "launch", "play"],
     needs: "which app",
     hands: false,
     tell: "open an app",
@@ -4682,6 +4686,7 @@ var TOOLS = {
     }
   },
   "message.write": {
+    words: ["text", "message", "msg", "whatsapp", "imessage", "tell", "let them know"],
     needs: "who it is to, and what it says",
     hands: true,
     tell: "write a message ready to send",
@@ -4697,6 +4702,7 @@ var TOOLS = {
     }
   },
   "phone.call": {
+    words: ["call", "ring", "dial", "phone"],
     needs: "a number",
     hands: true,
     tell: "bring up a call ready to dial",
@@ -4708,6 +4714,7 @@ var TOOLS = {
     }
   },
   "mail.write": {
+    words: ["email", "mail"],
     needs: "who it is to, a subject, and what it says",
     hands: true,
     tell: "write an email ready to send",
@@ -4722,6 +4729,7 @@ var TOOLS = {
     }
   },
   "calendar.add": {
+    words: ["calendar", "diary", "appointment", "meeting", "schedule", "book"],
     needs: "a title and when it starts",
     hands: false,
     tell: "put something in the calendar",
@@ -4744,6 +4752,7 @@ var TOOLS = {
     }
   },
   "reminder.add": {
+    words: ["remind", "reminder", "forget to"],
     needs: "what to be reminded of, and when",
     hands: false,
     tell: "set a reminder",
@@ -4765,6 +4774,7 @@ var TOOLS = {
     }
   },
   "contact.find": {
+    words: ["contact", "number", "phone number"],
     needs: "a name",
     hands: false,
     tell: "look someone up in your contacts",
@@ -4786,6 +4796,7 @@ var TOOLS = {
     }
   },
   "shortcut.run": {
+    words: ["shortcut"],
     needs: "the name of one of your Shortcuts",
     hands: false,
     tell: "run one of your Shortcuts",
@@ -4798,6 +4809,7 @@ var TOOLS = {
     }
   },
   "math.calc": {
+    words: ["calculate", "work out", "percent", "plus", "minus", "times", "divided", "multiply", "add up", "sum", "how much is", "square root"],
     needs: "a sum",
     hands: false,
     tell: "work out a sum exactly",
@@ -4808,6 +4820,7 @@ var TOOLS = {
     }
   },
   "unit.convert": {
+    words: ["convert", "how many", "kilometres", "kilometers", "miles", "kilos", "pounds", "ounces", "celsius", "fahrenheit", "inches", "metres", "meters"],
     needs: "an amount, from what, to what",
     hands: false,
     tell: "convert between units",
@@ -4818,6 +4831,7 @@ var TOOLS = {
     }
   },
   "note.write": {
+    words: ["note", "write down", "jot", "make a note"],
     needs: "what to write down",
     hands: false,
     tell: "write something down",
@@ -4833,6 +4847,7 @@ var TOOLS = {
     }
   },
   "note.find": {
+    words: ["notes", "wrote down", "written down"],
     needs: "a word to look for, or nothing for the last few",
     hands: false,
     tell: "read your notes back",
@@ -4851,6 +4866,7 @@ var TOOLS = {
     }
   },
   "weather.now": {
+    words: ["weather", "temperature", "forecast", "raining", "rain", "sunny", "snowing", "how hot", "how cold", "degrees outside"],
     needs: "a place, or nothing for where you are",
     hands: false,
     tell: "look up the weather",
@@ -4863,6 +4879,7 @@ var TOOLS = {
     }
   },
   "code.run": {
+    words: ["code", "javascript", "run this", "what does this do"],
     needs: "a line or two of JavaScript",
     hands: false,
     tell: "run a bit of code and say what it gives back",
@@ -4875,6 +4892,7 @@ var TOOLS = {
     }
   },
   "file.read": {
+    words: ["file", "document", "read this"],
     needs: "nothing - you choose the file",
     hands: true,
     tell: "read a file you pick",
@@ -4894,6 +4912,7 @@ var TOOLS = {
     }
   },
   "timer.set": {
+    words: ["timer", "alarm", "countdown"],
     needs: "how long",
     hands: false,
     tell: "set a timer here",
@@ -5185,13 +5204,42 @@ function whenIsThat(text){
 /* Words that mean something is being asked for rather than asked about. The
    list of tools is long, and sending it with every "what is the capital of
    France" costs time on the one thing that should be quickest. */
-var DOING_RE = new RegExp("\\b(?:text|message|msg|call|ring|dial|phone|email|mail|" +
-  "open|launch|start|play|search|google|look ?up|find|show me|take me|navigate|" +
-  "directions|put|add|schedule|book|arrange|set|remind|remember to|create|make|" +
-  "write|send|run|shortcut|timer|alarm|diary|calendar|appointment|meeting)\\b", "i");
-function looksLikeDoing(text){
-  return DOING_RE.test(String(text || ""));
+/* Doing words that belong to no tool in particular. */
+var DOING_PLAIN = ["put", "add", "set", "start", "create", "make", "write", "send",
+  "arrange", "show me", "give me", "bring up"];
+
+/* Built once, from the tools themselves - so a tool cannot be left unreachable
+   because I forgot to add its words here by hand. That is exactly what happened
+   to the weather, which answered from memory instead of looking. */
+var doingRe = null;
+function doingPattern(){
+  if(doingRe) return doingRe;
+  var all = DOING_PLAIN.slice();
+  for(var name in TOOLS){
+    if(!TOOLS.hasOwnProperty(name)) continue;
+    if(TOOLS[name].words) all = all.concat(TOOLS[name].words);
+  }
+  var seen = {}, safe = [];
+  all.forEach(function(w){
+    var k = String(w).toLowerCase().trim();
+    if(!k || seen[k]) return;
+    seen[k] = true;
+    safe.push(k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  });
+  /* longest first, so "phone number" wins over "phone" */
+  safe.sort(function(a, b){ return b.length - a.length; });
+  doingRe = new RegExp("\\b(?:" + safe.join("|") + ")\\b", "i");
+  return doingRe;
 }
+function looksLikeDoing(text){
+  /* "tell me a joke" is not a request to message anyone, but "tell mum I am
+     late" is - so the one phrase that is never a message comes out first,
+     rather than losing the word altogether and stranding the real request. */
+  var s = String(text || "").replace(/\btell me\b/gi, " ");
+  return doingPattern().test(s);
+}
+/* kept so anything still looking for it finds a working pattern */
+var DOING_RE = { test: function(s){ return looksLikeDoing(s); } };
 
 /* what he is told he can do - only when he might need it */
 /* ==================== how he sounds ====================
@@ -9353,7 +9401,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.79";
+var BUILD = "2026-08-21.80";
 
 function banner(kind, html){
   var b = $("banner");
