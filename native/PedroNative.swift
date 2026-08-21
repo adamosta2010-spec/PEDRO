@@ -403,9 +403,12 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
             // It only ever read English. Ask the device what it can read and
             // let it try all of them - a sign in Arabic came back as nothing at
             // all, which is indistinguishable from there being no sign.
+            // Ask the request its own revision rather than naming one: the named
+            // constants each arrived in a different iOS, and pinning to one is
+            // how this failed to build at all.
             if #available(iOS 15.0, *) {
                 if let able = try? VNRecognizeTextRequest.supportedRecognitionLanguages(
-                        for: .accurate, revision: VNRecognizeTextRequestRevision3) {
+                        for: .accurate, revision: text.revision) {
                     text.recognitionLanguages = able
                 }
             }
