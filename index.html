@@ -4189,6 +4189,18 @@ function tellMicTheWords(){
 function wireNativeMic(){
   if(micWired || !Native || !Native.addListener) return;
   micWired = true;
+  /* A phone call, Siri, headphones, the audio daemon restarting: each of these
+     used to leave him deaf with nothing to show for it. The phone reports them
+     now, so they end up in the trouble log. */
+  natListen("pedroAudio", function(ev){
+    var what = (ev && ev.what) || "something";
+    if(what === "listening again"){
+      hudLog("him", "microphone back " + ((ev && ev.why) || ""), false);
+      return;
+    }
+    noteTrouble("microphone: " + what);
+    if(what === "interrupted") hudLog("him", "microphone taken by something else", false);
+  });
   natListen("pedroSpeech", function(ev){
     micHeardAnything = true;
     var text = (ev && ev.text) || "";
@@ -8072,6 +8084,18 @@ function noteTrouble(what){
     localStorage.setItem("pedro.trouble", JSON.stringify(list));
   }catch(e){}
 }
+/* the most recent thing of one kind, for reporting on it */
+function troubleLike(prefix){
+  try{
+    var list = JSON.parse(localStorage.getItem("pedro.trouble") || "[]");
+    for(var i = list.length - 1; i >= 0; i--){
+      if(String(list[i].what || "").indexOf(prefix) === 0 &&
+         Date.now() - list[i].t < 2 * 3600 * 1000) return list[i];
+    }
+  }catch(e){}
+  return null;
+}
+
 function lastTrouble(){
   try{
     var list = JSON.parse(localStorage.getItem("pedro.trouble") || "[]");
@@ -8270,6 +8294,9 @@ function runDiagnostics(){
   else if(!s.elevenKey) fine.push("using the phone's own voice");
 
   if(hf.on && hf.rec) fine.push("microphone live");
+  var micTrouble = troubleLike("microphone:");
+  if(micTrouble) wrong.push("the microphone has been taken from me " +
+    (micTrouble.n > 1 ? micTrouble.n + " times " : "") + "recently - " + micTrouble.what);
   else if(hf.on) wrong.push("the microphone is not running");
 
   if(!inApp()) fine.push("running as a web page, so the phone's own things are out of reach");
@@ -9779,8 +9806,18 @@ function carryOn(line){
     hf.talking = false;
     if(!hf.on) return;
     if(!hf.want){ hfSet("wait", hfIdleLabel()); return; }
-    hf.turns++;
     hf.said = "";                /* nothing carried over from the last question */
+    /* Off screen he answers and stands down: back to needing his name. Holding
+       a conversation open for two minutes behind another app hears the room
+       rather than the person, and costs battery for the privilege. */
+    if(document.visibilityState === "hidden"){
+      hf.turns = 0;
+      hfSet("wait", hfIdleLabel());
+      hfHeard.textContent = "";
+      hfFreshMic();              /* nothing heard over him carried into the next */
+      return;
+    }
+    hf.turns++;
     hfSet("hear", "Listening - just ask");
     hfHeard.textContent = "";
     /* If something was said over the top of him it is still sitting in the
@@ -10452,7 +10489,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.89";
+var BUILD = "2026-08-21.90";
 
 function banner(kind, html){
   var b = $("banner");

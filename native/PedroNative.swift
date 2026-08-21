@@ -209,6 +209,76 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
     /// microphone. Until then the microphone has to close while he talks, or
     /// he hears himself and answers his own voice.
     private var echoFree = false
+    /// set while something else has the audio session, so we know to come back
+    private var interrupted = false
+    /// so the notifications are only ever subscribed to once
+    private var watchingAudio = false
+    /// several notifications can arrive for one event - one rebuild is enough
+    private var comingBack = false
+
+    /// A phone call, Siri, an alarm, headphones, the audio daemon restarting -
+    /// every one of these stops the engine, and none of them were watched for.
+    /// He went deaf; and with the session inactive iOS suspended the app and
+    /// eventually killed it, which is what looked like it keeping refreshing.
+    private func watchAudio() {
+        guard !watchingAudio else { return }
+        watchingAudio = true
+        let centre = NotificationCenter.default
+        let session = AVAudioSession.sharedInstance()
+
+        centre.addObserver(forName: AVAudioSession.interruptionNotification,
+                           object: session, queue: .main) { [weak self] note in
+            guard let self = self else { return }
+            guard let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+                  let kind = AVAudioSession.InterruptionType(rawValue: raw) else { return }
+            if kind == .began {
+                self.interrupted = true
+                self.notifyListeners("pedroAudio", data: ["what": "interrupted"])
+                return
+            }
+            self.interrupted = false
+            var mayResume = true
+            if let opts = note.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt {
+                mayResume = AVAudioSession.InterruptionOptions(rawValue: opts).contains(.shouldResume)
+            }
+            self.notifyListeners("pedroAudio", data: ["what": "interruption ended",
+                                                     "resuming": mayResume])
+            if mayResume { self.rebuildAudio("after an interruption") }
+        }
+
+        centre.addObserver(forName: AVAudioSession.mediaServicesWereResetNotification,
+                           object: session, queue: .main) { [weak self] _ in
+            guard let self = self else { return }
+            self.notifyListeners("pedroAudio", data: ["what": "media services reset"])
+            self.rebuildAudio("after media services reset")
+        }
+
+        centre.addObserver(forName: .AVAudioEngineConfigurationChange,
+                           object: engine, queue: .main) { [weak self] _ in
+            guard let self = self else { return }
+            self.notifyListeners("pedroAudio", data: ["what": "route changed"])
+            self.rebuildAudio("after the route changed")
+        }
+    }
+
+    /// Put the microphone back together. Rebuilt rather than resumed: after an
+    /// interruption or a reset the engine, the request and the task are all
+    /// dead, and reusing them fails quietly - which is the worst way to fail.
+    private func rebuildAudio(_ why: String) {
+        guard wantListening else { return }
+        guard !comingBack else { return }
+        comingBack = true
+        recognizer = nil            // a recogniser from before a reset is no good
+        stopEverything()
+        // a moment for iOS to finish handing the session back
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [weak self] in
+            guard let self = self else { return }
+            self.comingBack = false
+            guard self.wantListening, !self.interrupted else { return }
+            self.restartListening()
+            self.notifyListeners("pedroAudio", data: ["what": "listening again", "why": why])
+        }
+    }
 
     /// Hand a URL to iOS so it opens whatever app owns that scheme - maps,
     /// music, a phone number, or one of their own Shortcuts. iOS decides what
@@ -627,6 +697,7 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
     }
 
     private func beginListening(_ call: CAPPluginCall) {
+        watchAudio()
         stopEverything()
 
         recognizer = SFSpeechRecognizer(locale: Locale.current) ?? SFSpeechRecognizer()
@@ -739,6 +810,15 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
         if recognizer.supportsOnDeviceRecognition { req.requiresOnDeviceRecognition = true }
         request = req
         do {
+            // After an interruption the session is inactive, so starting the
+            // engine could only fail. This restart never asked for it back -
+            // which is why one phone call left him deaf until the app was
+            // opened again.
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playAndRecord, mode: .spokenAudio,
+                                    options: [.duckOthers, .defaultToSpeaker, .allowBluetooth])
+            try session.setActive(true, options: .notifyOthersOnDeactivation)
+
             let node = engine.inputNode
             enableEchoCancelling(node)
             node.removeTap(onBus: 0)

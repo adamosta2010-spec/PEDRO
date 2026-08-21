@@ -667,5 +667,58 @@ const has = s => src.indexOf(s) > -1;
 }
 
 
+/* ---------- the background problem ---------- */
+{
+  const sw = fs.readFileSync("native/PedroNative.swift", "utf8");
+  /* Background audio was declared, so the app was allowed to keep running. What
+     was missing is everything that happens TO an audio session on a phone
+     somebody is using - and with the session gone inactive, background audio
+     stops keeping the app alive: iOS suspends it, then kills it, and the next
+     open reloads the page. That is the refreshing. */
+  t("a phone call taking the microphone is noticed",
+    sw.indexOf("AVAudioSession.interruptionNotification") > -1, true);
+  t("and he comes back when it ends", sw.indexOf("shouldResume") > -1, true);
+  t("the audio daemon restarting is noticed",
+    sw.indexOf("mediaServicesWereResetNotification") > -1, true);
+  t("and headphones changing the input format",
+    sw.indexOf("AVAudioEngineConfigurationChange") > -1, true);
+  t("it is all rebuilt rather than resumed - the old objects are dead",
+    sw.indexOf("recognizer = nil            // a recogniser from before a reset") > -1, true);
+  t("several notifications for one event cause one rebuild",
+    sw.indexOf("guard !comingBack else { return }") > -1, true);
+  t("and nothing is rebuilt if listening was not wanted",
+    sw.indexOf("guard wantListening else { return }") > -1, true);
+  t("the notifications are only subscribed to once",
+    sw.indexOf("guard !watchingAudio else { return }") > -1, true);
+
+  /* restartListening already existed, for when Apple ends a task after about a
+     minute. It never asked for the audio session back - so after one phone
+     call, starting the engine could only fail. */
+  const restart = sw.slice(sw.indexOf("private func restartListening"));
+  t("restarting asks for the session back first",
+    restart.indexOf("session.setActive(true") > -1 &&
+    restart.indexOf("session.setActive(true") < restart.indexOf("try engine.start()"), true);
+
+  /* and the page is told, so it stops being a mystery */
+  t("the phone says what happened to the microphone",
+    sw.indexOf('notifyListeners("pedroAudio"') > -1, true);
+  t("the page listens for it", has('natListen("pedroAudio"'), true);
+  t("and writes it down", src.indexOf('noteTrouble("microphone: " + what)') > -1, true);
+  t("diagnostics reports a microphone that keeps being taken",
+    grab("runDiagnostics").indexOf("taken from me") > -1, true);
+  t("but only recently", grab("troubleLike").indexOf("2 * 3600 * 1000") > -1, true);
+
+  /* what he asked for: answer in the background, then stand down */
+  const on = grab("carryOn");
+  t("off screen he answers and then stands down",
+    on.indexOf('document.visibilityState === "hidden"') > -1, true);
+  t("back to needing his name", on.indexOf("hfSet(\"wait\", hfIdleLabel());") > -1, true);
+  t("rather than holding a conversation open behind other apps",
+    on.indexOf("hf.turns = 0;") > -1, true);
+  t("and with a fresh microphone, so nothing said over him carries over",
+    on.indexOf("hfFreshMic();              /* nothing heard over him") > -1, true);
+}
+
+
 console.log(fail ? NL + fail + " FAILURES" : NL + "All " + pass + " JARVIS tests passed");
 process.exit(fail ? 1 : 0);
