@@ -949,14 +949,25 @@ const TOOLSRC = decl("TOOLS");
   /* "The design is very ugly." Flat solid polygons with a thin outline is a
      low-poly toy. A hologram is mostly edges. */
   t("the faces are a wash you can see through", code.indexOf("0.13 + q.light * 0.10") > -1, true);
+  /* It laid a wide soft pass under the bright one to fake a glow - measured,
+     that was a third of all the drawing for the least of the look. One fill
+     and one stroke now, and the line is a little stronger. */
   t("and the edges are what you read the shape from",
-    code.indexOf("g.lineWidth = wide") > -1 && code.indexOf("g.lineWidth = thin") > -1, true);
-  t("the glow is faked, not blurred - sixty blurred paths a frame is what cooks a phone",
-    code.indexOf("g.shadowBlur") === -1, true);
+    code.indexOf("g.strokeStyle = shade(q.c, 1.2, 0.95)") > -1, true);
+  t("one fill and one stroke, not two strokes",
+    (code.match(/g\.stroke\(/g) || []).length, 1);
+  t("and a face too small to see is not drawn at all",
+    code.indexOf("if(q.small) continue;") > -1, true);
+  t("thirty frames a second, not sixty",
+    code.indexOf("now - LAST < 32") > -1, true);
   t("every colour is pulled towards one light", code.indexOf("function parts3") > -1, true);
   t("but not all the way, or the parts cannot be told apart",
     code.indexOf("var m = 0.62;") > -1, true);
-  t("and it stands on something", code.indexOf("A grid under it") > -1, true);
+  /* the grid stopped moving when panning went, so eighteen strokes a frame
+     became one copy of a canvas drawn once */
+  t("and it stands on something", code.indexOf("function makeGrid") > -1, true);
+  t("drawn once and stamped, not eighteen strokes a frame",
+    code.indexOf("g.drawImage(GRID, 0, 0)") > -1, true);
   t("with lines across it and darker edges",
     grab("spec3dPage").indexOf("#scan") > -1 && grab("spec3dPage").indexOf("#vig") > -1, true);
   t("the name is sized for the screen, not for a square",
