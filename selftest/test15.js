@@ -52,8 +52,13 @@ const has = s => src.indexOf(s) > -1;
   t("serious is steadier than excited", moods.serious.stability > moods.excited.stability, true);
   t("calm is slower than normal", moods.calm.speed < moods.normal.speed, true);
   t("excited is quicker", moods.excited.speed > moods.normal.speed, true);
-  t("every mood but normal says how to write too",
-    Object.keys(moods).filter(k => k !== "normal").every(k => moods[k].tone.length > 10), true);
+  /* the two level ones say nothing about tone on purpose - composed is how
+     he starts, and the manner block already says how that sounds */
+  t("every mood that is not level says how to write too",
+    Object.keys(moods).filter(k => k !== "normal" && k !== "composed")
+      .every(k => moods[k].tone.length > 10), true);
+  t("composed is steadier than normal", moods.composed.stability > moods.normal.stability, true);
+  t("and less of a performance", moods.composed.style < moods.normal.style, true);
 
   const set = new Function(decl("MOODS") + grab("moodSet") +
     " return function(name, store){ this.store = store; return moodSet(name); };");

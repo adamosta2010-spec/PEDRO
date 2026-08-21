@@ -63,8 +63,15 @@ const t = (n, g, w) => {
   const pace = grab("gripSpinApply");
   t("each ring keeps its own pace", pace.indexOf("dataset.pace") > -1, true);
   t("and they are all scaled by the one rate", pace.indexOf("pace / rate") > -1, true);
-  t("the rings, the ticks and the globe all follow",
-    ["ring", "ticks", "globe", "pulse"].every(c => pace.indexOf(c) > -1), true);
+  t("the rings, the ticks and the circle all follow",
+    ["ring", "ticks", "disc", "sheen", "pulse"].every(c => pace.indexOf(c) > -1), true);
+  /* the pace of each ring is set by the state - listening turns faster - so a
+     pace read once and kept meant that after one drag he never changed again */
+  t("a pace read once is not kept forever", pace.indexOf("paceState") > -1, true);
+  t("at normal speed the stylesheet is left alone",
+    pace.indexOf("rate === 1 ? '' :") > -1, true);
+  t("and it is redone when he starts listening",
+    grab("hfSet").indexOf("gripSpinApply") > -1, true);
   t("how fast it was left is remembered", src.indexOf("grip.spin = g.spin || 1") > -1, true);
   t("and saved", src.indexOf("spin: grip.spin") > -1, true);
 }

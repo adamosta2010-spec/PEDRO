@@ -43,7 +43,9 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
         CAPPluginMethod(name: "calendarAdd",    returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "reminderAdd",    returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "contactFind",    returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "readFile",       returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "readFile",       returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "calendarNext",   returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "batteryLevel",   returnType: CAPPluginReturnPromise)
     ]
 
     // MARK: - on-device model
@@ -396,6 +398,21 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
         }
     }
 
+    /// Writing an event only needs write-only access, which is a smaller ask.
+    /// Reading what is coming up needs the full permission, so it is asked for
+    /// separately and only when something actually wants to read.
+    private func askToReadCalendar(_ done: @escaping (Bool, String) -> Void) {
+        if #available(iOS 17.0, *) {
+            events.requestFullAccessToEvents { granted, error in
+                done(granted, error?.localizedDescription ?? "")
+            }
+        } else {
+            events.requestAccess(to: .event) { granted, error in
+                done(granted, error?.localizedDescription ?? "")
+            }
+        }
+    }
+
     private func askForReminders(_ done: @escaping (Bool, String) -> Void) {
         if #available(iOS 17.0, *) {
             events.requestFullAccessToReminders { granted, error in
@@ -463,6 +480,76 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
             } catch {
                 call.reject("could not save it: " + error.localizedDescription)
             }
+        }
+    }
+
+    /// What is coming up, so he can say it without being asked twice.
+    /// Only the next few, only the near future, and nothing is kept.
+    @objc func calendarNext(_ call: CAPPluginCall) {
+        let hours = max(1, min(168, call.getInt("hours") ?? 24))
+        let limit = max(1, min(10, call.getInt("limit") ?? 3))
+        askToReadCalendar { [weak self] granted, why in
+            guard let self = self else { return }
+            guard granted else {
+                call.reject(why.isEmpty ? "the calendar is not allowed - turn it on in Settings" : why)
+                return
+            }
+            let from = Date()
+            let to = from.addingTimeInterval(TimeInterval(hours * 3600))
+            let calendars = self.events.calendars(for: .event)
+            guard !calendars.isEmpty else {
+                call.resolve(["events": [] as [Any]])
+                return
+            }
+            let query = self.events.predicateForEvents(withStart: from, end: to, calendars: calendars)
+            let found = self.events.events(matching: query)
+                .sorted { ($0.startDate ?? from) < ($1.startDate ?? from) }
+                .prefix(limit)
+            let shape = DateFormatter()
+            shape.dateFormat = "yyyy-MM-dd'T'HH:mm"
+            shape.locale = Locale(identifier: "en_US_POSIX")
+            let out: [[String: Any]] = found.map { e in
+                var row: [String: Any] = [
+                    "title": e.title ?? "Something",
+                    "allDay": e.isAllDay
+                ]
+                if let start = e.startDate {
+                    row["start"] = shape.string(from: start)
+                    row["inMinutes"] = Int(start.timeIntervalSinceNow / 60)
+                }
+                if let where_ = e.location, !where_.isEmpty { row["where"] = where_ }
+                return row
+            }
+            call.resolve(["events": out])
+        }
+    }
+
+    /// The battery. Safari has never had the web battery API, so from the page
+    /// this is unknowable - the phone answers instead.
+    @objc func batteryLevel(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            let device = UIDevice.current
+            let wasOn = device.isBatteryMonitoringEnabled
+            device.isBatteryMonitoringEnabled = true
+            let level = device.batteryLevel
+            let state = device.batteryState
+            if !wasOn { device.isBatteryMonitoringEnabled = false }
+            guard level >= 0 else {
+                call.reject("the phone will not say")
+                return
+            }
+            var how = "unknown"
+            switch state {
+            case .charging: how = "charging"
+            case .full: how = "full"
+            case .unplugged: how = "unplugged"
+            default: how = "unknown"
+            }
+            call.resolve([
+                "percent": Int((level * 100).rounded()),
+                "state": how,
+                "low": device.batteryLevel <= 0.2 && state != .charging
+            ])
         }
     }
 

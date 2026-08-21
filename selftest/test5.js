@@ -41,6 +41,11 @@ var allLessons = function(){ return lessons().concat(HOUSE_LESSONS); };
 eval(declOf("MOODS"));
 var moodNow = function(){ return MOODS.normal; };
 eval(declOf("MASTER_WRITTEN"));
+/* how he speaks - composed and British, or nothing at all */
+eval((typeof declOf === "function" ? declOf : decl)("MANNERS"));
+eval((typeof declOf === "function" ? declOf : decl)("MANNER_REPLACES"));
+eval("var mannerBlock = " + grab("mannerBlock").replace("function mannerBlock", "function") + ";");
+eval("var promptWithout = " + grab("promptWithout").replace("function promptWithout", "function") + ";");
 eval(["MEMORY_RULES", "REMEMBER_RE", "FORGET_RE"].map(grabVar).join("\n") +
      "\n" + names.map(grab).join("\n"));
 

@@ -90,7 +90,10 @@ if(ok){
     ["keydown on textarea attached", !!(L["input"] && L["input"]["keydown"])],
     ["attach button attached", !!(L["btnAttach"] && L["btnAttach"]["click"])],
     ["mic attached", !!(L["btnMic"] && L["btnMic"]["click"])],
-    ["picture button attached", !!(L["btnImg"] && L["btnImg"]["click"])],
+    /* He is a voice assistant - a picture is the one thing he cannot say. The
+       button used to say "Next message makes a picture" and then answer in
+       words, which is worse than not having it. */
+    ["there is no picture button to lie about it", !L["btnImg"]],
     ["settings button attached", !!(L["btnSettings"] && L["btnSettings"]["click"])],
     ["theme button attached", !!(L["btnTheme"] && L["btnTheme"]["click"])],
     ["new chat attached", !!(L["btnNew"] && L["btnNew"]["click"])],

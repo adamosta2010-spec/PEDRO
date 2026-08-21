@@ -14,16 +14,13 @@ function grab(name){
 /* the prompt names the apps Pedro can open; the list itself is not what these test */
 const appList = () => "maps, music, spotify, messages, phone, web";
 const names = ["activeGeminiModel","fastGeminiModel","bestModel","modelTier","modelVersion","studies","studyFor","studyOf","forgetStudy","shortContext","providerLabel","apiErrorBody","noKeyYet","trimImages","memories","recallFor","isDevice","inApp","isGemini","isGroq","isLocal","isOpenAIStyle","allKeys","apiKeyNow","systemPrompt","taughtBlock","pickLessons","relevance","lessons","facts","claudeContent","geminiParts",
-               "claudeRequest","geminiRequest","buildRequest","wantsPicture","esc","shots"];
+               "claudeRequest","geminiRequest","buildRequest","esc","shots"];
 let store = { settings:{ provider:"gemini", aiName:"Pedro", apiKey:"sk-x", geminiKey:"AIzaTEST",
-  model:"claude-opus-5", geminiModel:"gemini-2.5-flash", imageModel:"gemini-2.5-flash-image",
+  model:"claude-opus-5", geminiModel:"gemini-2.5-flash",
   effort:"low", groqKey:"", groqModel:"llama-3.3-70b-versatile", localUrl:"http://localhost:11434", localModel:"qwen2.5:7b", name:"Adam", about:"", facts:[], lessons:[], memories:[], studies:[] } };
-let voiceMode = false, imgMode = false;
+let voiceMode = false;
 let fastMode = false;   /* the quick path, used for building animations */
 const isLocked = () => false;
-/* DRAW_RE lives at module scope in the app */
-const DRAW_SRC = src.match(/var DRAW_RE = (\/.*\/i);/)[1];
-eval("var DRAW_RE = " + DRAW_SRC + ";");
 /* the prompt is built from a plain declaration as well as from functions */
 const { decl: declOf } = require("./lib").reader(src);
 eval(declOf("MASTER_PROMPT"));
@@ -39,6 +36,11 @@ var activeChat = function(){ return null; };
 eval(declOf("SUM_AFTER"));
 eval("var summaryOf = " + grab("summaryOf").replace("function summaryOf", "function") + ";");
 eval(declOf("MASTER_WRITTEN"));
+/* how he speaks - composed and British, or nothing at all */
+eval((typeof declOf === "function" ? declOf : decl)("MANNERS"));
+eval((typeof declOf === "function" ? declOf : decl)("MANNER_REPLACES"));
+eval("var mannerBlock = " + grab("mannerBlock").replace("function mannerBlock", "function") + ";");
+eval("var promptWithout = " + grab("promptWithout").replace("function promptWithout", "function") + ";");
 eval(names.map(grab).join("\n"));
 
 let fail = 0, pass = 0;
@@ -71,19 +73,13 @@ t("claude request carries the photo",
   buildRequest(withPhoto).body.messages[0].content[0].source.data, "AAAA");
 store.settings.provider = "gemini";
 
-/* ---- picture-request detection ---- */
-t("draw me a picture", wantsPicture("draw me a picture of a fox"), true);
-t("generate an image", wantsPicture("generate an image of a castle"), true);
-t("make me a logo", wantsPicture("make me a logo for my game"), true);
-t("normal question is not a draw", wantsPicture("what is the capital of Peru"), false);
-t("asking about a picture is not a draw", wantsPicture("what is in this picture"), false);
-t("code question is not a draw", wantsPicture("create a function that sorts an array"), false);
-store.settings.provider = "claude";
-t("claude never auto-draws", wantsPicture("draw me a picture of a fox"), false);
-store.settings.provider = "gemini";
-imgMode = true;
-t("manual picture mode forces it", wantsPicture("a red bicycle"), true);
-imgMode = false;
+/* Picture-making is gone: he is a voice assistant, and a picture is the one
+   thing he cannot say. Reading one still works - that is the camera, and it
+   is the other direction. */
+t("nothing here makes pictures any more", src.indexOf("function drawPicture") > -1, false);
+t("and nothing decides that a question was a request for one",
+  src.indexOf("var DRAW_RE") > -1, false);
+/* reading a photo is untouched - it is tested where the attachments are */
 
 /* ---- rendering ---- */
 t("no images renders nothing", shots({content:"hi"}), "");

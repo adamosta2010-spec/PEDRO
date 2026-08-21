@@ -61,17 +61,16 @@ t("on the website it explains the app is needed",
 t("the Web Speech API is gone from the app entirely",
   src.includes("webkitSpeechRecognition") || src.includes("new SR()"), false);
 
-/* ---- picture recovery is actually wired up ---- */
-const draw = grab("drawPicture");
-t("drawPicture takes a retry flag", /function drawPicture\(c, prompt, attach, retried\)/.test(draw), true);
-t("it reloads the model list on a stale model", draw.includes("loadGeminiModels"), true);
-t("it picks a different picture model",
-  draw.includes("id !== store.settings.imageModel"), true);
-t("it retries once, not forever", draw.includes("drawPicture(c, prompt, attach, true)") &&
-  draw.includes("!retried"), true);
-t("no image models at all is explained",
-  /no picture models/i.test(draw), true);
-t("a cancelled draw stays silent", draw.includes('err.name === "AbortError"'), true);
+/* ---- picture-making is gone ---- */
+/* The branch that made one went first, and the button, the tool card and the
+   model setting stayed - so it said "Next message makes a picture" and then
+   answered in words. A control that lies is worse than one that is missing. */
+t("nothing draws any more", src.indexOf("function drawPicture") > -1, false);
+t("nor asks Gemini for a picture", src.indexOf("function generateImage") > -1, false);
+t("there is no picture mode to be in", src.indexOf("var imgMode") > -1, false);
+t("no button for it", src.indexOf('id="btnImg"') > -1, false);
+t("no card for it either", src.indexOf('data-tool="img"') > -1, false);
+t("and no setting for which model drew them", src.indexOf("imageModel") > -1, false);
 
 /* ---- hands-free has to use whichever recogniser the device actually has ---- */
 /* the failure mode here is silence: the orb says Listening and nothing happens */
@@ -197,7 +196,13 @@ function nativeFrom(cap, exp){
   const inSrc = bit => src.indexOf(bit) > -1;
   const pv = grab("pickVoice");
   t("a chosen voice beats the automatic pick", pv.indexOf("store.settings.voiceName") > -1, true);
-  t("the automatic pick prefers the human-sounding ones", pv.indexOf("voiceIsGood") > -1, true);
+  t("the automatic pick is ranked, not filtered", pv.indexOf("phoneScore") > -1, true);
+  t("and still prefers the human-sounding ones",
+    grab("phoneScore").indexOf("voiceIsGood") > -1, true);
+  /* filtering on British first meant a phone with no British voice got nothing
+     and fell back to the robot - so it is a score, not a filter */
+  t("a phone with no British voice still gets its best one",
+    grab("phoneScore").indexOf("voiceIsBritish") > -1 && pv.indexOf("ranked[0]") > -1, true);
   t("one place decides what sounds human",
     grab("voiceIsGood").indexOf("siri|premium|enhanced|natural|neural") > -1, true);
   t("choosing again re-picks rather than keeping the old one",
@@ -543,13 +548,15 @@ function nativeFrom(cap, exp){
   const inSrc = bit => src.indexOf(bit) > -1;
   const inPage = bit => page.indexOf(bit) > -1;
 
-  t("the reactor is drawn, not borrowed", inPage('<span class="ball"></span>'), true);
-  t("nothing in the middle depends on an icon",
-    inPage('<span class="core"><svg><use href="#bot"/></svg></span>'), false);
-  t("the ball glows", inPage("box-shadow:") && inPage("ballGlow"), true);
-  t("it has reactor segments", inPage("conic-gradient"), true);
-  t("it reacts while he listens", inPage("#hfOrb.hear .ball"), true);
-  t("and while he talks", inPage("#hfOrb.talk .ball"), true);
+  /* The cyan ball used to be painted on top of the new circle - .core came
+     after .disc in the markup - so the thing that was supposed to have gone
+     was the thing you actually saw. */
+  t("the old ball is gone from the markup", inPage('<span class="ball"></span>'), false);
+  t("and so is the core it sat in", inPage('<span class="core">'), false);
+  t("and its styling with it", inPage("ballGlow") || inPage("#hfOrb .swirl"), false);
+  t("nothing is left of the orbits either", inPage("#hfOrb .orbits"), false);
+  t("it still reacts while he listens", inPage("#hfOrb.hear .disc"), true);
+  t("and while he talks", inPage("#hfOrb.talk .disc"), true);
 
   t("there is a dock", inPage('id="dock"'), true);
   t("it opens a panel", inSrc("function dockToggle"), true);
@@ -560,48 +567,56 @@ function nativeFrom(cap, exp){
   t("and a way to the rest", inSrc('$("dockMore")'), true);
 
   t("the pause before he answers is shorter", inSrc("}, 900);"), true);
-  t("the new voice is the default", inSrc('elevenVoice:"IKne3meq5aSn9XLyUdCD"'), true);
-  /* every older voice is moved across now, not just the one */
-  t("and anyone on an older one is moved across",
-    inSrc("elevenVoice !== "), true);
+  /* A voice id in this file is a guess about somebody else's account. It is
+     asked for now, and one already picked by hand is kept. */
+  t("no voice is assumed", inSrc('elevenVoice:""'), true);
+  t("their account is asked what it has", inSrc("function elevenList"), true);
+  t("and the most JARVIS-sounding one is taken", inSrc("function elevenChooseVoice"), true);
+  t("a phone that had one forced on it is cleared",
+    inSrc('store.settings.elevenVoice === "IKne3meq5aSn9XLyUdCD"'), true);
   t("and none of the old ids are left behind",
     !inSrc("Pno1sSZ9LihyDUpvtooA") && !inSrc("wDsJlOXPqcvIUKdLXjDs"), true);
 }
 
 
-/* ---- the reactor keeps moving ---- */
+/* ---- the circle in the middle ---- */
 {
   const page = require("fs").readFileSync("index.html", "utf8");
   const inPage = bit => page.indexOf(bit) > -1;
-  t("the ball is lit when nothing is happening", inPage("#hfOrb.wait .ball{animation-duration"), true);
-  t("it has orbits around it", inPage("#hfOrb .orbits{"), true);
-  t("three of them, tilted", inPage("#hfOrb .o1{") && inPage("#hfOrb .o2{") && inPage("#hfOrb .o3{"), true);
-  t("each carries a light", inPage("#hfOrb .orbits i b{"), true);
-  t("there is a ring of ticks", inPage("#hfOrb .ticks{"), true);
-  t("the ball turns inside the glass", inPage("#hfOrb .swirl{"), true);
-  t("the orbits are in the markup too", inPage('<i class="o1"><b></b></i>'), true);
-  t("it stops spinning for anyone who dislikes motion",
-    inPage("#hfOrb .mer, #hfOrb .lat{animation:none"), true);
-}
 
+  /* The globe was thirty-odd elements in a preserve-3d context, which is the
+     most expensive way a phone can draw anything. Adam asked for a flat circle,
+     blue running into white, with some movement. */
+  t("there is a circle", inPage('<span class="disc">'), true);
+  t("it is round", inPage("#hfOrb .disc{") && inPage("border-radius:50%"), true);
+  t("blue running into white", inPage("radial-gradient(circle at 34% 28%"), true);
+  t("white at the top left", inPage("#ffffff 0%"), true);
+  t("and deep blue at the far edge", inPage("#142a72 100%"), true);
+  t("it breathes", inPage("discBreathe"), true);
+  t("and a sheen turns across it", inPage("discTurn"), true);
+  t("which is what stops it looking painted on", inPage("conic-gradient(from 0deg"), true);
+  t("it quickens while he speaks", inPage("#hfOrb.talk .disc{ animation-duration:2.1s }"), true);
+  t("and gets out of the way for a simulation", inPage("#hfOrb.showing .disc{display:none}"), true);
 
-/* ---- the globe ---- */
-{
-  const page = require("fs").readFileSync("index.html", "utf8");
-  const css = page.match(/<style>([\s\S]*?)<\/style>/)[1];
-  const inPage = bit => page.indexOf(bit) > -1;
-  const count = (re) => (css.match(re) || []).length;
+  /* the globe really is gone, not merely hidden */
+  t("no meridians left in the markup", inPage('<i class="m11"></i>'), false);
+  t("no latitudes either", inPage('<i class="l6"></i>'), false);
+  t("and nothing is drawn in 3D any more", inPage("transform-style:preserve-3d"), false);
 
-  t("the globe is made of meridians", count(/#hfOrb .mer .m/g) >= 12, true);
-  t("and latitudes", count(/#hfOrb .lat .l/g) >= 7, true);
-  t("they are in the markup as well", inPage('<i class="m11"></i>'), true);
-  t("the two layers turn against each other",
-    inPage("#hfOrb .lat{animation:hudSpinY 26s linear infinite reverse}"), true);
-  t("the sphere is a real one, not a flat picture", inPage("transform-style:preserve-3d"), true);
+  /* one ring is left, and it turns slowly */
+  t("there is still a ring", inPage("#hfOrb .ring{"), true);
+  t("turning slowly", inPage("#hfOrb .r2{ animation-duration:26s }"), true);
+  /* the circle he asked to be animated was landing inside a blanket
+     animation:none, so it never moved once */
+  t("and the circle is not switched off with them",
+    inPage("#hfOrb .disc, #hfOrb .disc .sheen{ animation:none !important }"), false);
+  t("the middle ring carries the reticle", inPage("#hfOrb .r3{inset:13%"), true);
+  /* what costs a phone is animating layout, not the number of things moving */
+  t("nothing animates a height any more",
+    inPage("to{height:52px") || inPage("to{height:19px"), false);
+  t("the bars scale instead", inPage("transform:scaleY(1)"), true);
+  t("and the sheen does not blend", inPage("    mix-blend-mode:screen;"), false);
 
-  /* translateZ takes a length; a percentage silently kills the whole rule */
-  t("no latitude uses a percentage length", (css.match(/translateZ" + String.fromCharCode(92) + "([^)]*%[^)]*" + String.fromCharCode(92) + ")/g) || []).length, 0);
-  t("they are sized from the orb itself", inPage("translateZ(calc(var(--orb)"), true);
   t("the orb fits a phone screen", inPage("--orb:min(300px, 78vw, 34vh)"), true);
 }
 
@@ -641,9 +656,9 @@ function nativeFrom(cap, exp){
   t("a provider that cannot stream still answers", inSrc("if(isDevice() || !isGemini()) return askOnce(c);"), true);
 
   t("the simulation runs inside the ball", page.indexOf('id="orbViz"') > -1, true);
-  t("the globe fades back while it plays", page.indexOf("#hfOrb.showing .globe") > -1, true);
+  t("the circle gets out of the way while it plays", page.indexOf("#hfOrb.showing .disc") > -1, true);
   t("it is still walled off", page.indexOf('id="orbViz" sandbox="allow-scripts"') > -1, true);
-  t("tapping the ball puts the globe back", inSrc("if(vizStop()) return;"), true);
+  t("tapping it puts the circle back", inSrc("if(vizStop()) return;"), true);
   t("and stops whatever was running", grab("vizStop").indexOf("srcdoc = ''") > -1, true);
 }
 
@@ -875,11 +890,14 @@ function nativeFrom(cap, exp){
   t("they can be picked up and moved", grab("handsOn").indexOf("panelWhere(held.dataset.panel") > -1, true);
   t("and stay where they were put", inSrc("function panelWhere"), true);
 
-  const small = new Function('store','save','speak','hudLog','hudSync','banner',
+  /* the time, the date and the weather are answered before any of this and are
+     tested on their own - stubbed here so a timer is what is being tested */
+  const small = new Function('store','save','speak','hudLog','hudSync','banner','rightNow',
     'var runningTimer=null;' + v("TIMER_RE") + v("COIN_RE") + v("DICE_RE") +
     grab("startTimer") + grab("timerLeft") + grab("theSmallThings") +
     '; return { go: theSmallThings, left: timerLeft };')
-    ({ settings:{} }, function(){}, function(){}, function(){}, function(){}, function(){});
+    ({ settings:{} }, function(){}, function(){}, function(){}, function(){}, function(){},
+     function(){ return false; });
   t("a timer is set without asking anyone", small.go("set a timer for 5 minutes"), true);
   t("seconds work too", small.go("timer for 30 seconds"), true);
   t("a coin can be flipped", small.go("flip a coin"), true);

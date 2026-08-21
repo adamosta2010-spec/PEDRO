@@ -110,6 +110,9 @@ jobs:
           # the phone will end the app outright if it asks for these without saying why
           /usr/libexec/PlistBuddy -c "Add :NSCalendarsUsageDescription string 'Pedro puts things in your calendar when you ask him to.'" "$PLIST" || true
           /usr/libexec/PlistBuddy -c "Add :NSCalendarsWriteOnlyAccessUsageDescription string 'Pedro puts things in your calendar when you ask him to.'" "$PLIST" || true
+          # reading what is coming up is a separate permission on iOS 17 - without
+          # this key the app is ended the moment it asks
+          /usr/libexec/PlistBuddy -c "Add :NSCalendarsFullAccessUsageDescription string 'Pedro reads what is coming up so he can tell you before it starts.'" "$PLIST" || true
           /usr/libexec/PlistBuddy -c "Add :NSRemindersUsageDescription string 'Pedro sets reminders when you ask him to.'" "$PLIST" || true
           /usr/libexec/PlistBuddy -c "Add :NSRemindersFullAccessUsageDescription string 'Pedro sets reminders when you ask him to.'" "$PLIST" || true
           /usr/libexec/PlistBuddy -c "Add :NSContactsUsageDescription string 'Pedro looks up a number when you ask him to call or message someone.'" "$PLIST" || true
@@ -159,7 +162,7 @@ jobs:
           PL=ios/App/build/Build/Products/Release-iphoneos/App.app/Info.plist
           /usr/libexec/PlistBuddy -c "Print :UIBackgroundModes" "$PL" | grep -q audio || { echo "background audio is not declared"; exit 1; }
           echo "  background listening is declared"
-          for k in NSMicrophoneUsageDescription NSSpeechRecognitionUsageDescription NSCameraUsageDescription NSPhotoLibraryUsageDescription NSCalendarsUsageDescription NSRemindersUsageDescription NSContactsUsageDescription; do
+          for k in NSMicrophoneUsageDescription NSSpeechRecognitionUsageDescription NSCameraUsageDescription NSPhotoLibraryUsageDescription NSCalendarsUsageDescription NSCalendarsFullAccessUsageDescription NSRemindersUsageDescription NSContactsUsageDescription; do
             if /usr/libexec/PlistBuddy -c "Print :$k" "$PL" >/dev/null 2>&1; then
               echo "  declared $k"
             else

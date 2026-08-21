@@ -18,11 +18,12 @@ const t = (n, g, w) => {
    so the harness has to carry all of them */
 const COMMAND_PATTERNS = ["BUILD_MODE_RE", "OPEN_RE", "CLOSE_RE", "HIDE_RE", "STOP_RE",
   "PAUSE_RE", "RESUME_RE", "VIZ_RE", "VIZ_HINT_RE", "STUDY_RE", "UNSTUDY_RE", "EDIT_RE",
-  "UNDO_RE", "TIMER_RE", "COIN_RE", "DICE_RE", "CAM_RE", "DRAW_RE", "REMEMBER_RE",
+  "UNDO_RE", "TIMER_RE", "COIN_RE", "DICE_RE", "CAM_RE", "REMEMBER_RE",
   "FORGET_RE", "HIGHLIGHT_RE"];
 const worth = new Function("appNamed",
   COMMAND_PATTERNS.map(decl).join("\n") + "\n" +
   decl("PEDRO_PANELS") + "\n" +
+  decl("NOW_RE") + "\n" +
   decl("HF_FILLER") + "\n" + decl("HF_SHORT_ASK") + "\n" +
   grab("isACommand") + "\n" + grab("worthAnswering") +
   "\n return worthAnswering;")(function(){ return null; });
@@ -86,16 +87,52 @@ t("so does a one word answer to his question", worth("yes"), true);
     has("App-Prefs: is private"), true);
 }
 
-/* ---- one voice ---- */
+/* ---- the voice is chosen, not guessed ----
+   A voice id written into this file is a guess about somebody else's account:
+   if it is not in theirs, every sentence fails and he falls back to the phone.
+   The account is asked instead, and what comes back is ranked. */
 {
-  const { decl: declIt } = require("./lib").reader(src);
+  const { decl: declIt, grab: grabIt } = require("./lib").reader(src);
   const voices = new Function(declIt("ELEVEN_VOICES") + " return ELEVEN_VOICES;")();
-  t("there is one voice", voices.length, 1);
-  t("and it is the new one", voices[0].id, "IKne3meq5aSn9XLyUdCD");
+  t("nothing is assumed about their account", voices.length, 0);
+  t("no voice id is baked into the file",
+    src.indexOf("IKne3meq5aSn9XLyUdCD") === src.lastIndexOf("IKne3meq5aSn9XLyUdCD"), true);
   t("none of the old ones are left",
     src.indexOf("Pno1sSZ9LihyDUpvtooA") === -1 && src.indexOf("wDsJlOXPqcvIUKdLXjDs") === -1, true);
-  t("a phone with an older one saved is moved across",
-    src.indexOf('store.settings.elevenVoice !== "IKne3meq5aSn9XLyUdCD"') > -1, true);
+  t("a phone that had one forced on it is cleared",
+    src.indexOf('store.settings.elevenVoice === "IKne3meq5aSn9XLyUdCD"') > -1, true);
+  t("and the line that overwrote the choice on every start is gone",
+    src.indexOf('store.settings.elevenVoice !== "IKne3meq5aSn9XLyUdCD"') === -1, true);
+
+  /* the ranking itself */
+  const score = new Function(declIt("JARVIS_FIRST") + grabIt("voiceScore") + " return voiceScore;")();
+  const v = (name, accent, gender, about) =>
+    ({ name, labels: { accent, gender, description: about || "" } });
+  t("a British man outranks an American one",
+    score(v("Daniel","british","male")) > score(v("Josh","american","male")), true);
+  t("and outranks a British woman",
+    score(v("Daniel","british","male")) > score(v("Alice","british","female")), true);
+  t("calm and authoritative beats excitable",
+    score(v("A","british","male","calm authoritative")) >
+    score(v("B","british","male","excited energetic")), true);
+  t("a voice with no labels at all still scores something",
+    typeof score({ name:"Whoever" }), "number");
+  t("and the whole list is asked for, not assumed",
+    grabIt("elevenList").indexOf("api.elevenlabs.io/v1/voices") > -1, true);
+  t("a refusal is not remembered forever",
+    grabIt("elevenList").indexOf("elevenListed = null") > -1, true);
+  t("one already chosen by hand is kept",
+    grabIt("elevenChooseVoice").indexOf("store.settings.elevenVoice &&") > -1, true);
+
+  /* the phone's own voice, for no key and no signal */
+  const phone = new Function("store", declIt("PHONE_BRITISH") + declIt("PHONE_MALE") +
+    grabIt("voiceIsGood") + grabIt("voiceIsBritish") + grabIt("phoneScore") +
+    " return phoneScore;")({ settings:{ manner:"jarvis" } });
+  const pv = (name, lang) => ({ name, lang: lang || "en-US" });
+  t("Daniel is the one on an iPhone", phone(pv("Daniel","en-GB")) > phone(pv("Samantha","en-US")), true);
+  t("a British voice beats an American one", phone(pv("Arthur","en-GB")) > phone(pv("Alex","en-US")), true);
+  t("and Enhanced still counts for something",
+    phone(pv("Alex (Enhanced)","en-US")) > phone(pv("Fred","en-US")), true);
 }
 
 /* ---- typing instead of speaking ---- */

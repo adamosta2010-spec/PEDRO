@@ -205,10 +205,12 @@ const when = new Function(grab("whenIsThat") + " return whenIsThat;")();
     sw.indexOf("yyyy-MM-dd'T'HH:mm") > -1, true);
 
   const wf = fs.readFileSync(".github/workflows/build-ios.yml", "utf8");
-  ["NSCalendarsUsageDescription", "NSRemindersUsageDescription", "NSContactsUsageDescription"]
+  ["NSCalendarsUsageDescription", "NSCalendarsFullAccessUsageDescription",
+   "NSRemindersUsageDescription", "NSContactsUsageDescription"]
     .forEach(k => t(k + " is declared, or the phone ends the app", wf.indexOf(k) > -1, true));
   t("and they are checked after the build",
-    wf.indexOf("NSCalendarsUsageDescription NSRemindersUsageDescription NSContactsUsageDescription") > -1, true);
+    wf.indexOf("NSCalendarsUsageDescription NSCalendarsFullAccessUsageDescription " +
+                "NSRemindersUsageDescription NSContactsUsageDescription") > -1, true);
 }
 
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " doing-things tests passed");

@@ -27,5 +27,6 @@ node selftest/test12.js index.html | tail -1
 node selftest/test13.js index.html | tail -1
 node selftest/test14.js index.html | tail -1
 node selftest/test15.js index.html | tail -1
+node selftest/test16.js index.html | tail -1
 node selftest/test10.js index.html | tail -1
 rm -f selftest/_app.js

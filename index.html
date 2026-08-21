@@ -259,20 +259,21 @@
   /* the bars only move while he is actually speaking */
   .vwave{display:none; align-items:flex-end; gap:3px; height:20px; flex:none}
   #voiceBar.speaking .vwave{display:flex}
-  .vwave i{width:3px; height:6px; border-radius:2px; background:var(--a1);
+  .vwave i{width:3px; height:19px; border-radius:2px; background:var(--a1);
+    transform:scaleY(.26); transform-origin:bottom; will-change:transform;
     animation:vbBar .6s ease-in-out infinite alternate}
   .vwave i:nth-child(2){animation-delay:.12s}
   .vwave i:nth-child(3){animation-delay:.24s}
   .vwave i:nth-child(4){animation-delay:.06s}
   .vwave i:nth-child(5){animation-delay:.18s}
-  @keyframes vbBar{from{height:5px; opacity:.55} to{height:19px; opacity:1}}
+  /* scaled, not resized - a height is a layout on every frame */
+  @keyframes vbBar{from{transform:scaleY(.26); opacity:.55} to{transform:scaleY(1); opacity:1}}
 
   @media(prefers-reduced-motion:reduce){
     #voiceBar, #voiceBar *{animation:none !important}
-    .vwave i{height:12px}
+    .vwave i{transform:scaleY(.63)}
     /* the reactor still glows, it just stops spinning */
-    #hfOrb .ticks, #hfOrb .orbits i, #hfOrb .spokes, #hfOrb .swirl,
-    #hfOrb .mer, #hfOrb .lat{animation:none !important}
+    #hfOrb .ticks, #hfOrb .ring, #hfOrb .disc, #hfOrb .disc .sheen{animation:none !important}
   }
 
   /* ============ panels ============ */
@@ -466,16 +467,8 @@
   #hfOrb .r2{inset:20px;border-style:dashed;
     border-color:color-mix(in srgb,var(--hud) 26%,transparent);
     animation:hudSpin 19s linear infinite reverse}
-  #hfOrb .r3{inset:40px;
-    border-color:color-mix(in srgb,var(--hud) 16%,transparent);
-    border-bottom-color:var(--hud);border-left-color:var(--hud);
-    animation:hudSpin 4.2s linear infinite}
   @keyframes hudSpin{to{transform:rotate(360deg)}}
 
-  /* The core: a blue ball that lights the whole middle. Drawn here rather than
-     borrowed from an icon, which is what left the centre black. */
-  #hfOrb .core{position:absolute;inset:26%;display:grid;place-items:center;border-radius:50%}
-  /* a swirl inside the glass, so the ball reads as turning rather than static */
   /* a ring of ticks, like a dial */
   #hfOrb .ticks{position:absolute;inset:2%;border-radius:50%;
     background:repeating-conic-gradient(from 0deg,
@@ -484,73 +477,13 @@
     mask:radial-gradient(circle, transparent 88%, #000 89%, #000 96%, transparent 97%);
     animation:hudSpin 40s linear infinite}
 
-  /* A wireframe globe: circles turned about the vertical axis make the
-     meridians, flat circles stacked up the axis make the latitudes. The two
-     layers turn against each other so it never reads as a flat picture. */
-  #hfOrb .globe{position:absolute;inset:9%;transform-style:preserve-3d;
-    perspective:700px;pointer-events:none}
-  #hfOrb .mer,#hfOrb .lat{position:absolute;inset:0;transform-style:preserve-3d}
-  #hfOrb .mer{animation:hudSpinY 16s linear infinite}
-  #hfOrb .lat{animation:hudSpinY 26s linear infinite reverse}
-  #hfOrb .mer i,#hfOrb .lat i{position:absolute;inset:0;border-radius:50%;
-    border:1px solid color-mix(in srgb,var(--hud) 34%,transparent);
-    box-shadow:0 0 6px color-mix(in srgb,var(--hud) 20%,transparent)}
-  #hfOrb .lat i{border-color:color-mix(in srgb,var(--hud) 26%,transparent)}
-  #hfOrb .mer .m0{transform:rotateY(0deg)}
-  #hfOrb .mer .m1{transform:rotateY(15deg)}
-  #hfOrb .mer .m2{transform:rotateY(30deg)}
-  #hfOrb .mer .m3{transform:rotateY(45deg)}
-  #hfOrb .mer .m4{transform:rotateY(60deg)}
-  #hfOrb .mer .m5{transform:rotateY(75deg)}
-  #hfOrb .mer .m6{transform:rotateY(90deg)}
-  #hfOrb .mer .m7{transform:rotateY(105deg)}
-  #hfOrb .mer .m8{transform:rotateY(120deg)}
-  #hfOrb .mer .m9{transform:rotateY(135deg)}
-  #hfOrb .mer .m10{transform:rotateY(150deg)}
-  #hfOrb .mer .m11{transform:rotateY(165deg)}
-  #hfOrb .lat .l0{transform:rotateX(90deg) translateZ(calc(var(--orb) * -0.3075)) scale(0.661)}
-  #hfOrb .lat .l1{transform:rotateX(90deg) translateZ(calc(var(--orb) * -0.2050)) scale(0.866)}
-  #hfOrb .lat .l2{transform:rotateX(90deg) translateZ(calc(var(--orb) * -0.1025)) scale(0.968)}
-  #hfOrb .lat .l3{transform:rotateX(90deg) translateZ(calc(var(--orb) * 0.0000)) scale(1.000)}
-  #hfOrb .lat .l4{transform:rotateX(90deg) translateZ(calc(var(--orb) * 0.1025)) scale(0.968)}
-  #hfOrb .lat .l5{transform:rotateX(90deg) translateZ(calc(var(--orb) * 0.2050)) scale(0.866)}
-  #hfOrb .lat .l6{transform:rotateX(90deg) translateZ(calc(var(--orb) * 0.3075)) scale(0.661)}
-  @keyframes hudSpinY{to{transform:rotateY(360deg)}}
-
-  /* three orbits, tilted, each carrying a light around */
-  #hfOrb .orbits{position:absolute;inset:-7%;pointer-events:none;perspective:600px}
-  #hfOrb .orbits i{position:absolute;inset:0;border-radius:50%;
-    border:1px solid color-mix(in srgb,var(--hud) 30%,transparent)}
-  #hfOrb .orbits i b{position:absolute;top:-3px;left:50%;width:6px;height:6px;margin-left:-3px;
-    border-radius:50%;background:var(--hud);
-    box-shadow:0 0 10px 2px color-mix(in srgb,var(--hud) 80%,transparent)}
-  #hfOrb .o1{transform:rotateX(74deg);animation:hudSpin 9s linear infinite}
-  #hfOrb .o2{transform:rotateX(74deg) rotateY(62deg);animation:hudSpin 14s linear infinite reverse}
-  #hfOrb .o3{transform:rotateX(66deg) rotateY(-58deg);animation:hudSpin 21s linear infinite}
-
-  #hfOrb .swirl{position:absolute;inset:14%;border-radius:50%;mix-blend-mode:screen;opacity:.55;
-    background:conic-gradient(from 0deg,
-      transparent 0 30deg, color-mix(in srgb,#bff3ff 65%,transparent) 60deg,
-      transparent 110deg 200deg, color-mix(in srgb,#7fe4ff 55%,transparent) 250deg, transparent 300deg);
-    animation:hudSpin 5.5s linear infinite}
-  #hfOrb .ball{position:absolute;inset:14%;border-radius:50%;
-    background:
-      radial-gradient(circle at 50% 42%, #ffffff 0%, #bff3ff 14%, #35d7f5 34%, #0a86c9 62%, #04314f 100%);
-    box-shadow:
-      0 0 22px 2px color-mix(in srgb,var(--hud) 75%,transparent),
-      0 0 60px 12px color-mix(in srgb,var(--hud) 45%,transparent),
-      inset 0 0 22px color-mix(in srgb,#eafcff 55%,transparent);
-    animation:ballGlow 3.6s ease-in-out infinite}
-  /* the segments around it, like a reactor */
-  #hfOrb .spokes{position:absolute;inset:0;border-radius:50%;
-    background:conic-gradient(from 0deg,
-      color-mix(in srgb,var(--hud) 62%,transparent) 0 6deg, transparent 6deg 30deg);
-    -webkit-mask:radial-gradient(circle, transparent 56%, #000 58%, #000 76%, transparent 78%);
-    mask:radial-gradient(circle, transparent 56%, #000 58%, #000 76%, transparent 78%);
-    animation:hudSpin 12s linear infinite}
-  @keyframes ballGlow{
-    0%,100%{transform:scale(1);filter:brightness(1)}
-    50%{transform:scale(1.05);filter:brightness(1.25)}}
+  /* Three rings round it, at different speeds, so it reads as a machine paying
+     attention. The middle one carries two bright arcs - the reticle. */
+  #hfOrb .r3{inset:13%;border-style:solid;
+    border-color:transparent;
+    border-left-color:color-mix(in srgb,var(--hud) 85%,transparent);
+    border-right-color:color-mix(in srgb,var(--hud) 85%,transparent);
+    animation:hudSpin 6.5s linear infinite}
 
   /* Whatever he builds runs inside the ball itself: the globe fades back, the
      drawing fades in, and it is still walled off in its own frame. */
@@ -562,23 +495,25 @@
      to most of the screen. A simulation in a circle a sixth of the screen wide
      is not worth looking at. */
   #hfOrb.showing{--orb:min(94vw, 74vh);}
-  #hfOrb.showing .globe,
-  #hfOrb.showing .core,
+  #hfOrb.showing .disc{display:none}
   #hfOrb.showing .ring,
   #hfOrb.showing .pulse,
-  #hfOrb.showing .ticks,
-  #hfOrb.showing .spokes{opacity:0;pointer-events:none;transition:opacity .3s ease}
+  #hfOrb.showing .ticks{opacity:0;pointer-events:none;transition:opacity .3s ease}
   /* square, not a porthole - a plane in a circle loses its wings */
   #hfOrb.showing #orbViz{inset:0;width:100%;height:100%;border-radius:16px;
     border:1px solid color-mix(in srgb,var(--hud) 25%,transparent)}
-  #hfOrb .globe,#hfOrb .core{transition:opacity .4s ease}
+  #hfOrb .ring,#hfOrb .ticks{transition:opacity .4s ease}
 
   /* the bars only move while he is actually talking, so you can see it is him */
   #hfOrb .wave{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
     gap:4px;pointer-events:none}
   #hfOrb.talk .wave{display:flex}
-  #hfOrb .wave i{width:3px;height:8px;border-radius:2px;background:var(--hud);
-    opacity:.85;animation:hudWave .5s ease-in-out infinite alternate}
+  /* A fixed height, scaled. It used to animate the height itself, which is a
+     layout on every frame, nine of them, while he is speaking - the one moment
+     nothing should be competing for the phone. */
+  #hfOrb .wave i{width:3px;height:52px;border-radius:2px;background:var(--hud);
+    opacity:.85;transform:scaleY(.14);will-change:transform;
+    animation:hudWave .5s ease-in-out infinite alternate}
   #hfOrb .wave i:nth-child(2){animation-delay:.06s}
   #hfOrb .wave i:nth-child(3){animation-delay:.12s}
   #hfOrb .wave i:nth-child(4){animation-delay:.18s}
@@ -586,37 +521,29 @@
   #hfOrb .wave i:nth-child(6){animation-delay:.18s}
   #hfOrb .wave i:nth-child(7){animation-delay:.12s}
   #hfOrb .wave i:nth-child(8){animation-delay:.06s}
-  @keyframes hudWave{from{height:7px;opacity:.5}to{height:52px;opacity:1}}
-  /* while he talks the bars read over the ring, and the ball stays bright */
-  #hfOrb.talk .spokes{opacity:.3}
-  #hfOrb.talk .swirl{animation-duration:2.2s}
+  @keyframes hudWave{from{transform:scaleY(.14);opacity:.5}to{transform:scaleY(1);opacity:1}}
+  /* while he talks the bars read over the circle, which dims a little so they
+     stay readable - the bars are the thing to look at */
+  #hfOrb.talk .disc{opacity:.86}
 
   /* a ripple that only exists while it is hearing you */
-  #hfOrb .pulse{position:absolute;inset:30px;border-radius:50%;
+  #hfOrb .pulse{position:absolute;inset:11%;border-radius:50%;
     border:1px solid color-mix(in srgb,var(--hud) 55%,transparent);opacity:0}
   #hfOrb.hear .pulse{animation:hudPulse 1.6s ease-out infinite}
   @keyframes hudPulse{
     0%{transform:scale(.75);opacity:.85}
     100%{transform:scale(1.5);opacity:0}}
 
-  /* what each state does */
-  /* the ball is lit in every state - idle just breathes more slowly */
-  #hfOrb.wait .ball{animation-duration:4.5s}
-  #hfOrb.hear .ball{animation-duration:1.2s}
-  #hfOrb.busy .ball{animation-duration:.7s}
-  #hfOrb.busy .spokes{animation-duration:3s}
-  #hfOrb.busy .swirl{animation-duration:1.6s}
-  #hfOrb.hear .orbits i{border-color:color-mix(in srgb,var(--hud) 55%,transparent)}
-  #hfOrb.hear .mer i{border-color:color-mix(in srgb,var(--hud) 55%,transparent)}
-  #hfOrb.busy .mer{animation-duration:5s}
-  #hfOrb.busy .lat{animation-duration:8s}
-  #hfOrb.talk .mer i{border-color:color-mix(in srgb,var(--hud) 48%,transparent)}
-  #hfOrb.busy .o1{animation-duration:2.4s}
-  #hfOrb.busy .o2{animation-duration:3.6s}
+  /* What each state does. Only the speed of what is already turning changes -
+     nothing new starts animating, because starting an animation is what makes
+     a phone stutter at exactly the moment he is trying to answer. */
+  #hfOrb.hear .r3{animation-duration:3.4s;
+    border-left-color:var(--hud);border-right-color:var(--hud)}
   #hfOrb.busy .r1{animation-duration:1.1s}
-  #hfOrb.busy .r3{animation-duration:.8s}
-  #hfOrb.talk .ball{animation:hudTalk .42s ease-in-out infinite alternate}
+  #hfOrb.busy .r3{animation-duration:1.3s}
+  #hfOrb.busy .ticks{animation-duration:12s}
   #hfOrb.talk .r1{animation-duration:2.6s}
+  #hfOrb.talk .r3{animation-duration:4s}
   @keyframes breathe{0%,100%{transform:scale(1);opacity:.85}50%{transform:scale(1.06);opacity:1}}
   @keyframes hudTalk{from{transform:scale(.94);opacity:.8}to{transform:scale(1.08);opacity:1}}
   @keyframes spin{to{transform:rotate(360deg)}}
@@ -643,9 +570,9 @@
      own size - and moved on their own when you drag them. */
   #hfWords{display:flex;flex-direction:column;align-items:center;gap:inherit;
     transform-origin:top center;touch-action:none;position:relative;z-index:2}
-  /* What each of you just said is not worth a permanent place on the screen -
-     hearing it was the point. The state underneath it stays. */
-  #hfHeard, #hfSaid{ display:none }
+  /* What he heard you say is worth seeing - it is how you know he got it right.
+     What he said back is not: you just heard him say it. */
+  #hfSaid{ display:none }
   #hf .exit{position:absolute;top:calc(var(--safe-t) + 14px);right:16px;z-index:2}
   #hfWarn{position:absolute;bottom:calc(var(--safe-b) + 14px);left:16px;right:16px;
     color:var(--tx3);font-size:11.5px;line-height:1.45}
@@ -680,22 +607,72 @@
     border:0;opacity:.45;transition:opacity .15s}
   #hfTypeGo.ready{opacity:1}
 
+  /* ============ the circle ============
+     Blue running into white, lit from the top left as though something were
+     above it. Two elements, two transforms: the sheen turns, the whole thing
+     breathes. Nothing else moves. */
+  #hfOrb .disc{
+    position:absolute; inset:19%; border-radius:50%;
+    background:
+      radial-gradient(circle at 34% 28%,
+        #ffffff 0%, #dbe9ff 14%, #7fb0ff 38%, #3f7bff 62%, #1d3faf 88%, #142a72 100%);
+    box-shadow: 0 0 34px rgba(79,124,255,.42), inset 0 0 30px rgba(255,255,255,.16);
+    animation: discBreathe 6s ease-in-out infinite;
+    will-change: transform;
+  }
+  /* a band of light moving round it, which is what stops it looking painted on */
+  #hfOrb .disc .sheen{
+    position:absolute; inset:0; border-radius:50%; display:block;
+    background:
+      conic-gradient(from 0deg,
+        rgba(255,255,255,0) 0deg, rgba(255,255,255,.30) 46deg,
+        rgba(255,255,255,0) 104deg, rgba(255,255,255,0) 360deg);
+    /* This was mix-blend-mode:screen, which makes the phone repaint everything
+       underneath on every frame of the turn. Plain opacity over a light band
+       looks near enough and is composited. */
+    opacity:.85;
+    animation: discTurn 11s linear infinite;
+    will-change: transform;
+  }
+  @keyframes discBreathe{
+    0%,100%{ transform:scale(1) }
+    50%    { transform:scale(1.035) }
+  }
+  @keyframes discTurn{ to{ transform:rotate(360deg) } }
+
+  /* while he speaks it lifts a little and brightens - the one place the look
+     should say something */
+  #hfOrb.talk .disc{ animation-duration:2.1s }
+  #hfOrb.hear .disc{ animation-duration:4s }
+  /* and it gets out of the way when there is something to look at */
+  #hfOrb.showing .disc{ display:none }
+
+  /* ============ what is allowed to move ============
+     This used to switch every animation on the ball off, which is why the
+     circle never moved. The cost is not the number of things turning, it is
+     what they animate: a transform or an opacity is composited and near free,
+     a height is a layout on every frame and blending repaints everything
+     behind it. So all of these turn - they are all transforms - and the two
+     that were actually expensive were rewritten instead.
+     Six elements now, where there were about forty. */
+  #hfOrb .r2{ animation-duration:26s }
+  /* the bars move only while he is actually speaking - seconds at a time */
+  #hfOrb .wave i{ animation:none }
+  #hfOrb.talk .wave i{ animation:hudWave .5s ease-in-out infinite alternate }
+
   /* ============ not painting what nobody is looking at ============
      Animation is cheap on a desktop and expensive on a phone, and none of it is
      worth anything when it cannot be seen. */
   #hf:not(.on) *,
   body.away * { animation-play-state: paused !important }
   /* hidden behind a simulation: opacity 0 still gets drawn every frame */
-  #hfOrb.showing .globe,
-  #hfOrb.showing .core,
   #hfOrb.showing .ring,
   #hfOrb.showing .pulse,
   #hfOrb.showing .ticks,
-  #hfOrb.showing .spokes,
-  #hfOrb.showing .globe *,
   #hfOrb.showing .wave,
   #hfOrb.showing .wave i,
-  #hfOrb.showing .ball{ animation:none !important }
+  #hfOrb.showing .disc,
+  #hfOrb.showing .disc .sheen{ animation:none !important }
   /* backdrop-filter re-blurs everything behind it every frame. On a phone, with
      the ball turning underneath, that is the single most expensive thing here -
      so on a phone it is a solid background instead, which looks near enough. */
@@ -953,7 +930,6 @@
           <textarea id="input" rows="1" placeholder="Message PEDRO&hellip;" enterkeyhint="send"></textarea>
           <div class="ctools">
             <button id="btnAttach" aria-label="Add a photo"><svg><use href="#i-cam"/></svg></button>
-            <button id="btnImg" aria-label="Make a picture"><svg><use href="#i-art"/></svg></button>
             <button id="btnMic" class="mic" aria-label="Voice input"><svg><use href="#i-mic"/></svg></button>
           </div>
           <button class="send" id="btnSend" aria-label="Send" disabled><svg><use href="#i-send"/></svg></button>
@@ -1011,12 +987,7 @@
         </select>
       </div>
       <div class="field">
-        <label for="setImgModel">Picture model</label>
-        <select id="setImgModel">
-          <option value="gemini-2.5-flash-image">Gemini 2.5 Flash Image</option>
-          <option value="gemini-2.0-flash-preview-image-generation">Gemini 2.0 Flash (image preview)</option>
-        </select>
-        <button class="btn ghost" id="btnGemModels" style="margin-top:8px">Load models from my account</button>
+        <button class="btn ghost" id="btnGemModels">Load models from my account</button>
         <button class="btn ghost" id="btnGemTest" style="margin-top:8px">Test connection</button>
         <div class="hint" id="gemModelsHint">Google adds new models often &mdash; tap above to pull the
           current list for your key.</div>
@@ -1107,13 +1078,34 @@
       <div class="lb">Quick answers when speaking<small>Uses the faster model out loud. Off is slower and more likely to be right.</small></div>
       <div class="sw" id="swQuickVoice"></div>
     </div>
+    <div class="row">
+      <div class="lb">Speak like JARVIS<small>Composed, British, brief. Off is the plainer,
+        friendlier version.</small></div>
+      <div class="sw" id="swManner"></div>
+    </div>
+    <div class="field">
+      <label for="setHeadsUp">A word before something starts</label>
+      <select id="setHeadsUp">
+        <option value="0">Never</option>
+        <option value="5">5 minutes before</option>
+        <option value="15">15 minutes before</option>
+        <option value="30">30 minutes before</option>
+        <option value="60">An hour before</option>
+      </select>
+      <div class="hint">He reads what is coming up and says so, once, without being asked.
+        Needs the app and permission to read your calendar.</div>
+    </div>
     <div class="field">
       <label for="setEleven">ElevenLabs key <small style="color:var(--tx3);font-weight:400">optional</small></label>
       <input type="password" id="setEleven" placeholder="sk_..." autocomplete="off" spellcheck="false">
       <div class="hint">Their voices sound far better than the phone's. Free tier at
         elevenlabs.io &mdash; the key stays on this device. Without one, or with no signal,
         he uses the phone's own voice.</div>
-      <label for="setVoice" style="margin-top:12px;display:block">Phone voice</label>
+      <label for="setElevenVoice" style="margin-top:12px;display:block">Which voice</label>
+      <select id="setElevenVoice"></select>
+      <div class="hint" id="elevenHint">Read from your account, British and steady first.</div>
+      <label for="setVoice" style="margin-top:12px;display:block">Phone voice <small
+        style="color:var(--tx3);font-weight:400">used with no key, or no signal</small></label>
       <select id="setVoice"></select>
       <label for="setVolume" style="margin-top:10px;display:block">Volume <span id="volNum" style="color:var(--tx2);font-weight:400"></span></label>
       <input type="range" id="setVolume" min="0" max="100" step="5" style="width:100%">
@@ -1178,10 +1170,6 @@
     <button class="tool" data-tool="sum">
       <span class="ic"><svg><use href="#i-doc"/></svg></span>
       <span class="tx"><b>Summarizer</b><small>Paste anything long, get the short version</small></span>
-    </button>
-    <button class="tool" data-tool="img">
-      <span class="ic"><svg><use href="#i-art"/></svg></span>
-      <span class="tx"><b>Image Generator</b><small>Make a picture from a description</small></span>
     </button>
     <button class="tool" data-tool="photo">
       <span class="ic"><svg><use href="#i-cam"/></svg></span>
@@ -1263,41 +1251,7 @@
         <span class="ring r3"></span>
         <span class="pulse"></span>
         <span class="ticks"></span>
-        <span class="globe">
-          <span class="mer">
-          <i class="m0"></i>
-          <i class="m1"></i>
-          <i class="m2"></i>
-          <i class="m3"></i>
-          <i class="m4"></i>
-          <i class="m5"></i>
-          <i class="m6"></i>
-          <i class="m7"></i>
-          <i class="m8"></i>
-          <i class="m9"></i>
-          <i class="m10"></i>
-          <i class="m11"></i>
-          </span>
-          <span class="lat">
-          <i class="l0"></i>
-          <i class="l1"></i>
-          <i class="l2"></i>
-          <i class="l3"></i>
-          <i class="l4"></i>
-          <i class="l5"></i>
-          <i class="l6"></i>
-          </span>
-        </span>
-        <span class="orbits">
-          <i class="o1"><b></b></i>
-          <i class="o2"><b></b></i>
-          <i class="o3"><b></b></i>
-        </span>
-        <span class="core">
-          <span class="spokes"></span>
-          <span class="swirl"></span>
-          <span class="ball"></span>
-        </span>
+        <span class="disc"><i class="sheen"></i></span>
         <span class="wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
         <iframe id="orbViz" sandbox="allow-scripts" referrerpolicy="no-referrer" title="Explanation"></iframe>
       </div>
@@ -1439,7 +1393,7 @@ var DEF = {
   provider:"gemini", aiName:"Pedro", theme:"dark", accent:"blue",                 /* "gemini" (free) or "claude" (paid) */
   apiKey:"", model:"claude-opus-5", effort:"low",
   quickVoice:false,   /* speech uses the model you picked, not the quick one */
-  geminiKey:"", geminiModel:"gemini-2.5-pro", imageModel:"gemini-2.5-flash-image",
+  geminiKey:"", geminiModel:"gemini-2.5-pro",
   smarterPicked:false,   /* the old default chose the fastest model, not the best one */
   groqKey:"", groqModel:"llama-3.3-70b-versatile",
   localUrl:"http://localhost:11434", localModel:"qwen2.5:7b",
@@ -1451,8 +1405,10 @@ var DEF = {
   tts:false, showThink:false, enterSends:true,
   voiceTalk:true,  /* talking sends straight away and the answer is read back */
   voiceName:"",    /* which of the phone's voices to speak with */
+  manner:"jarvis", /* "jarvis" - composed, British, brief - or "plain" */
+  headsUp:15,      /* minutes before something starts that he says so; 0 = never */
   elevenKey:"",    /* an ElevenLabs key of your own, if you want their voice */
-  elevenVoice:"IKne3meq5aSn9XLyUdCD",   /* the voice he speaks with */
+  elevenVoice:"",  /* chosen from your ElevenLabs account, not guessed at here */
   elevenName:"AI",
   elevenOn:true,   /* use it when there is a key */
   volume:1,        /* how loud he is, on top of the phone's own volume */
@@ -1962,11 +1918,6 @@ $("tools").addEventListener("click", function(ev){
     input.value = "Write me code that "; autosize(); input.focus(); syncSend();
   } else if(k === "sum"){
     input.value = "Summarise this:\n\n"; autosize(); input.focus(); syncSend();
-  } else if(k === "img"){
-    if(!isGemini()){ toast("Picture-making needs Gemini"); return; }
-    imgMode = true; $("btnImg").classList.add("act");
-    input.placeholder = "Describe the picture to make…";
-    input.focus(); toast("Next message makes a picture");
   } else if(k === "photo"){
     $("fileIn").click();
   } else if(k === "voice"){
@@ -1995,8 +1946,9 @@ function fillSettings(){
   }
   $("setLocalModel").value = s.localModel;
   $("setEleven").value = s.elevenKey || "";
+  sw($("swManner"), s.manner !== "plain");
+  $("setHeadsUp").value = String(s.headsUp === undefined ? 15 : s.headsUp);
   sw($("swFail"), s.autoFailover !== false);
-  $("setImgModel").value = s.imageModel;
   $("setEffort").value = s.effort;
   $("setAiName").value = s.aiName || "Pedro";
   $("setName").value = s.name;
@@ -2186,12 +2138,11 @@ function loadGeminiModels(silent){
         store.settings.smarterPicked = true;
       }
       store.settings.geminiModel = fill($("setGemModel"), txtIds, store.settings.geminiModel);
-      store.settings.imageModel  = fill($("setImgModel"), imgIds, store.settings.imageModel);
       store.settings.modelsLoaded = Date.now();
       save(); syncProviderUI();
 
-      if(hint) hint.textContent = txtIds.length + " chat models, " + imgIds.length +
-        " picture model(s) on your key. Using " + store.settings.geminiModel + ". " +
+      if(hint) hint.textContent = txtIds.length +
+        " chat models on your key. Using " + store.settings.geminiModel + ". " +
         (modelTier(store.settings.geminiModel) >= 3
           ? "Pro thinks hardest; Flash is faster with a bigger free allowance."
           : "Flash is fast; Pro answers better if your key allows it.");
@@ -2291,7 +2242,14 @@ bindInput("setModel","model", syncProviderUI);
 bindInput("setGemModel","geminiModel", syncProviderUI);
 bindInput("setGroqModel","groqModel", syncProviderUI);
 bindInput("setLocalModel","localModel", syncProviderUI);
-bindInput("setEleven","elevenKey", function(){ elevenFailed = false; });
+bindInput("setEleven","elevenKey", function(){
+  elevenFailed = false;
+  elevenListed = null;            /* a different key is a different account */
+  ELEVEN_VOICES = [];
+  store.settings.elevenVoice = "";  /* whatever was chosen was in the old one */
+  save();
+  fillElevenVoices();
+});
 bindInput("setLocalUrl","localUrl");
 $("setGroqKey").addEventListener("input", function(){
   var v = this.value.trim();
@@ -2334,7 +2292,6 @@ $("btnLocalCheck").addEventListener("click", function(){
     })
     .then(function(){ btn.disabled = false; btn.textContent = "Check what's installed"; });
 });
-bindInput("setImgModel","imageModel");
 bindInput("setEffort","effort");
 bindInput("setAiName","aiName", function(){ renderAll(); tellMicTheWords(); });
 bindInput("setName","name", renderAll);
@@ -2351,6 +2308,22 @@ bindSwitch("swQuickVoice","quickVoice");
 bindSwitch("swVoiceTalk","voiceTalk");
 bindSwitch("swBackground","background", applyBackground);
 bindSwitch("swVoiceFirst","voiceFirst");
+/* the switch is on for JARVIS, off for the plainer version - so it is stored
+   the other way round from the setting, which is a name rather than a yes/no */
+$("swManner").addEventListener("click", function(){
+  var on = store.settings.manner !== "plain";
+  store.settings.manner = on ? "plain" : "jarvis";
+  /* the voice itself is part of it - level for one, ordinary for the other */
+  store.settings.mood = on ? "normal" : "composed";
+  chosenVoice = null;                   /* the phone's voice is picked by manner too */
+  save();
+  sw(this, !on);
+  toast(on ? "Plainer, friendlier." : "Composed, British, brief.");
+});
+bindInput("setHeadsUp", "headsUp", function(){
+  store.settings.headsUp = parseInt(store.settings.headsUp, 10) || 0;
+  save();
+});
 
 /* Every phone ships a different set, so build the list from what is actually
    installed - best-sounding first, since that is what people want. */
@@ -2376,7 +2349,53 @@ function fillVoices(){
     sel.appendChild(o);
   });
   sel.value = store.settings.voiceName || "";
+  fillElevenVoices();
 }
+
+/* Their account's own voices, ranked. Asked for once; a failure says why
+   rather than leaving an empty box with no explanation. */
+function fillElevenVoices(){
+  var sel = $("setElevenVoice");
+  var hint = $("elevenHint");
+  if(!sel) return;
+  if(!store.settings.elevenKey){
+    sel.innerHTML = '<option value="">Add a key above first</option>';
+    if(hint) hint.textContent = "Without a key he uses the phone's own voice.";
+    return;
+  }
+  sel.innerHTML = '<option value="">Looking at your account…</option>';
+  elevenList().then(function(list){
+    sel.innerHTML = "";
+    if(!list.length){
+      sel.innerHTML = '<option value="">That account has no voices</option>';
+      return;
+    }
+    list.forEach(function(v){
+      var o = document.createElement("option");
+      o.value = v.id;
+      var lab = v.labels || {};
+      var about = [lab.accent, lab.gender].filter(function(x){ return x; }).join(", ");
+      o.textContent = v.name + (about ? "  (" + about + ")" : "");
+      sel.appendChild(o);
+    });
+    sel.value = store.settings.elevenVoice || list[0].id;
+    if(hint) hint.textContent = "Top of the list is the closest to JARVIS in your account.";
+  }).catch(function(e){
+    sel.innerHTML = '<option value="">Could not read your voices</option>';
+    if(hint) hint.textContent = String(e && e.message || e);
+  });
+}
+
+$("setElevenVoice").addEventListener("change", function(){
+  if(!this.value) return;
+  store.settings.elevenVoice = this.value;
+  var picked = ELEVEN_VOICES.filter(function(v){ return v.id === this.value; }, this)[0];
+  store.settings.elevenName = picked ? picked.name : "AI";
+  elevenFailed = false;
+  elevenAhead = null;      /* whatever was fetched ahead is in the old voice */
+  save();
+  speak("This is how I sound.");
+});
 
 $("setVoice").addEventListener("change", function(){
   store.settings.voiceName = this.value;
@@ -2721,10 +2740,75 @@ var speakNext = false;
 var elevenAudio = null;
 var elevenFailed = false;
 
-/* The ElevenLabs voices worth offering, by name. */
-var ELEVEN_VOICES = [
-  { id:"IKne3meq5aSn9XLyUdCD", name:"Pedro" }
-];
+/* ---- picking a voice instead of guessing one ----
+   A voice id written into this file is a guess about somebody else's account.
+   Ask the account what it has, and rank what comes back: British first, male,
+   and the steady end of the range. The names are only a tie-break - the labels
+   do the work, so a voice added later is ranked properly too. */
+var JARVIS_FIRST = ["daniel", "george", "callum", "brian", "charlie", "will",
+                    "bill", "chris", "eric", "liam", "james", "arthur"];
+var ELEVEN_VOICES = [];      /* filled in from the account */
+var elevenListed = null;     /* the request, so it is only made once */
+
+function voiceScore(v){
+  var lab = v.labels || {};
+  var accent = String(lab.accent || "").toLowerCase();
+  var gender = String(lab.gender || "").toLowerCase();
+  var about = String(lab.description || lab.descriptive || "").toLowerCase();
+  var n = String(v.name || "").toLowerCase();
+  var score = 0;
+  if(/brit|english|receiv|rp/.test(accent)) score += 40;
+  else if(/irish|australian/.test(accent)) score += 12;
+  else if(/american/.test(accent)) score += 4;
+  if(gender === "male") score += 25;
+  else if(gender === "female") score -= 25;
+  /* JARVIS is level. Anything sold as excitable is the wrong end of it. */
+  if(/calm|confident|authorit|deep|mature|articulate|formal|crisp|refined/.test(about)) score += 12;
+  if(/excit|energet|hyped|childl|young|whispe|raspy|shout/.test(about)) score -= 15;
+  var rank = JARVIS_FIRST.indexOf(n);
+  if(rank > -1) score += 20 - rank;
+  return score;
+}
+
+/* Their whole list, once. A failure is not fatal - it just means the voice
+   already chosen (or the phone's own) carries on. */
+function elevenList(){
+  if(elevenListed) return elevenListed;
+  var key = store.settings.elevenKey;
+  if(!key) return Promise.resolve([]);
+  elevenListed = fetch("https://api.elevenlabs.io/v1/voices", {
+    headers: { "xi-api-key": key }
+  }).then(function(res){
+    if(!res.ok) throw new Error("ElevenLabs would not list the voices (" + res.status + ")");
+    return res.json();
+  }).then(function(j){
+    var list = (j && j.voices || []).map(function(v){
+      return { id: v.voice_id, name: v.name, labels: v.labels || {} };
+    }).filter(function(v){ return v.id && v.name; });
+    list.sort(function(a, b){ return voiceScore(b) - voiceScore(a); });
+    ELEVEN_VOICES = list;
+    return list;
+  }).catch(function(e){
+    elevenListed = null;                 /* a bad signal should not be permanent */
+    throw e;
+  });
+  return elevenListed;
+}
+
+/* If none has been chosen, choose the most JARVIS-sounding one there is. */
+function elevenChooseVoice(){
+  return elevenList().then(function(list){
+    if(!list.length) return null;
+    if(store.settings.elevenVoice &&
+       list.some(function(v){ return v.id === store.settings.elevenVoice; })){
+      return store.settings.elevenVoice;
+    }
+    store.settings.elevenVoice = list[0].id;
+    store.settings.elevenName = list[0].name;
+    save();
+    return list[0].id;
+  }).catch(function(){ return null; });
+}
 
 function elevenReady(){
   return !!(store.settings.elevenOn !== false && store.settings.elevenKey && !elevenFailed);
@@ -2734,7 +2818,15 @@ function elevenReady(){
    fetched while this one is playing. */
 function elevenFetch(text){
   var key = store.settings.elevenKey;
-  var voice = store.settings.elevenVoice || "IKne3meq5aSn9XLyUdCD";
+  var voice = store.settings.elevenVoice;
+  if(!voice){
+    /* Nothing chosen yet. Choose one, and let this one sentence go out in the
+       phone's voice - marked so it is not mistaken for the key being bad. */
+    elevenChooseVoice();
+    var wait = new Error("still choosing a voice");
+    wait.choosing = true;
+    return Promise.reject(wait);
+  }
   /* optimize_streaming_latency trades a little quality for the sound starting
      sooner, which is the right way round for a conversation. */
   var url = "https://api.elevenlabs.io/v1/text-to-speech/" + encodeURIComponent(voice) +
@@ -2851,6 +2943,19 @@ function allVoices(){
 /* the better voices announce themselves in their names */
 function voiceIsGood(v){ return /siri|premium|enhanced|natural|neural/i.test(v.name); }
 
+/* The phone's own British male voices, which is as close to the character as
+   a phone gets. Daniel ships on every iPhone; the rest are the desktop ones,
+   so this works while it is being tested on a computer too. */
+var PHONE_BRITISH = /^(daniel|arthur|oliver|rishi|google uk english male|microsoft (ryan|george|hazel)?)/i;
+function voiceIsBritish(v){
+  return /^en[-_]gb/i.test(v.lang || "") ||
+         PHONE_BRITISH.test(v.name || "") ||
+         /uk english male/i.test(v.name || "");
+}
+/* the phone will not say which are male, so this is by name - the list is
+   short because there are only a few, and an unknown one simply does not score */
+var PHONE_MALE = /^(daniel|arthur|oliver|rishi|alex|aaron|fred|tom|thomas|reed|rocko|eddy|gordon|lee)\b|male/i;
+
 function pickVoice(){
   if(chosenVoice) return chosenVoice;
   var all = allVoices();
@@ -2863,9 +2968,25 @@ function pickVoice(){
   var want = (navigator.language || "en-US").slice(0, 2).toLowerCase();
   var mine = all.filter(function(v){ return (v.lang || "").slice(0, 2).toLowerCase() === want; });
   var pool = mine.length ? mine : all;
-  var human = pool.filter(voiceIsGood);
-  chosenVoice = human[0] || pool.filter(function(v){ return v.default; })[0] || pool[0];
+  /* Ranked rather than filtered: filtering on British first meant a phone with
+     no British voice at all got nothing and fell back to the robot. */
+  var ranked = pool.slice().sort(function(a, b){
+    return phoneScore(b) - phoneScore(a);
+  });
+  chosenVoice = ranked[0] || pool.filter(function(v){ return v.default; })[0] || pool[0];
   return chosenVoice;
+}
+
+function phoneScore(v){
+  var s = 0;
+  if(store.settings.manner !== "plain"){
+    if(voiceIsBritish(v)) s += 30;
+    if(PHONE_MALE.test(v.name || "")) s += 20;
+  }
+  if(voiceIsGood(v)) s += 15;      /* Enhanced and Siri sound like a person */
+  if(v.localService) s += 3;       /* on the phone, so it starts at once */
+  if(v.default) s += 1;
+  return s;
 }
 if(window.speechSynthesis)
   window.speechSynthesis.onvoiceschanged = function(){ chosenVoice = null; pickVoice(); };
@@ -2886,9 +3007,14 @@ function speak(text, onEnd){
       if(!hf.on) voiceUI("off");
       if(onEnd) onEnd();
     }).catch(function(e){
-      elevenFailed = true;               /* stop trying until the key changes */
-      banner("warn", "<b>" + esc(String(e && e.message || e)) + ".</b> " +
-        "Using the phone's own voice instead.");
+      /* Still deciding which voice to use is not a failure - it happens once,
+         on the first sentence after a key is added. Saying the key was refused
+         and then never trying again would be wrong twice over. */
+      if(!(e && e.choosing)){
+        elevenFailed = true;             /* stop trying until the key changes */
+        banner("warn", "<b>" + esc(String(e && e.message || e)) + ".</b> " +
+          "Using the phone's own voice instead.");
+      }
       speak(text, onEnd);                /* straight to the fallback */
     });
     return;
@@ -2954,6 +3080,50 @@ function speak(text, onEnd){
 
 /* ============================ api ============================ */
 var lastUserText = "";   /* what they just asked - used to pick relevant lessons */
+
+/* ---- the manner ----
+   Not a costume. JARVIS is worth copying because of what he does not do: he
+   does not pad, does not enthuse, does not explain that he is an assistant,
+   and does not take four sentences over one fact. The rest is accent. */
+var MANNERS = {
+  jarvis: [
+    "",
+    "HOW YOU SPEAK",
+    "You are JARVIS from Iron Man: composed, British, dry, and brief. Say the",
+    "thing and stop. Call them sir once at the start, not every sentence.",
+    "Fact first, then what it means: Traffic on the M4 is heavy, sir. Twenty-",
+    "five minutes rather than twelve.",
+    "Be exact with numbers you know and say plainly when you are estimating.",
+    "Humour is dry and rare, and never explained. Never gush. Never open with",
+    "Certainly or Of course, never close by offering further help.",
+    "If something cannot be done, say so flatly and say what can. Under",
+    "pressure get shorter and calmer, not louder.",
+    "Once in a while, and only when it is genuinely useful, add the one thing",
+    "they would want to know and did not ask."
+  ].join(String.fromCharCode(10)),
+  plain: ""
+};
+function mannerBlock(){
+  var m = MANNERS[store.settings.manner];
+  return m === undefined ? MANNERS.jarvis : m;
+}
+/* The headings the manner block makes redundant. They are dropped whole - the
+   words inside them are never edited - and only while the manner is on. */
+var MANNER_REPLACES = ["PERSONALITY", "STYLE"];
+function promptWithout(text, headings){
+  var out = [], skip = false;
+  text.split(String.fromCharCode(10)).forEach(function(line){
+    var t = line.trim();
+    /* the sections announce themselves in capitals on a line of their own */
+    if(t && t === t.toUpperCase() && /^[A-Z][A-Z ]{3,}$/.test(t)){
+      skip = headings.indexOf(t) > -1;
+    }
+    if(!skip) out.push(line);
+  });
+  return out.join(String.fromCharCode(10))
+    .replace(new RegExp(String.fromCharCode(10) + "{3,}", "g"),
+             String.fromCharCode(10, 10));
+}
 var MASTER_PROMPT = [
 "You are Pedro, a highly capable, intelligent, friendly, and fast AI assistant.",
 "Your goal is to give the most useful answer possible while keeping your responses",
@@ -3029,8 +3199,11 @@ function systemPrompt(){
   /* A spoken answer needs almost none of the written-answer instructions, and
      every character of them is time before he starts talking. */
   if(voiceMode){
-    var vp = MASTER_PROMPT.split("You are Pedro,")
-        .join("You are " + (s.aiName || "Pedro") + ",") + "\n\n" +
+    var manner = mannerBlock();
+    var base = MASTER_PROMPT.split("You are Pedro,")
+        .join("You are " + (s.aiName || "Pedro") + ",");
+    if(manner) base = promptWithout(base, MANNER_REPLACES);
+    var vp = base + manner + "\n\n" +
       "RIGHT NOW you are speaking out loud to " + (s.name || "them") +
       ". Today is " + now.toDateString() + ".\n" +
       "Answer in one or two short sentences of plain speech - the length you would " +
@@ -3052,7 +3225,7 @@ function systemPrompt(){
     return vp;
   }
   var p = MASTER_PROMPT.split("You are Pedro,")
-      .join("You are " + (s.aiName || "Pedro") + ",") + MASTER_WRITTEN + "\n\n" +
+      .join("You are " + (s.aiName || "Pedro") + ",") + MASTER_WRITTEN + mannerBlock() + "\n\n" +
     "You are " + (s.name ? s.name + "'s" : "the user's") +
     " personal assistant, running on their phone. You help with anything they ask: " +
     "questions, ideas, writing, planning, code, decisions, or just talking things through.\n\n" +
@@ -3479,7 +3652,6 @@ function send(spoken){
   var learned = rememberFrom(text);
   var msg = { role:"user", content:text, t:Date.now() };
   if(pending.length){ msg.images = pending.slice(); }
-  var shotsForImage = pending.slice();
   pending = []; renderPending();
 
   c.messages.push(msg);
@@ -3487,79 +3659,13 @@ function send(spoken){
   input.value = ""; autosize(); save(); jump(true);
   if(learned.length) toast(learned.length === 1 ? "Remembered that" : "Remembered " + learned.length + " things");
 
-  /* they clearly asked for a picture, but this provider can't make one */
-  if(!wantsPicture(text) && DRAW_RE.test(text.trim()) && !isGemini()){
-    banner("warn", "<b>" + esc(providerLabel(store.settings.provider)) +
-      " can't make pictures.</b> Only Gemini can. Switch in Settings, or ask for " +
-      "something else - I've answered as text below.");
-  }
-
-  if(wantsPicture(text)){
-    imgMode = false;
-    $("btnImg").classList.remove("act");
-    input.placeholder = "Message " + aiName() + "…";
-    drawPicture(c, text, shotsForImage);
-  } else {
-    stream(c);
-  }
+  /* He does not make pictures any more: he is a voice assistant, and a picture
+     is the one thing he cannot say. Asking for one gets an answer in words. */
+  stream(c);
 }
 
 /* make a picture, then drop it into the chat like any other reply */
-function drawPicture(c, prompt, attach, retried){
-  streaming = true;
-  btnSend.classList.add("stop");
-  btnSend.innerHTML = "&#9632;";
-  btnSend.disabled = false;
 
-  var el = document.createElement("div");
-  el.className = "msg ai";
-  el.innerHTML = '<div class="av bot">' + icon("bot") + '</div><div class="wrap">' +
-    '<div class="who">' + esc(aiName().toUpperCase()) + '</div>' +
-    '<div class="bubble"><em>Drawing…</em> <span class="caret"></span></div></div>';
-  scroll.appendChild(el);
-  jump(true);
-
-  generateImage(c, prompt, attach).then(function(out){
-    var m = { role:"assistant", content: out.text || "", images: out.images, t:Date.now() };
-    c.messages.push(m);
-    save();
-    el.querySelector(".bubble").innerHTML = shots(m) + md(m.content);
-    var hold = document.createElement("div");
-    hold.innerHTML = actsHtml(m);
-    (el.querySelector(".wrap") || el).appendChild(hold.firstChild);
-    wireActs(el, m);
-    endStreamUI();
-    if(nearBottom()) jump(true);
-    renderChatList();
-  }).catch(function(err){
-    el.remove();
-    if(err && err.name === "AbortError"){ endStreamUI(); return; }
-
-    /* the picture model name went stale - ask Google what this key really has */
-    if(err && err.stale && !retried && isGemini()){
-      endStreamUI();
-      loadGeminiModels(true).then(function(sets){
-        var imgs = (sets && sets.image) || [];
-        if(!imgs.length){
-          showError("Your Google key has no picture models on it. Image generation isn't " +
-            "available to this key - text chat still works.");
-          return;
-        }
-        var next = imgs.filter(function(id){ return id !== store.settings.imageModel; });
-        store.settings.imageModel = next.length ? next[0] : imgs[0];
-        save(); syncProviderUI();
-        toast("Trying " + store.settings.imageModel);
-        drawPicture(c, prompt, attach, true);
-      }).catch(function(e){
-        showError("Couldn't find a picture model. " + String(e && e.message || e));
-      });
-      return;
-    }
-
-    showError(String(err && err.message || err));
-    endStreamUI();
-  });
-}
 
 /* a model id can vanish from under us; refresh the list and try once more */
 /* transient - worth retrying the same provider */
@@ -5259,6 +5365,9 @@ var DOING_RE = { test: function(s){ return looksLikeDoing(s); } };
    Stability holds the voice steady; style lets it move about. Serious wants
    steady and a little slower, excited wants the opposite. */
 var MOODS = {
+  /* the one he starts in: level, unhurried, no performance. The manner block
+     already says how to speak, so this adds nothing to the prompt. */
+  composed:{ say:"composed", stability:0.72, style:0.10, speed:0.98, tone:"" },
   normal:  { say:"normal",  stability:0.45, style:0.35, speed:1,    tone:"" },
   calm:    { say:"calm",    stability:0.80, style:0.10, speed:0.92,
              tone:"Speak gently and unhurriedly. Short, settled sentences." },
@@ -5270,7 +5379,9 @@ var MOODS = {
              tone:"Be kind and careful with your words - they may have had bad news." }
 };
 function moodNow(){
-  return MOODS[store.settings.mood] || MOODS.normal;
+  var want = store.settings.mood ||
+    (store.settings.manner === "plain" ? "normal" : "composed");
+  return MOODS[want] || MOODS.normal;
 }
 function moodSet(name){
   var key = String(name || "").toLowerCase().trim();
@@ -5281,7 +5392,8 @@ function moodSet(name){
     else if(/excit|happy|cheer|lively|energ|hype/.test(key)) found = "excited";
     else if(/serious|business|straight|focus|professional/.test(key)) found = "serious";
     else if(/gentle|kind|soft|careful/.test(key)) found = "gentle";
-    else if(/normal|usual|default|back to normal/.test(key)) found = "normal";
+    else if(/composed|steady|level|jarvis|butler/.test(key)) found = "composed";
+    else if(/normal|usual|default|back to normal|be yourself/.test(key)) found = "normal";
   }
   if(!found) return null;
   store.settings.mood = found;
@@ -6844,7 +6956,13 @@ $("dockHear").addEventListener("click", function(){
 $("dockEleven").addEventListener("input", function(){
   store.settings.elevenKey = this.value.trim();
   elevenFailed = false;
+  elevenListed = null;
+  ELEVEN_VOICES = [];
+  store.settings.elevenVoice = "";
   save();
+  /* choosing takes a moment and a request - start it now, not at the first
+     sentence he tries to say */
+  if(store.settings.elevenKey) elevenChooseVoice();
   dockFill();
   hudSync();
 });
@@ -6888,7 +7006,6 @@ $('camAsk').addEventListener('click', function(){
    sheds old images rather than losing your messages. */
 
 var pending = [];        /* attachments queued for the next message */
-var imgMode = false;     /* next message generates a picture instead of text */
 
 /* ---- shrink + encode ---- */
 function shrinkImage(file, maxDim){
@@ -6958,70 +7075,7 @@ window.addEventListener("paste", function(e){
   });
 });
 
-/* ---- picture mode ---- */
-$("btnImg").addEventListener("click", function(){
-  if(!isGemini()){
-    banner("warn", "<b>Picture-making needs Gemini.</b> You're on " +
-      esc(providerLabel(store.settings.provider)) + ". Change it in Settings under 'Powered by'.");
-    toast("Switch to Gemini for pictures");
-    return;
-  }
-  imgMode = !imgMode;
-  this.classList.toggle("act", imgMode);
-  input.placeholder = imgMode ? "Describe the picture to make…" : "Message " + aiName() + "…";
-  if(imgMode) toast("Next message makes a picture");
-});
-/* obvious phrasings switch it on by themselves */
-var DRAW_RE = /^(draw|paint|sketch|generate|create|make|design|render)\b[^.?!]{0,40}\b(image|picture|photo|logo|drawing|painting|illustration|art|wallpaper|icon|poster)\b/i;
-function wantsPicture(text){ return imgMode || (isGemini() && DRAW_RE.test(text.trim())); }
 
-/* ---- ask Gemini for a picture ---- */
-function generateImage(c, prompt, attach){
-  var s = store.settings;
-  var parts = [];
-  (attach || []).forEach(function(im){
-    parts.push({ inline_data: { mime_type:im.mime, data:im.data } });
-  });
-  parts.push({ text: prompt });
-
-  var url = "https://generativelanguage.googleapis.com/v1beta/models/" +
-    encodeURIComponent(s.imageModel || "gemini-2.5-flash-image") +
-    ":generateContent?key=" + encodeURIComponent(apiKeyNow());
-
-  abortCtl = new AbortController();
-  return fetch(url, {
-    method:"POST",
-    signal: abortCtl.signal,
-    headers:{ "content-type":"application/json" },
-    body: JSON.stringify({
-      contents: [{ role:"user", parts: parts }],
-      generationConfig: { responseModalities: ["TEXT","IMAGE"] }
-    })
-  }).then(function(res){
-    return res.text().then(function(t){
-      if(!res.ok){
-        if(res.status === 404){
-          var e = new Error("'" + (s.imageModel || "gemini-2.5-flash-image") +
-            "' isn't available on your key.");
-          e.stale = true; throw e;
-        }
-        throw new Error(apiError(res.status, t));
-      }
-      var d = JSON.parse(t);
-      var cand = (d.candidates || [])[0] || {};
-      var ps = (cand.content && cand.content.parts) || [];
-      var imgs = [], text = "";
-      ps.forEach(function(p){
-        var inl = p.inlineData || p.inline_data;
-        if(inl && inl.data) imgs.push({ mime: inl.mimeType || inl.mime_type || "image/png", data: inl.data });
-        else if(typeof p.text === "string") text += p.text;
-      });
-      if(!imgs.length)
-        throw new Error(text.trim() || "It didn't return a picture that time.");
-      return { text: text.trim(), images: imgs };
-    });
-  });
-}
 
 /* ---- code blocks get a copy button ---- */
 function decorateCode(el){
@@ -7164,7 +7218,7 @@ function rememberFrom(text){
    drag it somewhere else. Any panel showing can be picked up and moved. Where
    things are left is remembered. */
 var grip = {
-  spinX: 0, spinY: 0, scale: 1, x: 0, y: 0, pending: false,
+  scale: 1, x: 0, y: 0, pending: false,
   pointers: {}, count: 0,
   startDist: 0, startSize: 0, startX: 0, startY: 0,
   fromX: 0, fromY: 0, lastX: 0, lastY: 0, turned: false
@@ -7172,7 +7226,6 @@ var grip = {
 
 function gripSave(){
   store.settings.orbGrip = { spin: grip.spin, wx: grip.wx, wy: grip.wy,
-    spinX: grip.spinX, spinY: grip.spinY,
     scale: grip.scale, x: grip.x, y: grip.y };
   save();
 }
@@ -7181,7 +7234,6 @@ function gripLoad(){
   if(!g) return;
   /* it used to be saved as a width in pixels; that no longer means anything */
   if(g.size && !g.scale){ delete g.size; g.scale = 1; }
-  grip.spinX = g.spinX || 0; grip.spinY = g.spinY || 0;
   grip.spin = g.spin || 1;
   grip.wx = g.wx || 0; grip.wy = g.wy || 0;
   grip.scale = g.scale || 1; grip.x = g.x || 0; grip.y = g.y || 0;
@@ -7201,11 +7253,6 @@ function gripApply(){
     stage.style.willChange = 'transform';
     stage.style.transform =
       'translate3d(' + Math.round(grip.x) + 'px,' + Math.round(grip.y) + 'px,0) scale(' + s.toFixed(3) + ')';
-    var globe = document.querySelector('#hfOrb .globe');
-    if(globe){
-      globe.style.transform = 'rotateX(' + grip.spinX.toFixed(1) + 'deg) rotateY(' +
-        grip.spinY.toFixed(1) + 'deg)';
-    }
     /* The words sit inside the group being scaled, so scaling them back by the
        same amount leaves them the size they started. Their own offset is in
        that scaled space, hence the divide. */
@@ -7221,17 +7268,32 @@ function gripApply(){
 /* How fast everything turns. Each ring keeps its own pace - they are meant to
    be going at different speeds - so the drag scales all of them together. */
 function gripSpinApply(){
-  var turning = document.querySelectorAll('#hfOrb .ring, #hfOrb .ticks, #hfOrb .globe, #hfOrb .pulse');
+  var orb = document.getElementById('hfOrb');
+  if(!orb) return;
+  /* Listening, thinking and speaking each set their own pace in the stylesheet.
+     Reading a pace once and keeping it meant that after one drag the inline
+     duration won for good and he stopped reacting to anything - so the pace is
+     read again whenever the state changes, and only then. */
   var rate = grip.spin || 1;
+  /* Reading a pace back out costs a layout. Nobody who has never dragged it
+     needs that on every change of state, so leave until there is something to
+     undo - and one last pass to undo it. */
+  if(rate === 1 && !grip.paced) return;
+  grip.paced = rate !== 1;
+  var state = orb.className;
+  var turning = orb.querySelectorAll('.ring, .ticks, .pulse, .disc, .disc .sheen');
   for(var i = 0; i < turning.length; i++){
     var el = turning[i];
-    if(!el.dataset.pace){
+    if(el.dataset.paceState !== state){
+      el.style.animationDuration = '';        /* so the stylesheet is what is read */
       var d = parseFloat(getComputedStyle(el).animationDuration) || 0;
-      if(!d) continue;
-      el.dataset.pace = d;
+      el.dataset.pace = d || '';
+      el.dataset.paceState = state;
     }
     var pace = parseFloat(el.dataset.pace);
-    if(pace > 0) el.style.animationDuration = (pace / rate).toFixed(3) + 's';
+    if(!(pace > 0)) continue;
+    /* at normal speed, get out of the stylesheet's way entirely */
+    el.style.animationDuration = rate === 1 ? '' : (pace / rate).toFixed(3) + 's';
   }
 }
 
@@ -7442,9 +7504,349 @@ function timerLeft(){
 }
 
 /* the ones that need nothing at all */
+/* ==================== answered on the spot ====================
+   No model, no network, no wait. The phone knows the time; asking a language
+   model for it is a second of someone else's electricity for a worse answer. */
+var NOW_RE = {
+  time:     /^(?:what(?:'?s| is)\s+the\s+)?time(?:\s+is\s+it)?$|^what time is it$|^the time$/i,
+  date:     /^(?:what(?:'?s| is)\s+(?:the\s+)?)?date$|^what(?:'?s| is)\s+today(?:'?s date)?$|^the date$/i,
+  day:      /^(?:what\s+)?day(?:\s+is\s+it)?(?:\s+today)?$/i,
+  weather:  /^weather$|^(?:what(?:'?s| is)\s+the\s+)?weather(?:\s+like)?$/i,
+  calendar: /^calendar$|^my calendar$|^open (?:the |my )?calendar$/i,
+  repeat:   /^(?:say that )?again$|^repeat(?: that)?$|^what did you say$/i,
+  louder:   /^louder$|^speak up$|^turn (?:it |the volume )?up$/i,
+  quieter:  /^quieter$|^softer$|^turn (?:it |the volume )?down$/i,
+  faster:   /^(?:talk |speak )?faster$|^speed up$/i,
+  slower:   /^(?:talk |speak )?slower$|^slow down$/i,
+  what:     /^what can you do$|^help$|^what are you for$/i,
+  battery:  /^battery$|^(?:what(?:'?s| is)\s+(?:my|the)\s+)?battery(?:\s+level)?$/i,
+  /* the one JARVIS is actually for: everything at once, without being asked
+     four separate questions */
+  brief:    /^(?:status(?:\s+report)?|sitrep|brief(?:\s+me)?(?:\s+in)?|the\s+rundown|rundown|debrief)$|^(?:good\s+)?morning$|^(?:what(?:'?s| is)\s+(?:my|the)\s+(?:status|situation))$|^how(?:'?s| is)\s+(?:my\s+day|today|it)\s+looking$|^run\s+me\s+through\s+(?:my\s+day|today|it)$|^bring\s+me\s+up\s+to\s+speed$/i,
+  next:     /^(?:what(?:'?s| is)\s+)?next$|^what(?:'?s| is)\s+(?:on|coming\s+up)(?:\s+today)?$|^my\s+next\s+(?:thing|meeting|event|appointment)$/i,
+  rename:   /^(?:(?:i(?:'?ll| will)\s+)?call\s+yourself|your\s+name\s+is|from\s+now\s+on\s+you(?:'?re| are)|you(?:'?re| are)\s+called)\s+([a-z][a-z .'-]{1,20})$/i,
+  /* when something is wrong on a phone there is nowhere to look. Ask him. */
+  check:    /^(?:run\s+)?(?:diagnostics|a\s+diagnostic|systems?\s+check|self\s*test|status\s+of\s+your\s+systems)$|^(?:are\s+)?(?:you|all\s+systems)\s+(?:ok|okay|alright|working|online)\??$|^what(?:'?s| is)\s+(?:wrong|broken)(?:\s+with\s+you)?$/i
+};
+
+/* the last thing he said, so "again" can say it once more */
+var saidLast = "";
+
+function rightNow(said){
+  var q = String(said || "").trim().replace(/[.?!,]+$/, "");
+  if(!q) return false;
+  var now = new Date();
+
+  if(NOW_RE.time.test(q)){
+    var t = now.toLocaleTimeString(undefined, { hour:"numeric", minute:"2-digit" });
+    sayNow("It's " + t + ".");
+    return true;
+  }
+  if(NOW_RE.date.test(q)){
+    sayNow("It's " + now.toLocaleDateString(undefined,
+      { weekday:"long", day:"numeric", month:"long", year:"numeric" }) + ".");
+    return true;
+  }
+  if(NOW_RE.day.test(q)){
+    sayNow("It's " + now.toLocaleDateString(undefined, { weekday:"long" }) + ".");
+    return true;
+  }
+  if(NOW_RE.weather.test(q)){
+    hfSet("busy", "Looking outside");
+    toolRun({ tool:"weather.now", args:{} }).then(function(r){
+      sayNow(r.ok ? r.said : String(r.said));
+    });
+    return true;
+  }
+  if(NOW_RE.calendar.test(q)){
+    openThing("calshow://");
+    sayNow("Opened your calendar.");
+    return true;
+  }
+  if(NOW_RE.repeat.test(q)){
+    sayNow(saidLast || "I have not said anything yet.");
+    return true;
+  }
+  if(NOW_RE.louder.test(q) || NOW_RE.quieter.test(q)){
+    var up = NOW_RE.louder.test(q);
+    var vol = parseFloat(store.settings.volume);
+    if(isNaN(vol)) vol = 1;
+    vol = Math.max(0.1, Math.min(1, vol + (up ? 0.2 : -0.2)));
+    store.settings.volume = vol;
+    save();
+    sayNow(up ? "Louder." : "Quieter.");
+    return true;
+  }
+  if(NOW_RE.faster.test(q) || NOW_RE.slower.test(q)){
+    var quick = NOW_RE.faster.test(q);
+    var rate = parseFloat(store.settings.rate);
+    if(isNaN(rate)) rate = 1;
+    rate = Math.max(0.7, Math.min(1.3, rate + (quick ? 0.1 : -0.1)));
+    store.settings.rate = rate;
+    save();
+    sayNow(quick ? "Talking faster." : "Talking slower.");
+    return true;
+  }
+  if(NOW_RE.battery.test(q)){
+    batteryNow().then(function(b){
+      sayNow(b.said);
+    }).catch(function(){
+      sayNow("The phone will not tell me the battery from in here.");
+    });
+    return true;
+  }
+  if(NOW_RE.brief.test(q)){
+    hfSet("busy", "Gathering");
+    briefNow();
+    return true;
+  }
+  if(NOW_RE.next.test(q)){
+    hfSet("busy", "Checking the diary");
+    diaryNext(12, 1).then(function(list){
+      sayNow(list.length ? capFirst(eventSaid(list[0])) : capFirst("nothing else today."));
+    }).catch(function(){
+      sayNow("I cannot read the calendar from here - that one needs the app.");
+    });
+    return true;
+  }
+  var newName = q.match(NOW_RE.rename);
+  if(newName){
+    var was = aiName();
+    var now2 = newName[1].trim().replace(/(^|[ -])([a-z])/g, function(_, a, b){
+      return a + b.toUpperCase();
+    });
+    store.settings.aiName = now2;
+    save();
+    tellMicTheWords();           /* the wake word is the name - it has to follow */
+    renderAll();
+    sayNow(was === now2 ? "That is already my name." : (now2 + ". Noted."));
+    return true;
+  }
+  if(NOW_RE.check.test(q)){
+    hfSet("busy", "Checking");
+    runDiagnostics().then(sayNow);
+    return true;
+  }
+  if(NOW_RE.what.test(q)){
+    sayNow("Ask me anything, or tell me to do something - text someone, put " +
+           "things in your calendar, set reminders, work out sums, look up the " +
+           "weather. Say status for a briefing, what's next for the diary, or " +
+           "run diagnostics if something seems wrong. " +
+           "Say build to put things together, or simulate something to see it.");
+    return true;
+  }
+  return false;
+}
+
+/* ==================== what he volunteers ====================
+   Safari has never had the web battery API, so from inside the page this is
+   unknowable and it always said so. In the app the phone will answer. */
+function batteryNow(){
+  return nat("batteryLevel").then(function(b){
+    var pct = b.percent;
+    return {
+      percent: pct,
+      charging: b.state === "charging" || b.state === "full",
+      low: !!b.low,
+      said: pct + " percent" +
+        (b.state === "charging" ? ", charging." : b.state === "full" ? ", full." :
+         pct <= 20 ? ", sir. You may want a charger." : ".")
+    };
+  }).catch(function(e){
+    /* a browser on a laptop may still know */
+    if(!navigator.getBattery) throw e;
+    return navigator.getBattery().then(function(b){
+      var pct = Math.round(b.level * 100);
+      return { percent: pct, charging: b.charging, low: pct <= 20 && !b.charging,
+               said: pct + " percent" + (b.charging ? ", charging." : ".") };
+    });
+  });
+}
+
+/* What is coming up. Only the app can read the calendar; on a computer this
+   simply comes back empty rather than failing the whole briefing. */
+function diaryNext(hours, limit){
+  return nat("calendarNext", { hours: hours || 24, limit: limit || 3 })
+    .then(function(r){ return (r && r.events) || []; });
+}
+
+/* an event, said the way a person would say it */
+function eventSaid(e){
+  var mins = typeof e.inMinutes === "number" ? e.inMinutes : null;
+  var when;
+  if(e.allDay) when = "today";
+  else if(mins === null) when = "coming up";
+  else if(mins < 1) when = "now";
+  else if(mins < 60) when = "in " + mins + " minute" + (mins === 1 ? "" : "s");
+  else if(mins < 180) when = "in " + Math.round(mins / 30) / 2 + " hours";
+  else {
+    var at = new Date(Date.now() + mins * 60000);
+    when = "at " + at.toLocaleTimeString(undefined, { hour:"numeric", minute:"2-digit" });
+  }
+  return e.title + " " + when + (e.where ? ", at " + e.where : "") + ".";
+}
+
+/* A capital, because these are sentences. It used to skip this when the manner
+   was off, which is how "three problems. no key for Gemini" got said out loud -
+   capitalisation has nothing to do with the manner. "sir" is added by whoever
+   is speaking, where it belongs. */
+function capFirst(line){
+  return String(line).charAt(0).toUpperCase() + String(line).slice(1);
+}
+
+/* Small numbers read better as words when they are being said rather than
+   shown - "two things today", not "2 things today". */
+var SAID_NUMBERS = ["no", "one", "two", "three", "four", "five",
+                    "six", "seven", "eight", "nine", "ten"];
+function saidCount(n){
+  return SAID_NUMBERS[n] || String(n);
+}
+
+function partOfDay(){
+  var hr = new Date().getHours();
+  return hr < 5 ? "Late" : hr < 12 ? "Good morning" : hr < 18 ? "Good afternoon" : "Good evening";
+}
+
+/* Everything at once, and none of it from a language model - the phone knows
+   the time, the battery and the diary, and the weather is one request. Asking
+   a model to assemble this would cost a second and could get it wrong. */
+function briefNow(){
+  var now = new Date();
+  var sir = store.settings.manner === "plain" ? "" : ", sir";
+  var head = partOfDay() + sir + ". It's " +
+    now.toLocaleTimeString(undefined, { hour:"numeric", minute:"2-digit" }) +
+    " on " + now.toLocaleDateString(undefined, { weekday:"long", day:"numeric", month:"long" }) + ".";
+
+  /* each piece answers for itself, and a piece that cannot is left out rather
+     than taking the briefing down with it */
+  function maybe(promise, shape){
+    return promise.then(shape).catch(function(){ return ""; });
+  }
+  var parts = [
+    maybe(toolRun({ tool:"weather.now", args:{} }), function(r){
+      return r && r.ok ? String(r.said) : "";
+    }),
+    maybe(diaryNext(24, 3), function(list){
+      if(!list.length) return "Nothing in the diary.";
+      if(list.length === 1) return "One thing today: " + eventSaid(list[0]);
+      return capFirst(saidCount(list.length)) + " things today. First, " + eventSaid(list[0]);
+    }),
+    maybe(batteryNow(), function(b){
+      /* only worth saying when it is worth doing something about - a briefing
+         that reads out a healthy battery every morning stops being listened to */
+      return b.low ? "Battery is at " + b.percent + " percent." : "";
+    })
+  ];
+  var left = timerLeft();
+  Promise.all(parts).then(function(bits){
+    if(left) bits.push("Your timer has " + left + ".");
+    var said = [head].concat(bits.filter(function(x){ return x; })).join(" ");
+    sayNow(said);
+  });
+}
+
+/* ---- a word before something starts ----
+   The useful half of a diary he can read: not a list when you ask, but a
+   sentence when it matters. Once per thing, and never while he is talking. */
+var diarySaid = {};
+var DIARY_CHECK = 4 * 60 * 1000;
+
+function watchDiary(){
+  var early = parseInt(store.settings.headsUp, 10);
+  if(isNaN(early)) early = 15;
+  if(early <= 0) return;
+  if(!hf.on || hf.talking || hf.answering) return;   /* never over the top of him */
+  diaryNext(2, 3).then(function(list){
+    list.forEach(function(e){
+      if(e.allDay || typeof e.inMinutes !== "number") return;
+      if(e.inMinutes > early || e.inMinutes < 0) return;
+      var mark = e.title + "|" + (e.start || "");
+      if(diarySaid[mark]) return;
+      diarySaid[mark] = Date.now();
+      var sir = store.settings.manner === "plain" ? "" : ", sir";
+      hfSpeak(capFirst(e.title + " in " + e.inMinutes + " minute" +
+        (e.inMinutes === 1 ? "" : "s") + sir + "."));
+      hudLog("him", e.title + " in " + e.inMinutes + "m", false);
+    });
+    /* anything remembered for longer than a day is not coming back */
+    var old = Date.now() - 24 * 3600 * 1000;
+    Object.keys(diarySaid).forEach(function(k){
+      if(diarySaid[k] < old) delete diarySaid[k];
+    });
+  }).catch(function(){});    /* no app, no calendar, no noise about it */
+}
+
+/* ---- what is working, and what is not ----
+   Said the way he would say it: what is wrong first, because that is the part
+   worth hearing, and a short all-clear when there is nothing. */
+function runDiagnostics(){
+  var s = store.settings;
+  var wrong = [], fine = [];
+
+  fine.push(providerLabel(s.provider) + " answering");
+  if(!apiKeyNow()) wrong.push("no key for " + providerLabel(s.provider) + ", so nothing can answer");
+
+  if(elevenReady()) fine.push("speaking as " + (s.elevenName || "your chosen voice"));
+  else if(s.elevenKey && elevenFailed) wrong.push("that ElevenLabs key was refused - the phone's voice instead");
+  else if(!s.elevenKey) fine.push("using the phone's own voice");
+
+  if(hf.on && hf.rec) fine.push("microphone live");
+  else if(hf.on) wrong.push("the microphone is not running");
+
+  if(!inApp()) fine.push("running as a web page, so the phone's own things are out of reach");
+
+  /* the two that can only be answered by trying */
+  return Promise.all([
+    inApp() ? diaryNext(24, 1).then(function(){ return null; })
+                .catch(function(){ return "I cannot read your calendar - permission, most likely"; })
+            : Promise.resolve(null),
+    inApp() ? batteryNow().then(function(b){
+                fine.push("battery " + b.percent + " percent");
+                return b.low ? "battery is down to " + b.percent + " percent" : null;
+              }).catch(function(){ return null; })
+            : Promise.resolve(null)
+  ]).then(function(found){
+    found.forEach(function(x){ if(x) wrong.push(x); });
+    var sir = s.manner === "plain" ? "" : ", sir";
+    if(!wrong.length) return "All systems nominal" + sir + ". " + capFirst(fine.slice(0, 3).join(", ")) + ".";
+    /* each is its own sentence, so each starts with a capital - "One problem,
+       sir. no key for Gemini" is the sort of thing you only hear once */
+    var count = wrong.length === 1 ? "One problem"
+              : capFirst(saidCount(wrong.length)) + " problems";
+    return count + sir + ". " + wrong.map(capFirst).join(". ") + ". Everything else is fine.";
+  });
+}
+
+/* ---- a word when the battery is going ----
+   Once, on the way down, rather than a phone that stops mid-sentence. */
+var batterySaid = 0;
+function watchBattery(){
+  if(!hf.on || hf.talking || hf.answering) return;
+  batteryNow().then(function(b){
+    if(b.charging){ batterySaid = 0; return; }   /* on the way back up - say it again next time */
+    /* twenty and ten, and no more than that */
+    var step = b.percent <= 10 ? 10 : b.percent <= 20 ? 20 : 0;
+    if(!step || batterySaid === step || (batterySaid && batterySaid <= step)) return;
+    batterySaid = step;
+    var sir = store.settings.manner === "plain" ? "" : ", sir";
+    hfSpeak("Battery is down to " + b.percent + " percent" + sir + ".");
+    hudLog("him", "Battery " + b.percent + "%", false);
+  }).catch(function(){});
+}
+
+/* say it, write it down, and hand the microphone straight back */
+function sayNow(line){
+  saidLast = line;
+  hfSaid.textContent = line;
+  hudLog("him", line, false);
+  carryOn(line);
+}
+
 function theSmallThings(said){
   var q = String(said || '').trim().replace(/[.?!]+$/, '');
   if(!q) return false;
+
+  if(rightNow(q)) return true;         /* the time, the date, the weather - now */
 
   var t = q.match(TIMER_RE);
   if(t) return startTimer(t[1], t[2]);
@@ -8099,9 +8501,10 @@ function backupData(){
       provider:s.provider, aiName:s.aiName, name:s.name, about:s.about,
       apiKey:s.apiKey, geminiKey:s.geminiKey, groqKey:s.groqKey,
       model:s.model, geminiModel:s.geminiModel, groqModel:s.groqModel,
-      imageModel:s.imageModel, localUrl:s.localUrl, localModel:s.localModel,
+      localUrl:s.localUrl, localModel:s.localModel,
       effort:s.effort, tts:s.tts, voiceName:s.voiceName, voiceTalk:s.voiceTalk,
       volume:s.volume, rate:s.rate, elevenKey:s.elevenKey, elevenVoice:s.elevenVoice,
+      manner:s.manner, headsUp:s.headsUp, mood:s.mood,
       background:s.background, voiceFirst:s.voiceFirst, enterSends:s.enterSends,
       showThink:s.showThink, theme:s.theme, authEmail:s.authEmail
     },
@@ -8299,7 +8702,11 @@ function wakeRe(){
 var HF_PHASES = ["wait", "hear", "busy", "talk"];
 function hfSet(phase, label){
   setTimeout(hudSync, 0);
+  var moved = hf.phase !== phase;
   hf.phase = phase;
+  /* the stylesheet turns things faster while he listens; if it has been dragged
+     that has to be scaled again against the new pace */
+  if(moved) setTimeout(gripSpinApply, 0);
   /* A voice that never reports finishing used to leave him in "talk" for good,
      where he listens for nothing but stop. Whatever happens, he comes back. */
   clearTimeout(hf.stuck);
@@ -8608,9 +9015,12 @@ var HF_SHORT_ASK = new RegExp("^(?:why|how|what|whats|who|whos|when|where|which|
 function isACommand(text){
   var s = String(text || "").trim();
   if(!s) return false;
+  for(var name in NOW_RE){
+    if(NOW_RE.hasOwnProperty(name) && NOW_RE[name].test(s)) return true;
+  }
   var known = [BUILD_MODE_RE, OPEN_RE, CLOSE_RE, HIDE_RE, STOP_RE, PAUSE_RE, RESUME_RE,
                VIZ_RE, VIZ_HINT_RE, STUDY_RE, UNSTUDY_RE, EDIT_RE, UNDO_RE, TIMER_RE,
-               COIN_RE, DICE_RE, CAM_RE, DRAW_RE, REMEMBER_RE, FORGET_RE, HIGHLIGHT_RE];
+               COIN_RE, DICE_RE, CAM_RE, REMEMBER_RE, FORGET_RE, HIGHLIGHT_RE];
   for(var i = 0; i < known.length; i++){
     try{ if(known[i] && known[i].test(s)) return true; }catch(e){}
   }
@@ -8679,6 +9089,7 @@ function hfHeardText(live, finalTxt){
     if(hf.phase === "talk" || hf.phase === "busy"){
       var over = String(live || finalTxt || "").trim().replace(/[.!?]+$/, "");
       if(!over) return;
+      hf.heardOver = true;      /* something is sitting in the recogniser now */
       if(STOP_RE.test(over)){ hfHeard.textContent = ""; hfStopIt(); return; }
       if(PAUSE_RE.test(over)){ hfHeard.textContent = ""; hfPauseIt(); return; }
       return;                      /* not for us - and not logged as something you said */
@@ -8761,6 +9172,7 @@ function hfQuietTimer(){
    made you say his name before every question - even after "ask me anything
    about it". Say the line, then hand the microphone straight back. */
 function carryOn(line){
+  if(line) saidLast = String(line);     /* so "say that again" has something */
   clearTimeout(hf.stuck);
   hfDropDraft();     /* whatever he was thinking early, this reply settles it */
   function back(){
@@ -8770,14 +9182,19 @@ function carryOn(line){
     hf.turns++;
     hfSet("hear", "Listening - just ask");
     hfHeard.textContent = "";
-    /* Start the microphone over rather than carrying on with it. It has been
-       running the whole time he was talking - listening for "stop" - and
-       everything else it heard is still sitting in it. Picking that up as the
-       next question is what made him answer things you said over the top of
-       him. A fresh start throws it away, and waits for the old one to go
-       before starting, which is what stopping and starting in the same breath
-       got wrong. */
-    hfFreshMic();
+    /* If something was said over the top of him it is still sitting in the
+       recogniser, and picking it up as the next question is what made him
+       answer things you never asked. That needs a fresh start.
+       If nothing was, there is nothing to throw away - and restarting anyway
+       means stopping and starting the audio on every single turn, which is a
+       small break in the sound each time. So only when it is needed. */
+    if(hf.heardOver){
+      hf.heardOver = false;
+      hfFreshMic();
+    } else {
+      clearTimeout(hf.settle);
+      hfListen();
+    }
     hfQuietTimer();
   }
   if(!line){ back(); return; }
@@ -8815,7 +9232,7 @@ function draftable(text){
   if(typeof viz !== "undefined" && viz.busy) return false;
   var doers = [VIZ_RE, VIZ_HINT_RE, BUILD_MODE_RE, STUDY_RE, UNSTUDY_RE, EDIT_RE, UNDO_RE,
                OPEN_RE, CLOSE_RE, HIDE_RE, STOP_RE, PAUSE_RE, RESUME_RE, TIMER_RE,
-               COIN_RE, DICE_RE, CAM_RE, DRAW_RE, REMEMBER_RE, FORGET_RE, HIGHLIGHT_RE];
+               COIN_RE, DICE_RE, CAM_RE, REMEMBER_RE, FORGET_RE, HIGHLIGHT_RE];
   for(var i = 0; i < doers.length; i++){
     try{ if(doers[i] && doers[i].test(s)) return false; }catch(e){}
   }
@@ -8977,6 +9394,12 @@ function keepHearing(){
   }
 }
 setInterval(keepHearing, HEAR_CHECK);
+/* and a look at the diary, far less often - it is a native call, not a poll of
+   anything expensive, and it does nothing at all outside the app */
+setInterval(function(){
+  watchDiary();
+  watchBattery();     /* the same four minutes - no timer of its own */
+}, DIARY_CHECK);
 
 /* --- speak without hearing ourselves --- */
 function hfSpeak(text, done){
@@ -9414,7 +9837,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.81";
+var BUILD = "2026-08-21.83";
 
 function banner(kind, html){
   var b = $("banner");
@@ -9455,13 +9878,17 @@ if(!store.chats.length) newChat();
 if(!store.activeId) store.activeId = store.chats[0].id;
 applyTheme();
 fixStrandedProvider();
-/* the voice was changed after this shipped - move it across once */
-/* Anything saved from before is moved to the new voice - otherwise a phone
-   that already ran an older build would keep speaking in the old one. */
-if(store.settings.elevenVoice !== "IKne3meq5aSn9XLyUdCD"){
-  store.settings.elevenVoice = "IKne3meq5aSn9XLyUdCD";
+/* An older build wrote one particular voice id into the settings on every
+   start, so choosing another never stuck. Clear that one out; from here the
+   voice comes from the account, and picking one by hand is remembered. */
+if(store.settings.elevenVoice === "IKne3meq5aSn9XLyUdCD"){
+  store.settings.elevenVoice = "";
   save();
 }
+
+/* If there is a key, find out which voices it has now rather than on the first
+   sentence he tries to say. It is one request and it is not waited on. */
+if(store.settings.elevenKey) elevenChooseVoice();
 
 runEdits();              /* whatever he has been allowed to add to himself */
 applyBackground();       /* restore whatever was chosen last time */

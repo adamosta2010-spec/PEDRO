@@ -41,6 +41,11 @@ var activeChat = function(){ return null; };
 eval(declOf("SUM_AFTER"));
 eval("var summaryOf = " + grab("summaryOf").replace("function summaryOf", "function") + ";");
 eval(declOf("MASTER_WRITTEN"));
+/* how he speaks - composed and British, or nothing at all */
+eval((typeof declOf === "function" ? declOf : decl)("MANNERS"));
+eval((typeof declOf === "function" ? declOf : decl)("MANNER_REPLACES"));
+eval("var mannerBlock = " + grab("mannerBlock").replace("function mannerBlock", "function") + ";");
+eval("var promptWithout = " + grab("promptWithout").replace("function promptWithout", "function") + ";");
 eval(names.map(grab).join("\n"));
 
 let fail = 0, pass = 0;

@@ -14,21 +14,10 @@ const t = (n, g, w) => {
   else { pass++; console.log("ok   " + n); }
 };
 
-/* long declarations full of semicolons - scan with the quotes in mind */
-function declOf(name){
-  const i = src.indexOf("var " + name + " =");
-  if(i < 0) throw new Error("no declaration: " + name);
-  let q = null, depth = 0;
-  for(let k = i; k < src.length; k++){
-    const ch = src[k];
-    if(q){ if(ch === String.fromCharCode(92)) k++; else if(ch === q) q = null; continue; }
-    if(ch === "'" || ch === '"'){ q = ch; continue; }
-    if(ch === "(" || ch === "[" || ch === "{") depth++;
-    else if(ch === ")" || ch === "]" || ch === "}") depth--;
-    else if(ch === ";" && depth === 0) return src.slice(i, k + 1);
-  }
-  throw new Error("unterminated: " + name);
-}
+/* Long declarations, some of them regexes with quote characters inside. This
+   used to be scanned by hand here and the quotes inside /(?:what'?s)/ ended it
+   halfway through the file - the parser is asked instead. */
+function declOf(name){ return decl(name); }
 
 const keyOf = new Function(grab("draftKey") + " return draftKey;")();
 const fits  = new Function(grab("draftKey") + grab("draftFits") + " return draftFits;")();
@@ -64,9 +53,10 @@ function canDraft(text, world){
     "DRAFT_WORDS", "isDevice", "isGemini", "apiKeyNow", "hf", "wb", "cam", "viz",
     "VIZ_RE", "VIZ_HINT_RE", "BUILD_MODE_RE", "STUDY_RE", "UNSTUDY_RE", "EDIT_RE", "UNDO_RE",
     "OPEN_RE", "CLOSE_RE", "HIDE_RE", "STOP_RE", "PAUSE_RE", "RESUME_RE", "TIMER_RE",
-    "COIN_RE", "DICE_RE", "CAM_RE", "DRAW_RE", "REMEMBER_RE", "FORGET_RE", "HIGHLIGHT_RE",
+    "COIN_RE", "DICE_RE", "CAM_RE", "REMEMBER_RE", "FORGET_RE", "HIGHLIGHT_RE",
     declOf("HF_FILLER") + "\n" + declOf("HF_SHORT_ASK") + "\n" +
     declOf("PEDRO_PANELS") + "\n" +
+    declOf("NOW_RE") + "\n" +
     grab("isACommand") + "\n" +
     grab("worthAnswering") + "\n" + grab("draftKey") + grab("draftable") +
     " return draftable;");
@@ -81,7 +71,7 @@ function canDraft(text, world){
     pat("VIZ_RE"), pat("VIZ_HINT_RE"), pat("BUILD_MODE_RE"), pat("STUDY_RE"), pat("UNSTUDY_RE"),
     pat("EDIT_RE"), pat("UNDO_RE"), pat("OPEN_RE"), pat("CLOSE_RE"), pat("HIDE_RE"),
     pat("STOP_RE"), pat("PAUSE_RE"), pat("RESUME_RE"), pat("TIMER_RE"), pat("COIN_RE"),
-    pat("DICE_RE"), pat("CAM_RE"), pat("DRAW_RE"), pat("REMEMBER_RE"), pat("FORGET_RE"),
+    pat("DICE_RE"), pat("CAM_RE"), pat("REMEMBER_RE"), pat("FORGET_RE"),
     pat("HIGHLIGHT_RE"))(text);
 }
 
