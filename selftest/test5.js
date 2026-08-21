@@ -34,6 +34,9 @@ function grabVar(name){
 /* the prompt is built from a plain declaration as well as from functions */
 const { decl: declOf } = require("./lib").reader(src);
 eval(declOf("MASTER_PROMPT"));
+/* he now arrives with lessons of his own */
+eval(declOf("HOUSE_LESSONS"));
+var allLessons = function(){ return lessons().concat(HOUSE_LESSONS); };
 /* the prompt now carries the tone of whichever mood he is in */
 eval(declOf("MOODS"));
 var moodNow = function(){ return MOODS.normal; };

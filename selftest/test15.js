@@ -243,5 +243,40 @@ const has = s => src.indexOf(s) > -1;
   t("listeners are guarded the same way", src.indexOf("function natListen") > -1, true);
 }
 
+/* ---------- he arrives already taught ---------- */
+{
+  const house = new Function(decl("HOUSE_LESSONS") + " return HOUSE_LESSONS;")();
+  t("he starts with lessons rather than none", house.length >= 15, true);
+  t("every one is a question and an answer",
+    house.every(l => l.q && l.a && l.q.length > 2 && l.a.length > 2), true);
+
+  /* the ones that matter most, each written from something that went wrong */
+  const asked = q => house.filter(l => l.q === q)[0];
+  t("a short question gets a short answer",
+    asked("what is the capital of france").a.length < 12, true);
+  t("half-heard words get said so, not explained away",
+    /did not catch/.test(asked("brrm the the").a), true);
+  t("a request to text shows the tool, not a claim to have sent it",
+    /message.write/.test(asked("text mum that i am running late").a), true);
+  t("something he cannot know is said plainly",
+    /do not know|cannot see/.test(asked("what is my bank balance").a), true);
+  t("a thing to be built is described in real parts",
+    /hull|tracks|turret/.test(asked("simulate a tank").a), true);
+  t("and in the right proportions",
+    /long and low|wider than/.test(asked("simulate a tank").a), true);
+
+  const pick = grab("pickLessons");
+  t("they are drawn on alongside anything he is taught",
+    pick.indexOf("best(HOUSE_LESSONS)") > -1, true);
+  /* they must not turn up on a question they have nothing to do with - that
+     put a joke and a bank balance in front of every unrelated question */
+  t("but only when they bear on the question",
+    pick.indexOf("never the built-in ones") > -1, true);
+  t("and the fallback shows only what Adam taught",
+    pick.indexOf("return mine.slice(") > -1, true);
+  t("and what Adam teaches him comes first",
+    grab("allLessons").indexOf("lessons().concat(HOUSE_LESSONS)") > -1, true);
+}
+
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " everything-else tests passed");
 process.exit(fail ? 1 : 0);

@@ -7799,15 +7799,84 @@ function relevance(text, lesson){
   return score;
 }
 
+/* ==================== what he has been taught ====================
+   Worked examples, not rules - an example lands where another paragraph of
+   instruction does not. Every one of these is something that went wrong once.
+   Anything Adam teaches him himself comes first; these are the floor. */
+var HOUSE_LESSONS = [
+  /* answers out loud are short. This was the first complaint and the most
+     often repeated. */
+  { q: "what is the capital of france",
+    a: "Paris." },
+  { q: "how far is the moon",
+    a: "About 384,000 kilometres - a bit over a light second." },
+  { q: "what is 2 plus 2",
+    a: "Four." },
+
+  /* half-heard speech. He used to invent a situation to explain it. */
+  { q: "brrm the the",
+    a: "I did not catch that." },
+  { q: "shhk about the",
+    a: "Sorry - say that again?" },
+
+  /* machinery is never read out. He used to say the JSON aloud. */
+  { q: "search for train times",
+    a: "{\"tool\":\"web.search\",\"args\":{\"q\":\"train times\"}}" },
+  { q: "put the dentist in my calendar tomorrow at 3",
+    a: "{\"tool\":\"calendar.add\",\"args\":{\"title\":\"Dentist\",\"start\":\"tomorrow at 3pm\",\"minutes\":30}}" },
+  { q: "what is 17 percent of 340",
+    a: "{\"tool\":\"math.calc\",\"args\":{\"q\":\"17% of 340\"}}" },
+
+  /* a question is answered in words, not with a tool */
+  { q: "what is a diode",
+    a: "A one-way valve for electricity - current goes through it in one direction and not the other." },
+  { q: "why is the sky blue",
+    a: "Air scatters short wavelengths more than long ones, and blue is short." },
+
+  /* he cannot send or dial, and must not imply he did */
+  { q: "text mum that i am running late",
+    a: "{\"tool\":\"message.write\",\"args\":{\"to\":\"mum\",\"text\":\"Running late\"}}" },
+
+  /* describing a thing to be built: real parts, right proportions */
+  { q: "simulate a tank",
+    a: "A tank is long and low: a flat armoured hull, tracks down each side under it, a turret sitting on top with a long gun out the front. The hull is wider than it is tall and about twice as long as it is wide." },
+  { q: "simulate a plane",
+    a: "A tube for the fuselage, a wing out each side about as long as the body, a tail fin standing up at the back with small tailplanes either side, and engines slung under the wings." },
+
+  /* saying plainly when he does not know, rather than filling the gap */
+  { q: "what did i have for breakfast",
+    a: "I do not know - you have not told me." },
+  { q: "what is my bank balance",
+    a: "I cannot see that. I have no way to reach your bank." },
+
+  /* not padding, not opening with Sure, not offering help at the end */
+  { q: "is it raining in london",
+    a: "{\"tool\":\"weather.now\",\"args\":{\"place\":\"London\"}}" },
+  { q: "tell me a joke",
+    a: "I told my computer I needed a break, and now it will not stop sending me Kit Kats." }
+];
+
+/* Adam's own teaching first, then these. His always wins - if he has taught him
+   something that contradicts one of these, that is the answer. */
+function allLessons(){
+  return lessons().concat(HOUSE_LESSONS);
+}
+
 function pickLessons(text, max){
-  var all = lessons();
-  if(!all.length) return [];
-  var scored = all.map(function(l){ return { l:l, s:relevance(text, l) }; })
-                  .filter(function(x){ return x.s > 0; })
-                  .sort(function(a,b){ return b.s - a.s; });
-  /* nothing matched? send the most recent few so teaching still shows through */
-  if(!scored.length) return all.slice(-Math.min(3, max));
-  return scored.slice(0, max).map(function(x){ return x.l; });
+  function best(list){
+    return list.map(function(l){ return { l:l, s:relevance(text, l) }; })
+               .filter(function(x){ return x.s > 0; })
+               .sort(function(a,b){ return b.s - a.s; })
+               .map(function(x){ return x.l; });
+  }
+  var mine = lessons();
+  /* what Adam taught comes first, then the ones he shipped with */
+  var picked = best(mine).concat(best(HOUSE_LESSONS)).slice(0, max);
+  if(picked.length) return picked;
+  /* Nothing bears on it. Show the last few things Adam taught, so his teaching
+     still shows through - but never the built-in ones, or every unrelated
+     question would arrive with a joke and a bank balance attached to it. */
+  return mine.slice(-Math.min(3, max));
 }
 
 function taughtBlock(text){
@@ -9279,7 +9348,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.77";
+var BUILD = "2026-08-21.78";
 
 function banner(kind, html){
   var b = $("banner");
