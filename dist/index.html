@@ -558,10 +558,19 @@
     background:#0b0d12;opacity:0;transform:scale(.7);pointer-events:none;
     transition:opacity .45s ease, transform .45s cubic-bezier(.2,.9,.3,1)}
   #hfOrb.showing #orbViz{opacity:1;transform:scale(1);pointer-events:auto}
+  /* Something to look at: the ball gets out of its way entirely and opens out
+     to most of the screen. A simulation in a circle a sixth of the screen wide
+     is not worth looking at. */
+  #hfOrb.showing{--orb:min(94vw, 74vh);}
   #hfOrb.showing .globe,
   #hfOrb.showing .core,
-  #hfOrb.showing .spokes{opacity:0;transition:opacity .4s ease}
-  #hfOrb.showing .ticks{opacity:.5}
+  #hfOrb.showing .ring,
+  #hfOrb.showing .pulse,
+  #hfOrb.showing .ticks,
+  #hfOrb.showing .spokes{opacity:0;pointer-events:none;transition:opacity .3s ease}
+  /* square, not a porthole - a plane in a circle loses its wings */
+  #hfOrb.showing #orbViz{inset:0;width:100%;height:100%;border-radius:16px;
+    border:1px solid color-mix(in srgb,var(--hud) 25%,transparent)}
   #hfOrb .globe,#hfOrb .core{transition:opacity .4s ease}
 
   /* the bars only move while he is actually talking, so you can see it is him */
@@ -2686,11 +2695,15 @@ function elevenReady(){
   return !!(store.settings.elevenOn !== false && store.settings.elevenKey && !elevenFailed);
 }
 
-function elevenSpeak(text, onEnd){
+/* One sentence's worth of sound, asked for on its own so the next can be
+   fetched while this one is playing. */
+function elevenFetch(text){
   var key = store.settings.elevenKey;
   var voice = store.settings.elevenVoice || "IKne3meq5aSn9XLyUdCD";
+  /* optimize_streaming_latency trades a little quality for the sound starting
+     sooner, which is the right way round for a conversation. */
   var url = "https://api.elevenlabs.io/v1/text-to-speech/" + encodeURIComponent(voice) +
-            "?output_format=mp3_44100_128";
+            "?output_format=mp3_44100_128&optimize_streaming_latency=3";
   return fetch(url, {
     method: "POST",
     headers: { "xi-api-key": key, "content-type": "application/json" },
@@ -2711,7 +2724,31 @@ function elevenSpeak(text, onEnd){
       });
     }
     return res.blob();
-  }).then(function(blob){
+  });
+}
+
+/* what has been fetched ahead, and for which words */
+var elevenAhead = null;
+function elevenAheadFor(text){
+  if(elevenAhead && elevenAhead.text === text){
+    var got = elevenAhead.got;
+    elevenAhead = null;
+    return got;
+  }
+  return elevenFetch(text);
+}
+/* start on the next sentence while this one is still being said */
+function elevenPrefetch(text){
+  if(!text || !elevenReady()) return;
+  if(elevenAhead && elevenAhead.text === text) return;
+  elevenAhead = { text: text, got: elevenFetch(text) };
+  elevenAhead.got.catch(function(){});    /* a wasted one is not an error */
+}
+
+function elevenSpeak(text, onEnd){
+  return elevenAheadFor(text).then(function(blob){
+    /* the one after this can be on its way already */
+    if(typeof sayQueue !== "undefined" && sayQueue.length) elevenPrefetch(sayQueue[0]);
     return new Promise(function(resolve){
       if(elevenAudio){ try{ elevenAudio.pause(); }catch(e){} }
       var a = new Audio(URL.createObjectURL(blob));
@@ -4248,7 +4285,7 @@ function vizBuild(about){
     if(!parts.html){
       /* "Sure, here's the code" with no code. Ask once more, plainly, and
          never read that promise out as though it were the answer. */
-      if(tries === 0 && apiKeyNow() && !isDevice()){
+      if(tries === 0 && apiKeyNow()){
         tries = 1;
         enough = false;
         seen = '';
@@ -4273,6 +4310,12 @@ function vizBuild(about){
   function run(prompt){
     var one = { messages: [{ role:'user', content: prompt, t:Date.now() }] };
     lastPrompt = prompt;
+    /* The phone's own model cannot describe a thing in parts, so building and
+       simulating always go to the online one. If the phone's is the chosen
+       provider, it is stepped around for this one request only. */
+    var wasProvider = store.settings.provider;
+    if(isDevice() && store.settings.geminiKey) store.settings.provider = "gemini";
+    function putItBack(){ store.settings.provider = wasProvider; }
     askStream(one, function(acc){
       seen = acc;
       var n = (acc.match(/\n/g) || []).length;
@@ -4299,7 +4342,11 @@ function vizBuild(about){
           try{ if(abortCtl) abortCtl.abort(); }catch(e){}
         }
       }
-    }).then(done, function(err){
+    }).then(function(text){
+      putItBack();
+      done(text);
+    }, function(err){
+      putItBack();
       if(enough && seen){ done(seen); return; }   /* we stopped it on purpose */
       fallBack();      /* no signal, no key, or it fell over - draw it here */
     });
@@ -5160,7 +5207,28 @@ function toolRead(text){
   var raw;
   try{ raw = JSON.parse(s.slice(open, close + 1)); }catch(e){ return null; }
   if(!raw || typeof raw.tool !== "string") return null;
-  if(!TOOLS.hasOwnProperty(raw.tool)) return null;
+  var name = raw.tool;
+  if(!TOOLS.hasOwnProperty(name)){
+    /* "weather.lookup" for "weather.now", "search" for "web.search" - near
+       enough to be obvious, and refusing it only ends in the JSON being read
+       out instead */
+    var want = name.toLowerCase();
+    var leaf = want.split(".").pop();
+    var fits = [];
+    for(var known in TOOLS){
+      if(!TOOLS.hasOwnProperty(known)) continue;
+      var k = known.toLowerCase();
+      /* The whole name, or exactly the last part of it - and only when one
+         tool fits. Matching the first part would turn phone.wipe into
+         phone.call, and "add" fits both the diary and a reminder, so a guess
+         either way is worse than not understanding it. */
+      if(k === want){ fits = [known]; break; }
+      if(k.split(".").pop() === leaf) fits.push(known);
+    }
+    if(fits.length === 1) name = fits[0];
+    if(!TOOLS.hasOwnProperty(name)) return null;
+  }
+  raw.tool = name;
   var args = (raw.args && typeof raw.args === "object") ? raw.args : {};
   var safe = {};
   for(var k in args){
@@ -5174,6 +5242,34 @@ function toolRead(text){
 }
 
 /* doing it, and saying what happened */
+/* Whatever is left once the machinery is taken out. If he wrote a tool call
+   that could not be used, the words around it are still worth saying - the
+   JSON never is. */
+function withoutJson(text){
+  var s = String(text || "");
+  /* take out every {...} that looks like machinery rather than a sentence */
+  var out = "", depth = 0, start = -1;
+  for(var i = 0; i < s.length; i++){
+    var c = s.charAt(i);
+    if(c === "{"){
+      if(!depth) start = i;
+      depth++;
+    } else if(c === "}" && depth){
+      depth--;
+      if(!depth){
+        var blob = s.slice(start, i + 1);
+        /* a sentence in braces is not machinery; a quoted key is */
+        if(!/"\s*:/.test(blob)) out += blob;
+        start = -1;
+      }
+    } else if(!depth){
+      out += c;
+    }
+  }
+  if(depth && start > -1) out += "";          /* an unfinished blob goes too */
+  return out.replace(/```[a-z]*/gi, "").replace(/\s+/g, " ").trim();
+}
+
 function toolRun(call){
   var tool = TOOLS[call.tool];
   if(!tool) return Promise.resolve({ ok:false, said:"I cannot do that one" });
@@ -5256,15 +5352,20 @@ function spec3dMerge(specs, names){
 function spec3dAsk(about){
   var things = spec3dThings(about);
   if(things.length > 1) return spec3dAskMany(things);
-  return 'Describe ' + about + ' as a simple 3D model, as JSON and nothing else.' +
+  return 'Picture ' + about + ' properly first: what shape is the main body, what' +
+    ' is attached to it, and how big is each part next to the others. Then describe' +
+    ' it as a simple 3D model, as JSON and nothing else.' +
     ' {"name":"short name","parts":[{"n":"part name","s":"box|cyl|cone|ball|plate",' +
     '"p":[x,y,z],"d":[w,h,d],"r":[rx,ry,rz],"c":"#rrggbb","note":"one short line on' +
     ' what this part does","spin":"y"}]}' +
     ' Between 6 and 14 parts, the important ones, each named the way a person would' +
     ' name it. Centre the whole thing on 0,0,0 and keep it about 4 units across.' +
     ' r is degrees and may be left out. spin only for parts that really turn.' +
-    ' Colours light and distinct so the parts can be told apart. No words outside' +
-    ' the JSON.';
+    ' Colours light and distinct so the parts can be told apart.' +
+    ' Get the proportions right - a thing that is long and low should be long and' +
+    ' low in the numbers. Put each part where it actually sits: wheels underneath,' +
+    ' a turret on top, wings out to the sides. Name the parts the way someone who' +
+    ' knows the thing would name them. No words outside the JSON.';
 }
 
 /* Two or more things at once: one answer, laid out side by side, each part
@@ -5375,6 +5476,18 @@ var SPEC3D_KNOWN = {
     {n:"Sump",s:"box",p:[0,-1.15,0],d:[1.6,0.45,1.2],c:"#7a879f",note:"The oil sits here and is pumped around everything that rubs"},
     {n:"Intake",s:"cyl",p:[0,0.6,0.85],d:[0.35,0.9,0.35],r:[90,0,0],c:"#a8d8ef",note:"Air comes in this way"},
     {n:"Exhaust",s:"cyl",p:[0,0.35,-0.9],d:[0.32,0.9,0.32],r:[90,0,0],c:"#b58686",note:"Burnt gas leaves this way"}]} },
+  tank: { words:["tank","armour","armor","panzer"], spec:{
+    name:"Tank", parts:[
+    {n:"Hull",s:"box",p:[0,0,0],d:[2.2,0.75,3.6],c:"#7d8a6e",note:"The armoured body everything else is built onto"},
+    {n:"Turret",s:"cyl",p:[0,0.68,-0.2],d:[1.5,0.6,1.5],c:"#8b977a",note:"Turns to aim the gun without turning the whole tank"},
+    {n:"Gun",s:"cyl",p:[0,0.72,1.5],d:[0.22,2.6,0.22],r:[90,0,0],c:"#6f7a63",note:"Long, so the shell leaves it fast and straight"},
+    {n:"Mantlet",s:"box",p:[0,0.72,0.42],d:[0.7,0.5,0.35],c:"#6f7a63",note:"The thick shield where the gun comes out of the turret"},
+    {n:"Left track",s:"box",p:[-1.15,-0.3,0],d:[0.45,0.75,3.5],c:"#3f4547",note:"Spreads the weight so it does not sink, and grips the ground"},
+    {n:"Right track",s:"box",p:[1.15,-0.3,0],d:[0.45,0.75,3.5],c:"#3f4547",note:"Spreads the weight so it does not sink, and grips the ground"},
+    {n:"Left drive wheel",s:"cyl",p:[-1.15,-0.42,-1.45],d:[0.62,0.5,0.62],r:[0,0,90],c:"#5a6163",note:"Pulls the track round",spin:"x"},
+    {n:"Right drive wheel",s:"cyl",p:[1.15,-0.42,-1.45],d:[0.62,0.5,0.62],r:[0,0,90],c:"#5a6163",note:"Pulls the track round",spin:"x"},
+    {n:"Hatch",s:"cyl",p:[0,1,-0.35],d:[0.55,0.12,0.55],c:"#9aa688",note:"The way the commander gets in and out"},
+    {n:"Exhaust",s:"cyl",p:[0.8,0.3,-1.75],d:[0.18,0.5,0.18],r:[90,0,0],c:"#4a4f50",note:"The engine breathes out here"}]} },
   atom: { words:["atom","molecule","nucleus","electron"], spec:{
     name:"Atom", parts:[
     {n:"Nucleus",s:"ball",p:[0,0,0],d:[0.9,0.9,0.9],c:"#ffd76a",note:"Protons and neutrons packed together in the middle"},
@@ -6094,7 +6207,7 @@ function wbBuild(what, onDone){
     if(onDone) onDone("Here's " + what + ". Tap a part to hear what it does.");
     return;
   }
-  if(!apiKeyNow() || isDevice()){
+  if(!apiKeyNow() && !store.settings.geminiKey){
     if(onDone) onDone("I need the online model to work out what " + what + " is made of.");
     return;
   }
@@ -6103,6 +6216,8 @@ function wbBuild(what, onDone){
   var wasVoice = voiceMode;
   voiceMode = false;
   fastMode = true;
+  var wasProvider = store.settings.provider;
+  if(isDevice() && store.settings.geminiKey) store.settings.provider = "gemini";
   var only = { messages: [{ role:"user", content: spec3dAsk(what), t:Date.now() }] };
   wbSeen = "";
   askStream(only, function(acc){
@@ -6116,12 +6231,14 @@ function wbBuild(what, onDone){
     }
   }).then(function(text){
     voiceMode = wasVoice; fastMode = false;
+    store.settings.provider = wasProvider;
     var spec = spec3dRead(text);
     if(!spec){ if(onDone) onDone("I could not work out what " + what + " is made of."); return; }
     wbBuiltAdd(spec);
     if(onDone) onDone("Here's " + what + ". Tap a part to hear what it does.");
   }).catch(function(){
     voiceMode = wasVoice; fastMode = false;
+    store.settings.provider = wasProvider;
     /* aborted on purpose, or it fell over - either way use what arrived */
     var spec = spec3dRead(seenLast());
     if(spec){ wbBuiltAdd(spec); if(onDone) onDone("Here's " + what + "."); return; }
@@ -7078,7 +7195,9 @@ function handsOn(){
       var dist = gripDistance();
       if(grip.startDist > 10 && dist > 10){
         var want = grip.startScale * (dist / grip.startDist);
-        grip.scale = Math.max(0.55, Math.min(2.2, want));
+        /* room to push it right out when there is something to look at */
+        var most = $("hfOrb") && $("hfOrb").classList.contains("showing") ? 3.2 : 2.2;
+        grip.scale = Math.max(0.5, Math.min(most, want));
       }
       var mid = gripMiddle();
       grip.x = grip.fromX + (mid.x - grip.startX);
@@ -7975,11 +8094,27 @@ function hfSet(phase, label){
   /* A voice that never reports finishing used to leave him in "talk" for good,
      where he listens for nothing but stop. Whatever happens, he comes back. */
   clearTimeout(hf.stuck);
+  hf.waited = 0;
   if(phase === "talk" || phase === "busy"){
     var words = (hfSaid && hfSaid.textContent ? hfSaid.textContent.length : 0);
     var guess = phase === "talk" ? 6000 + words * 90 : 34000;
-    hf.stuck = setTimeout(function(){
+    hf.stuck = setTimeout(function look(){
       if(hf.phase !== phase) return;             /* it moved on by itself */
+      /* It is armed when the first sentence is ready, so a longer answer would
+         outlive its own watchdog and get cut off. If sound is still coming out,
+         he is not stuck - look again shortly. */
+      var stillGoing = (typeof saying !== "undefined" && saying) ||
+        (typeof sayQueue !== "undefined" && sayQueue.length > 0) ||
+        (elevenAudio && !elevenAudio.paused && !elevenAudio.ended);
+      /* Waiting is only worth doing so many times: a stalled audio element
+         claims to be playing for ever, and that is the very thing this is here
+         to rescue him from. */
+      hf.waited = (hf.waited || 0) + 1;
+      if(phase === "talk" && stillGoing && hf.waited < 12){
+        hf.stuck = setTimeout(look, 5000);
+        return;
+      }
+      hf.waited = 0;
       hudLog("him", "(that took too long - listening again)", false);
       sayStop();
       hf.talking = false;
@@ -8534,6 +8669,35 @@ function doTheThing(call, chat){
   });
 }
 
+/* He reached for a tool that does not exist. Ask once more with none on the
+   table, so he answers in words. */
+function askAgainPlainly(c, question){
+  hfSet("busy", "Thinking…");
+  var only = { messages: (c && c.messages ? c.messages.slice(-4) : [])
+    .concat([{ role:"user", content:
+      "Answer that in one or two short sentences of plain speech. Do not reply " +
+      "with JSON and do not use a tool.", t:Date.now() }]) };
+  var spoken = 0;
+  askStream(only, function(acc){
+    var done = wholeSentences(acc);
+    if(done.length > spoken){
+      var bit = done.slice(spoken);
+      spoken = done.length;
+      if(hf.phase !== "talk"){ hfSet("talk", "Speaking"); hf.talking = true; }
+      hfSaid.textContent = done;
+      sayChunk(bit);
+    }
+  }).then(function(text){
+    var say = withoutJson(text) || "I did not catch that.";
+    if(say.length > spoken) sayChunk(say.slice(spoken));
+    hfSaid.textContent = say;
+    hudLog("him", say, false);
+    sayWhenDone(function(){ carryOn(); });
+  }).catch(function(){
+    carryOn("I did not catch that.");
+  });
+}
+
 /* --- speak without hearing ourselves --- */
 function hfSpeak(text, done){
   hfPause();
@@ -8705,6 +8869,20 @@ function hfAsk(question){
       doTheThing(wants, c);
       return;
     }
+    /* Tool-shaped, but not a tool he has. Reading it out is what made him say
+       random things - so take it out, and if nothing sensible is left, ask
+       again plainly rather than saying machinery. */
+    if(String(answer).indexOf('"tool"') > -1 || /^\s*\{[\s\S]*"\s*:/.test(String(answer))){
+      var left = withoutJson(answer);
+      sayStop();
+      spoken = 0;
+      if(left.length > 12){
+        answer = left;
+      } else {
+        askAgainPlainly(c, question);
+        return;
+      }
+    }
     voiceMode = false;
     if(answer.length > spoken) sayChunk(answer.slice(spoken));
     hfSaid.textContent = answer;
@@ -8754,7 +8932,12 @@ function sayChunk(text){
   sayQueue.push(text);
   sayNext();
 }
-function sayStop(){ sayQueue = []; saying = false; sayDone = null; }
+function sayStop(){
+  sayQueue = [];
+  saying = false;
+  sayDone = null;
+  elevenAhead = null;      /* whatever was fetched ahead is no longer wanted */
+}
 
 /* everything up to the last finished sentence */
 function wholeSentences(text){
@@ -8951,7 +9134,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.74";
+var BUILD = "2026-08-21.75";
 
 function banner(kind, html){
   var b = $("banner");

@@ -77,8 +77,12 @@ const has = s => src.indexOf(s) > -1;
   t("an empty code block no longer counts as finished",
     build.indexOf("close - first > 60") > -1, true);
   t("the second ask only happens once", build.indexOf("tries === 0") > -1, true);
-  t("and not on the phone's own model, which cannot write a page",
-    build.indexOf("!isDevice()") > -1, true);
+  /* building and simulating always go to the online model now - the phone own
+     one cannot describe a thing in parts, so it is stepped around entirely */
+  t("building never goes to the phone own model",
+    build.indexOf("store.settings.provider = \"gemini\"") > -1, true);
+  t("and the chosen provider is put back afterwards",
+    build.indexOf("putItBack()") > -1, true);
 
   /* the ones he can draw with no model at all */
   const kinds = new Function(

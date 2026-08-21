@@ -834,8 +834,12 @@ function nativeFrom(cap, exp){
   t("and no longer leaves it tilted", grab("handsOn").indexOf("grip.spinY += dx") === -1, true);
   t("two fingers pinch it", grab("handsOn").indexOf("grip.startDist") > -1, true);
   t("and carry it somewhere else", grab("handsOn").indexOf("grip.x = grip.fromX") > -1, true);
-  t("it cannot be pinched to nothing", grab("handsOn").indexOf("Math.max(0.55") > -1, true);
-  t("nor blown up past the screen", grab("handsOn").indexOf("Math.min(2.2") > -1, true);
+  t("it cannot be pinched to nothing", grab("handsOn").indexOf("Math.max(0.5") > -1, true);
+  /* there is more room to push it out when a simulation is up - a model of a
+     plane in a sixth of the screen is not worth looking at */
+  t("nor blown up past all sense", grab("handsOn").indexOf("Math.min(most") > -1, true);
+  t("and a simulation may be pushed further than the ball",
+    grab("handsOn").indexOf("showing") > -1 && grab("handsOn").indexOf("3.2") > -1, true);
   t("it scales rather than resizing, which is what made it lag",
     grab("gripApply").indexOf("scale(") > -1 && grab("gripApply").indexOf("--orb") === -1, true);
   t("and writes the change once a frame", grab("gripApply").indexOf("requestAnimationFrame") > -1, true);
