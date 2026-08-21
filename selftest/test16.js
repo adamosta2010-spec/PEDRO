@@ -1010,5 +1010,61 @@ const TOOLSRC = decl("TOOLS");
 }
 
 
+/* ---------- the rest of what iOS allows ---------- */
+{
+  const sw = fs.readFileSync("native/PedroNative.swift", "utf8");
+  const TOOLS = new Function("Native", "APPS", "appNamed", "openThing", "whenIsThat",
+    "startTimer", "diaryNext", "eventSaid", "nat", "camOpen", "camAsk",
+    "nativeMicSupported", "store", "shortcutNames",
+    decl("TOOLS") + " return TOOLS;")(null, {}, () => null, () => Promise.resolve(),
+      () => null, () => {}, () => Promise.resolve([]), () => "", () => Promise.resolve({}),
+      () => {}, () => {}, () => true, { settings:{} }, () => []);
+
+  t("there are twenty-seven of them", Object.keys(TOOLS).length, 27);
+  t("every one says what it needs, what it does, and what words reach it",
+    Object.keys(TOOLS).filter(k => !(TOOLS[k].needs && TOOLS[k].tell &&
+      typeof TOOLS[k].run === "function" && TOOLS[k].words && TOOLS[k].words.length)).length, 0);
+
+  ["calendar.list", "reminder.list", "notify.at", "media.control",
+   "camera.look", "maps.show"].forEach(k =>
+    t(k + " is one of them", !!TOOLS[k], true));
+
+  /* the phone's side of each */
+  ["notify", "notifyCancel", "mediaControl", "nowPlaying", "remindersList"].forEach(m => {
+    t(m + " is offered to the app", sw.indexOf('CAPPluginMethod(name: "' + m + '"') > -1, true);
+    t(m + " is written", sw.indexOf("@objc func " + m + "(") > -1, true);
+  });
+  t("notifications come from the real framework", sw.indexOf("import UserNotifications") > -1, true);
+  t("and media from the real one too", sw.indexOf("import MediaPlayer") > -1, true);
+  /* being asked for something before you have wanted it is how permission gets
+     refused - so it is asked for at the moment one is set */
+  t("permission is asked when a notification is set, not at start",
+    sw.indexOf("centre.requestAuthorization") > -1 &&
+    sw.indexOf("@objc func notify") < sw.indexOf("centre.requestAuthorization"), true);
+  t("a time already gone is refused rather than fired at once",
+    sw.indexOf("that time has already gone past") > -1, true);
+  t("only reminders that are not done come back",
+    sw.indexOf("predicateForIncompleteReminders") > -1, true);
+  t("soonest first", sw.indexOf("return da < db") > -1, true);
+  /* third-party players keep playback to themselves - saying otherwise would
+     have him claim he had done something he had not */
+  t("media control says which player it moves",
+    sw.indexOf("Third-party apps") > -1, true);
+
+  /* Shortcuts: iOS will not list them, so he cannot run one he has never
+     heard of. Telling him the names is the whole fix. */
+  t("there is somewhere to type your Shortcuts", has('id="setShortcuts"'), true);
+  t("and they reach the prompt", grab("shortcutNames").indexOf("store.settings.shortcuts") > -1, true);
+  t("a tool that describes itself is asked, not pasted",
+    grab("toolsBlock").indexOf('typeof tell === "function" ? tell()') > -1, true);
+  const names = new Function("store", grab("shortcutNames") + " return shortcutNames;")(
+    { settings: { shortcuts: "Morning Routine, Drive Home ,, Wind Down" } })();
+  t("they are split and tidied", names, ["Morning Routine", "Drive Home", "Wind Down"]);
+  t("and near enough finds one",
+    TOOLS["shortcut.run"].run.toString().indexOf("indexOf(name.toLowerCase()) > -1") > -1, true);
+  t("nothing named asks which", TOOLS["shortcut.run"].run.toString().indexOf("which shortcut?") > -1, true);
+}
+
+
 console.log(fail ? NL + fail + " FAILURES" : NL + "All " + pass + " JARVIS tests passed");
 process.exit(fail ? 1 : 0);

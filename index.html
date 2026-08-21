@@ -1307,6 +1307,14 @@
       <div class="sw" id="swManner"></div>
     </div>
     <div class="field">
+      <label for="setShortcuts">Your Shortcuts</label>
+      <input type="text" id="setShortcuts" placeholder="Morning Routine, Drive Home, Wind Down"
+             autocomplete="off" spellcheck="false">
+      <div class="hint">iOS will not tell an app what Shortcuts you have, so he cannot
+        run one whose name he has never heard. Type them here, separated by commas,
+        and he can run any of them by name.</div>
+    </div>
+    <div class="field">
       <label for="setClaps">Clap to wake him</label>
       <select id="setClaps">
         <option value="0">Off</option>
@@ -1678,6 +1686,7 @@ var DEF = {
   manner:"jarvis", /* "jarvis" - composed, British, brief - or "plain" */
   patience:"normal", /* how long a silence means you have finished talking */
   claps:2,         /* how many claps wake him; 0 is off */
+  shortcuts:"",    /* the Shortcuts on this phone, by name - iOS will not list them */
   party:false,     /* colour, speed, and a livelier voice */
   headsUp:15,      /* minutes before something starts that he says so; 0 = never */
   elevenKey:"",    /* an ElevenLabs key of your own, if you want their voice */
@@ -2233,6 +2242,7 @@ function fillSettings(){
   $("setHeadsUp").value = String(s.headsUp === undefined ? 15 : s.headsUp);
   $("setPatience").value = s.patience || "normal";
   $("setClaps").value = String(s.claps === undefined ? 2 : s.claps);
+  $("setShortcuts").value = s.shortcuts || "";
   sw($("swFail"), s.autoFailover !== false);
   $("setEffort").value = s.effort;
   $("setAiName").value = s.aiName || "Pedro";
@@ -2628,6 +2638,7 @@ $("swManner").addEventListener("click", function(){
   toast(on ? "Plainer, friendlier." : "Composed, British, brief.");
 });
 bindInput("setPatience", "patience");
+bindInput("setShortcuts", "shortcuts");
 bindInput("setClaps", "claps", function(){
   store.settings.claps = parseInt(store.settings.claps, 10) || 0;
   save();
@@ -5344,17 +5355,145 @@ var TOOLS = {
       });
     }
   },
-  "shortcut.run": {
-    words: ["shortcut"],
-    needs: "the name of one of your Shortcuts",
+  "calendar.list": {
+    words: ["what's on", "my calendar", "my day", "diary", "schedule", "meetings",
+            "appointments", "what have i got", "am i free", "busy"],
+    needs: "how far ahead to look, in hours",
     hands: false,
-    tell: "run one of your Shortcuts",
+    tell: "read what is coming up in the calendar",
     run: function(a){
-      var name = String(a.name || "").trim();
-      if(!name) return Promise.resolve({ ok:false, said:"no shortcut named" });
+      var hours = parseInt(a.hours || a.h || 24, 10) || 24;
+      return diaryNext(hours, 6).then(function(list){
+        if(!list.length) return { ok:true, said:"nothing in the calendar for that time" };
+        return { ok:true, said: list.map(function(e){ return eventSaid(e); }).join(" ") };
+      }).catch(function(e){
+        return { ok:false, said:String(e && e.message || e) };
+      });
+    }
+  },
+  "reminder.list": {
+    words: ["my reminders", "what do i have to do", "to do", "todo", "tasks",
+            "what am i meant to", "what did i have to"],
+    needs: "nothing",
+    hands: false,
+    tell: "read the reminders that are not done yet",
+    run: function(){
+      return nat("remindersList", { limit: 8 }).then(function(r){
+        var list = (r && r.reminders) || [];
+        if(!list.length) return { ok:true, said:"nothing on the list" };
+        return { ok:true, said: list.map(function(x){
+          return x.title + (x.due ? " (due " + x.due.replace("T", " at ") + ")" : "");
+        }).join(". ") };
+      }).catch(function(e){
+        return { ok:false, said:String(e && e.message || e) };
+      });
+    }
+  },
+  "notify.at": {
+    words: ["notify", "notification", "alert me", "buzz me", "let me know",
+            "tell me at", "tell me in", "nudge me", "wake me"],
+    needs: "what to say, and when - either minutes, or a time",
+    hands: false,
+    tell: "put a notification on the phone for later",
+    run: function(a){
+      var body = String(a.body || a.text || a.what || a.q || "").slice(0, 200).trim();
+      var title = String(a.title || "Pedro").slice(0, 60);
+      var args = { title: title, body: body };
+      if(a.at) args.at = String(a.at);
+      else args.minutes = parseFloat(a.minutes || a.mins || 0) || 0;
+      if(!args.at && !args.minutes) return Promise.resolve({ ok:false, said:"I need a time" });
+      return nat("notify", args).then(function(r){
+        var mins = Math.round((r.inSeconds || 0) / 60);
+        return { ok:true, said:"set for " + (mins < 1 ? "under a minute" :
+          mins < 60 ? mins + " minutes" : Math.round(mins / 6) / 10 + " hours") + " from now" };
+      }).catch(function(e){
+        return { ok:false, said:String(e && e.message || e) };
+      });
+    }
+  },
+  "media.control": {
+    words: ["play", "pause", "stop the music", "skip", "next song", "next track",
+            "previous", "go back a song", "resume", "music", "song", "what's playing"],
+    needs: "one of: play, pause, next, back, toggle, what",
+    hands: false,
+    tell: "start, stop or skip what is playing",
+    run: function(a){
+      var what = String(a.action || a.what || a.q || "").toLowerCase().trim();
+      if(!what || /what|playing|which|name/.test(what)){
+        return nat("nowPlaying").then(function(r){
+          if(!r || !r.title) return { ok:true, said:"nothing is playing" };
+          return { ok:true, said:(r.playing ? "playing " : "paused on ") + r.title +
+            (r.artist ? " by " + r.artist : "") };
+        }).catch(function(e){ return { ok:false, said:String(e && e.message || e) }; });
+      }
+      return nat("mediaControl", { action: what }).then(function(){
+        return { ok:true, said:"done" };
+      }).catch(function(e){
+        return { ok:false, said:String(e && e.message || e) };
+      });
+    }
+  },
+  "camera.look": {
+    words: ["look at this", "what is this", "what am i holding", "read this",
+            "what does this say", "use the camera", "point the camera"],
+    needs: "what to look for, or nothing",
+    hands: false,
+    tell: "open the camera and say what is in front of it",
+    run: function(a){
+      var q = String(a.q || a.question || a.what || "").trim();
+      if(!nativeMicSupported()) return Promise.resolve({ ok:false, said:"the camera needs the app" });
+      camOpen();
+      /* the picture has to arrive before anything can be asked about it */
+      setTimeout(function(){ camAsk(q); }, 1100);
+      return Promise.resolve({ ok:true, said:"looking" });
+    }
+  },
+  "maps.show": {
+    words: ["where is", "show me on the map", "on a map", "find on the map", "locate"],
+    needs: "a place",
+    hands: false,
+    tell: "show a place on the map",
+    run: function(a){
+      var place = String(a.place || a.q || a.where || "").trim();
+      if(!place) return Promise.resolve({ ok:false, said:"where?" });
+      return openThing("maps://?q=" + encodeURIComponent(place))
+        .then(function(){ return { ok:true, said:"opened the map at " + place }; })
+        .catch(function(){
+          return openThing("https://maps.apple.com/?q=" + encodeURIComponent(place))
+            .then(function(){ return { ok:true, said:"opened the map at " + place }; });
+        });
+    }
+  },
+  "shortcut.run": {
+    words: ["shortcut", "shortcuts", "automation", "routine", "run my", "trigger"],
+    needs: "the name of one of your Shortcuts, exactly as it is named",
+    hands: false,
+    /* iOS gives no way to list somebody's Shortcuts, so he cannot run one whose
+       name he has never heard. Telling him the names is the whole fix, and they
+       come from Settings. */
+    tell: function(){
+      var mine = shortcutNames();
+      return "run one of your Shortcuts" +
+        (mine.length ? " - you have: " + mine.join(", ") : "") +
+        ". iOS switches to the Shortcuts app to run it";
+    },
+    run: function(a){
+      var name = String(a.name || a.shortcut || a.q || "").trim();
+      if(!name) return Promise.resolve({ ok:false, said:"which shortcut?" });
+      /* near enough is good enough - "morning" should find "Morning Routine" */
+      var mine = shortcutNames();
+      var close = mine.filter(function(x){
+        return x.toLowerCase().indexOf(name.toLowerCase()) > -1 ||
+               name.toLowerCase().indexOf(x.toLowerCase()) > -1;
+      })[0];
+      if(close) name = close;
       var url = "shortcuts://run-shortcut?name=" + encodeURIComponent(name) +
         (a.input ? "&input=text&text=" + encodeURIComponent(String(a.input)) : "");
-      return openThing(url).then(function(){ return { ok:true, said:"ran the shortcut " + name }; });
+      return openThing(url).then(function(){
+        return { ok:true, said:"running " + name + " - the Shortcuts app has it now" };
+      }).catch(function(e){
+        return { ok:false, said:"could not open Shortcuts - " + String(e && e.message || e) };
+      });
     }
   },
   "math.calc": {
@@ -5884,12 +6023,22 @@ function moodSet(name){
 var MOOD_RE = new RegExp("^(?:be|sound|talk|speak|act)" +
   String.fromCharCode(92) + "s+(?:more" + String.fromCharCode(92) + "s+)?([a-z ]{3,20})$", "i");
 
+/* The Shortcuts on this phone, by name. iOS will not list them, so they are
+   whatever was typed in Settings - and without them he can only run one whose
+   name happens to come up in conversation. */
+function shortcutNames(){
+  return String(store.settings.shortcuts || "")
+    .split(",").map(function(x){ return x.trim(); })
+    .filter(function(x){ return x.length > 0; }).slice(0, 24);
+}
+
 function toolsBlock(text){
   if(arguments.length && !looksLikeDoing(text)) return "";
   var lines = [];
   for(var name in TOOLS){
     if(!TOOLS.hasOwnProperty(name)) continue;
-    lines.push(name + " - " + TOOLS[name].tell);
+    var tell = TOOLS[name].tell;
+    lines.push(name + " - " + (typeof tell === "function" ? tell() : tell));
   }
   return "To do something on this phone, reply with only this: " +
     "{\"tool\":\"name\",\"args\":{...}}\n" +
@@ -9713,7 +9862,7 @@ function backupData(){
       effort:s.effort, tts:s.tts, voiceName:s.voiceName, voiceTalk:s.voiceTalk,
       volume:s.volume, rate:s.rate, elevenKey:s.elevenKey, elevenVoice:s.elevenVoice,
       manner:s.manner, headsUp:s.headsUp, mood:s.mood, home:s.home, patience:s.patience,
-      claps:s.claps, party:s.party,
+      claps:s.claps, party:s.party, shortcuts:s.shortcuts,
       panelSpots:s.panelSpots, panelSizes:s.panelSizes,
       voiceByHand:s.voiceByHand, voiceMoved:s.voiceMoved,
       background:s.background, voiceFirst:s.voiceFirst, enterSends:s.enterSends,
@@ -11178,7 +11327,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.94";
+var BUILD = "2026-08-21.95";
 
 function banner(kind, html){
   var b = $("banner");

@@ -7,6 +7,8 @@ import Vision
 import LocalAuthentication
 import EventKit
 import Contacts
+import UserNotifications
+import MediaPlayer
 import UniformTypeIdentifiers
 
 #if canImport(FoundationModels)
@@ -46,7 +48,12 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
         CAPPluginMethod(name: "readFile",       returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "calendarNext",   returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "batteryLevel",   returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "setClap",        returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "setClap",        returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "notify",         returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "notifyCancel",   returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "mediaControl",   returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "nowPlaying",     returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "remindersList",  returnType: CAPPluginReturnPromise)
     ]
 
     // MARK: - on-device model
@@ -685,6 +692,133 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
                 "state": how,
                 "low": device.batteryLevel <= 0.2 && state != .charging
             ])
+        }
+    }
+
+    // MARK: - a word at the right time
+
+    /// A notification, which is the only way to reach somebody who is not
+    /// looking at the app. Permission is asked for the first time one is set,
+    /// not at start - being asked for something before you have wanted it is
+    /// how permission gets refused.
+    @objc func notify(_ call: CAPPluginCall) {
+        let title = call.getString("title") ?? "Pedro"
+        let body = call.getString("body") ?? ""
+        let whenText = call.getString("at") ?? ""
+        let minutes = call.getDouble("minutes") ?? 0
+        let id = call.getString("id") ?? UUID().uuidString
+
+        var after: TimeInterval = minutes * 60
+        if let at = readDate(whenText) { after = at.timeIntervalSinceNow }
+        guard after > 0.5 else {
+            call.reject("that time has already gone past")
+            return
+        }
+
+        let centre = UNUserNotificationCenter.current()
+        centre.requestAuthorization(options: [.alert, .sound]) { granted, error in
+            guard granted else {
+                call.reject(error?.localizedDescription
+                    ?? "notifications are not allowed - turn them on in Settings")
+                return
+            }
+            let note = UNMutableNotificationContent()
+            note.title = title
+            if !body.isEmpty { note.body = body }
+            note.sound = .default
+            let fire = UNTimeIntervalNotificationTrigger(timeInterval: after, repeats: false)
+            let ask = UNNotificationRequest(identifier: id, content: note, trigger: fire)
+            centre.add(ask) { err in
+                if let err = err { call.reject(err.localizedDescription) }
+                else { call.resolve(["ok": true, "id": id, "inSeconds": Int(after)]) }
+            }
+        }
+    }
+
+    @objc func notifyCancel(_ call: CAPPluginCall) {
+        let id = call.getString("id") ?? ""
+        let centre = UNUserNotificationCenter.current()
+        if id.isEmpty { centre.removeAllPendingNotificationRequests() }
+        else { centre.removePendingNotificationRequests(withIdentifiers: [id]) }
+        call.resolve(["ok": true])
+    }
+
+    // MARK: - what is playing
+
+    /// The system music player - the Music app's own queue. Third-party apps
+    /// keep their playback to themselves, so this moves Music and says so
+    /// rather than pretending to control everything on the phone.
+    @objc func mediaControl(_ call: CAPPluginCall) {
+        let what = (call.getString("action") ?? "").lowercased()
+        DispatchQueue.main.async {
+            let player = MPMusicPlayerController.systemMusicPlayer
+            switch what {
+            case "play", "resume", "start": player.play()
+            case "pause", "stop": player.pause()
+            case "next", "skip", "forward": player.skipToNextItem()
+            case "back", "previous", "prev": player.skipToPreviousItem()
+            case "toggle":
+                if player.playbackState == .playing { player.pause() } else { player.play() }
+            default:
+                call.reject("I do not know how to " + what)
+                return
+            }
+            call.resolve(["ok": true, "action": what])
+        }
+    }
+
+    @objc func nowPlaying(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            let player = MPMusicPlayerController.systemMusicPlayer
+            guard let item = player.nowPlayingItem else {
+                call.resolve(["playing": false])
+                return
+            }
+            call.resolve([
+                "playing": player.playbackState == .playing,
+                "title": item.title ?? "",
+                "artist": item.artist ?? "",
+                "album": item.albumTitle ?? ""
+            ])
+        }
+    }
+
+    // MARK: - what is still to be done
+
+    /// Reminders that are not ticked off yet. Writing one was already here;
+    /// reading them was not, so he could set a reminder and never mention it
+    /// again.
+    @objc func remindersList(_ call: CAPPluginCall) {
+        let limit = max(1, min(20, call.getInt("limit") ?? 6))
+        askForReminders { [weak self] granted, why in
+            guard let self = self else { return }
+            guard granted else {
+                call.reject(why.isEmpty ? "reminders are not allowed - turn them on in Settings" : why)
+                return
+            }
+            let query = self.events.predicateForIncompleteReminders(
+                withDueDateStarting: nil, ending: nil, calendars: nil)
+            self.events.fetchReminders(matching: query) { found in
+                let shape = DateFormatter()
+                shape.dateFormat = "yyyy-MM-dd'T'HH:mm"
+                shape.locale = Locale(identifier: "en_US_POSIX")
+                let list = (found ?? [])
+                    .sorted { a, b in
+                        let da = a.dueDateComponents?.date ?? Date.distantFuture
+                        let db = b.dueDateComponents?.date ?? Date.distantFuture
+                        return da < db
+                    }
+                    .prefix(limit)
+                let out: [[String: Any]] = list.map { r in
+                    var row: [String: Any] = ["title": r.title ?? "Something"]
+                    if let due = r.dueDateComponents?.date {
+                        row["due"] = shape.string(from: due)
+                        row["inMinutes"] = Int(due.timeIntervalSinceNow / 60)
+                    }
+                    return row
+                }
+                call.resolve(["reminders": out])
+            }
         }
     }
 
