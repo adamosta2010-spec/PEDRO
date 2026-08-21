@@ -72,7 +72,10 @@ const has = s => src.indexOf(s) > -1;
   /* A voice id typed into this file is a guess about somebody else's account.
      If it is not in theirs, every sentence fails over to the phone's voice and
      nothing says why. The account is asked instead. */
-  t("no voice is assumed", has('elevenVoice:""'), true);
+  /* Adam gave the id and asked for it to be the voice. It is from his own
+     account, so it resolves - which was the whole objection to writing one in.
+     Anyone else still gets one chosen from theirs. */
+  t("his voice is what it starts with", has('elevenVoice:"wDsJlOXPqcvIUKdLXjDs"'), true);
   t("their account is asked what it holds", has("api.elevenlabs.io/v1/voices"), true);
   t("only once", grab("elevenList").indexOf("if(elevenListed) return elevenListed") > -1, true);
   t("but a bad signal is not remembered forever",
@@ -399,7 +402,7 @@ const has = s => src.indexOf(s) > -1;
 /* ---------- a voice id that stays put ---------- */
 {
   t("there is a box to paste one into", has('id="setVoiceId"'), true);
-  t("it is remembered as having been set by hand", has("voiceByHand:false"), true);
+  t("it is remembered as having been set by hand", has("voiceByHand:true"), true);
   t("choosing from the list leaves it alone",
     grab("elevenChooseVoice").indexOf("store.settings.voiceByHand && store.settings.elevenVoice") > -1, true);
   t("a new key does not clear it",
@@ -503,6 +506,39 @@ const has = s => src.indexOf(s) > -1;
     inPage("#cam.busy .camshot{pointer-events:none}"), true);
 }
 
+
+/* ---------- the camera when there is no key, or a bad one ---------- */
+{
+  /* "It says the API key does not work, but I do not use an API key."
+     visionProvider reaches for any key it can find whatever provider is
+     chosen, so a stale one takes over the camera - and then a failed request
+     just printed the failure, with the phone's own eyes sitting unused. */
+  t("a refused key is not reached for again", has("var visionRefused"), true);
+  t("and visionProvider skips it",
+    grab("visionProvider").indexOf("!visionRefused[mine]") > -1, true);
+  const ask = grab("camAsk");
+  t("a failed request falls back to the phone's own eyes",
+    ask.indexOf("return lookOnDevice(shot,") > -1, true);
+  t("and a key failure is recorded as one",
+    ask.indexOf("visionRefused[usedKey] = true") > -1, true);
+  t("what went wrong is written down", ask.indexOf("noteTrouble(") > -1, true);
+  t("the screen says it is looking itself", ask.indexOf("Looking myself") > -1, true);
+  t("it does not tell you to add a key and that your key was refused at once",
+    grab("lookOnDevice").indexOf("keyWasRefused") > -1, true);
+  t("and if there is no way to look at all, it says what would fix that",
+    ask.indexOf("I cannot look at pictures on this device") > -1, true);
+
+  /* the voice he asked for by id */
+  t("his voice is what it starts with", has('elevenVoice:"wDsJlOXPqcvIUKdLXjDs"'), true);
+  t("set by hand, so nothing overwrites it", has("voiceByHand:true"), true);
+  t("a phone already running gets it once", has("store.settings.voiceMoved"), true);
+  t("and changing it afterwards sticks",
+    src.indexOf("if(!store.settings.elevenVoice){") > -1, true);
+  /* a voice and no key looks set up and does nothing, which is the worst state */
+  t("a voice with no key is called out",
+    grab("runDiagnostics").indexOf("no ElevenLabs key") > -1, true);
+  t("and said in Settings too", has('id="voiceNeedsKey"'), true);
+}
 
 /* ---------- the answers show what they found ---------- */
 {

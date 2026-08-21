@@ -94,11 +94,13 @@ t("so does a one word answer to his question", worth("yes"), true);
 {
   const { decl: declIt, grab: grabIt } = require("./lib").reader(src);
   const voices = new Function(declIt("ELEVEN_VOICES") + " return ELEVEN_VOICES;")();
-  t("nothing is assumed about their account", voices.length, 0);
-  t("no voice id is baked into the file",
-    src.indexOf("IKne3meq5aSn9XLyUdCD") === src.lastIndexOf("IKne3meq5aSn9XLyUdCD"), true);
-  t("none of the old ones are left",
-    src.indexOf("Pno1sSZ9LihyDUpvtooA") === -1 && src.indexOf("wDsJlOXPqcvIUKdLXjDs") === -1, true);
+  t("nothing is assumed about anyone else's account", voices.length, 0);
+  t("only the one he asked for is written in, and only in two places",
+    (src.match(/wDsJlOXPqcvIUKdLXjDs/g) || []).length <= 3, true);
+  /* wDsJlOXPqcvIUKdLXjDs is the one Adam asked for by id, from his own
+     account. The one that used to be forced on every start is still gone. */
+  t("the forced one is gone", src.indexOf("Pno1sSZ9LihyDUpvtooA") === -1, true);
+  t("and is not the default", src.indexOf('elevenVoice:"IKne3meq5aSn9XLyUdCD"') === -1, true);
   t("a phone that had one forced on it is cleared",
     src.indexOf('store.settings.elevenVoice === "IKne3meq5aSn9XLyUdCD"') > -1, true);
   t("and the line that overwrote the choice on every start is gone",

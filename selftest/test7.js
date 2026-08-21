@@ -569,13 +569,15 @@ function nativeFrom(cap, exp){
   t("the pause before he answers is shorter", inSrc("}, 900);"), true);
   /* A voice id in this file is a guess about somebody else's account. It is
      asked for now, and one already picked by hand is kept. */
-  t("no voice is assumed", inSrc('elevenVoice:""'), true);
+  t("his voice is what it starts with", inSrc('elevenVoice:"wDsJlOXPqcvIUKdLXjDs"'), true);
   t("their account is asked what it has", inSrc("function elevenList"), true);
   t("and the most JARVIS-sounding one is taken", inSrc("function elevenChooseVoice"), true);
   t("a phone that had one forced on it is cleared",
     inSrc('store.settings.elevenVoice === "IKne3meq5aSn9XLyUdCD"'), true);
-  t("and none of the old ids are left behind",
-    !inSrc("Pno1sSZ9LihyDUpvtooA") && !inSrc("wDsJlOXPqcvIUKdLXjDs"), true);
+  /* the one that was forced on every phone at start is still gone - this is
+     a different id, and it is the one he asked for */
+  t("the id that was forced on every start is not the default",
+    !inSrc('elevenVoice:"IKne3meq5aSn9XLyUdCD"'), true);
 }
 
 

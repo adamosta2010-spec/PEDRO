@@ -1159,6 +1159,9 @@
       <input type="text" id="setVoiceId" placeholder="paste the ID from elevenlabs.io" autocomplete="off" spellcheck="false">
       <div class="hint" id="voiceIdHint">Set here it stays set - nothing overwrites it, ever.
         Clear the box to go back to choosing from the list.</div>
+      <div class="hint" id="voiceNeedsKey" style="color:var(--danger);display:none">
+        There is no ElevenLabs key above, so this voice cannot be used - he will
+        speak with the phone's own voice until you add one.</div>
       <label for="setVoice" style="margin-top:12px;display:block">Phone voice <small
         style="color:var(--tx3);font-weight:400">used with no key, or no signal</small></label>
       <select id="setVoice"></select>
@@ -1467,8 +1470,10 @@ var DEF = {
   manner:"jarvis", /* "jarvis" - composed, British, brief - or "plain" */
   headsUp:15,      /* minutes before something starts that he says so; 0 = never */
   elevenKey:"",    /* an ElevenLabs key of your own, if you want their voice */
-  elevenVoice:"",  /* chosen from your ElevenLabs account, not guessed at here */
-  voiceByHand:false, /* an id typed in by hand - nothing is allowed to change it */
+  /* The voice Adam picked and asked for by id. It is from his own account, so
+     it resolves - which was the whole objection to writing one in here. */
+  elevenVoice:"wDsJlOXPqcvIUKdLXjDs",
+  voiceByHand:true,  /* set deliberately - nothing is allowed to change it */
   elevenName:"AI",
   elevenOn:true,   /* use it when there is a key */
   volume:1,        /* how loud he is, on top of the phone's own volume */
@@ -2008,6 +2013,11 @@ function fillSettings(){
   $("setEleven").value = s.elevenKey || "";
   $("setHome").value = (s.home && s.home.byHand && s.home.name) || "";
   $("setVoiceId").value = s.voiceByHand ? (s.elevenVoice || "") : "";
+  var needs = $("voiceNeedsKey");
+  if(needs) needs.style.display = (s.elevenVoice && !s.elevenKey) ? "block" : "none";
+  $("voiceIdHint").textContent = s.voiceByHand && s.elevenVoice
+    ? "Set here it stays set - nothing overwrites it, ever."
+    : "Clear the box to go back to choosing from the list.";
   sw($("swManner"), s.manner !== "plain");
   $("setHeadsUp").value = String(s.headsUp === undefined ? 15 : s.headsUp);
   sw($("swFail"), s.autoFailover !== false);
@@ -6984,18 +6994,24 @@ function camHighlight(what){
 
 /* Not every model has eyes. The phone's own takes text only, and Groq's does
    too, so a picture sent to either is simply dropped. */
+/* A key that has already been refused for a picture is not tried again this
+   time round. Without this, every photo produced the same complaint about a
+   key the person did not know they had. */
+var visionRefused = {};
+
 function visionProvider(){
   var k = allKeys();
   var p = store.settings.provider;
-  if((p === "gemini" && k.gemini) || (p === "claude" && k.claude)) return p;
-  if(k.gemini) return "gemini";
-  if(k.claude) return "claude";
+  var mine = (p === "gemini" && k.gemini) || (p === "claude" && k.claude) ? p : null;
+  if(mine && !visionRefused[mine]) return mine;
+  if(k.gemini && !visionRefused.gemini) return "gemini";
+  if(k.claude && !visionRefused.claude) return "claude";
   return null;
 }
 
 /* The phone's own eyes. Not a model that can reason about a picture, but it
    names things, reads text, and needs nothing at all - no key, no signal. */
-function lookOnDevice(shot){
+function lookOnDevice(shot, keyWasRefused){
   if(!Native || !Native.analyse) return Promise.reject(new Error("no camera support here"));
   return nat("analyse", { image: shot.data }).then(function(r){
     var labels = (r && r.labels) || [];
@@ -7007,7 +7023,9 @@ function lookOnDevice(shot){
     else if(faces > 1) said.push("There are " + faces + " faces in it.");
     if(words.length) said.push("It says: " + words.slice(0, 12).join(" "));
     if(!said.length) said.push("I can see something, but nothing I can name.");
-    said.push("That is my own eyes rather than a proper model - add a Gemini key and I can say much more.");
+    said.push(keyWasRefused
+      ? "That was my own eyes - the key in Settings was refused."
+      : "That is my own eyes rather than a proper model - add a Gemini key and I can say much more.");
     return said.join(" ");
   });
 }
@@ -7049,9 +7067,25 @@ function camAsk(question){
   c.messages.push({ role:'user', content: question, images:[shot], t:Date.now() });
   save();
   voiceMode = true;
+  /* The network is an attempt, not a commitment. No key, a refused key or no
+     signal all mean the same thing: the phone looks at the picture itself. It
+     has the eyes for it and they were never being used. */
+  var usedKey = visionProvider();
   var work = withVision(function(){ return askOnce(only); });
-  /* nothing here can send a picture anywhere - look at it on the phone */
-  if(!work) work = lookOnDevice(shot);
+  if(!work){
+    work = lookOnDevice(shot);
+  } else {
+    work = work.catch(function(e){
+      var why = String(e && e.message || e);
+      /* a refused key is a refused key - stop reaching for it this time round */
+      if(/key|401|403|invalid|refus|quota|429|billing/i.test(why) && usedKey){
+        visionRefused[usedKey] = true;
+      }
+      noteTrouble('camera: ' + why);
+      camSet('Looking myself');
+      return lookOnDevice(shot, /key|401|403|invalid|refus/i.test(why));
+    });
+  }
   work.then(function(answer){
     voiceMode = false;
     cam.busy = false;
@@ -7067,6 +7101,12 @@ function camAsk(question){
     camEl.classList.remove('busy');
     camSet('That did not work');
     var why = String(e && e.message || e);
+    /* Both ways failed. Say what would fix it - an error about a key means
+       nothing to someone who never set one. */
+    if(/no camera support|not in the app|is not there/i.test(why)){
+      why = "I cannot look at pictures on this device. In the app I can, and " +
+            "with a Gemini key in Settings I can say a great deal more.";
+    }
     $('camSaid').textContent = why;
     speak(why);                       /* it is a camera - you are not reading it */
   });
@@ -8145,6 +8185,9 @@ function runDiagnostics(){
   if(!apiKeyNow()) wrong.push("no key for " + providerLabel(s.provider) + ", so nothing can answer");
 
   if(elevenReady() && s.elevenVoice) fine.push("speaking as " + (s.elevenName || "your chosen voice"));
+  else if(!s.elevenKey && s.elevenVoice)
+    wrong.push("there is a voice set but no ElevenLabs key, so that voice cannot be used - " +
+               "the key goes in Settings and the free tier is enough");
   else if(s.elevenKey && elevenFailed) wrong.push("that ElevenLabs key was refused - the phone's voice instead");
   else if(s.elevenKey && elevenWhy) wrong.push("I could not read your voices - " + elevenWhy);
   else if(s.elevenKey && !s.elevenVoice) wrong.push("no voice chosen yet, so the phone's voice is standing in");
@@ -8943,7 +8986,7 @@ function backupData(){
       volume:s.volume, rate:s.rate, elevenKey:s.elevenKey, elevenVoice:s.elevenVoice,
       manner:s.manner, headsUp:s.headsUp, mood:s.mood, home:s.home,
       panelSpots:s.panelSpots, panelSizes:s.panelSizes,
-      voiceByHand:s.voiceByHand,
+      voiceByHand:s.voiceByHand, voiceMoved:s.voiceMoved,
       background:s.background, voiceFirst:s.voiceFirst, enterSends:s.enterSends,
       showThink:s.showThink, theme:s.theme, authEmail:s.authEmail
     },
@@ -10292,7 +10335,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.87";
+var BUILD = "2026-08-21.88";
 
 function banner(kind, html){
   var b = $("banner");
@@ -10338,6 +10381,16 @@ fixStrandedProvider();
    voice comes from the account, and picking one by hand is remembered. */
 if(store.settings.elevenVoice === "IKne3meq5aSn9XLyUdCD" && !store.settings.voiceByHand){
   store.settings.elevenVoice = "";
+  save();
+}
+/* A phone that already ran a build without a voice gets the one he asked for.
+   Done once and written down, so that changing it later sticks. */
+if(!store.settings.voiceMoved){
+  store.settings.voiceMoved = true;
+  if(!store.settings.elevenVoice){
+    store.settings.elevenVoice = "wDsJlOXPqcvIUKdLXjDs";
+    store.settings.voiceByHand = true;
+  }
   save();
 }
 
