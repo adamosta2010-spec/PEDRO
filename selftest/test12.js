@@ -85,8 +85,10 @@ const t = (n, g, w) => {
       return src.indexOf('id="' + id + '"', at) > -1;
     }), true);
   const apply = grab("gripApply");
-  t("they are scaled back by however much the ball grew",
-    apply.indexOf("(1 / s).toFixed(3)") > -1, true);
+  /* Nothing is scaled any more - the ball is one size - so there is nothing
+     to scale the words back by. They can still be picked up and moved. */
+  t("nothing is scaled, so nothing is scaled back",
+    apply.indexOf("(1 / s).toFixed(3)") > -1, false);
   t("so a pinch does not change the words", apply.indexOf("hfWords") > -1, true);
   const on = grab("wordsOn");
   t("the words can be picked up", on.indexOf("pointerdown") > -1, true);

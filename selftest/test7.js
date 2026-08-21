@@ -862,16 +862,21 @@ function nativeFrom(cap, exp){
      and the drag decides how fast it spins */
   t("one finger sets how fast it spins", grab("handsOn").indexOf("grip.spin = Math.max(0.15") > -1, true);
   t("and no longer leaves it tilted", grab("handsOn").indexOf("grip.spinY += dx") === -1, true);
-  t("two fingers pinch it", grab("handsOn").indexOf("grip.startDist") > -1, true);
-  t("and carry it somewhere else", grab("handsOn").indexOf("grip.x = grip.fromX") > -1, true);
-  t("it cannot be pinched to nothing", grab("handsOn").indexOf("Math.max(0.5") > -1, true);
-  /* there is more room to push it out when a simulation is up - a model of a
-     plane in a sixth of the screen is not worth looking at */
-  t("nor blown up past all sense", grab("handsOn").indexOf("Math.min(most") > -1, true);
-  t("and a simulation may be pushed further than the ball",
-    grab("handsOn").indexOf("showing") > -1 && grab("handsOn").indexOf("3.2") > -1, true);
-  t("it scales rather than resizing, which is what made it lag",
-    grab("gripApply").indexOf("scale(") > -1 && grab("gripApply").indexOf("--orb") === -1, true);
+  /* Adam asked for it fixed: not resizable, not draggable about, and in the
+     middle of the screen. A second finger does nothing at all now. */
+  t("two fingers no longer pinch it", grab("handsOn").indexOf("grip.startDist > 10") > -1, false);
+  t("nor carry it somewhere else", grab("handsOn").indexOf("grip.x = grip.fromX") > -1, false);
+  t("a second finger simply does nothing",
+    grab("handsOn").indexOf("if(grip.count >= 2) return;") > -1, true);
+  t("and nothing writes a scale onto the middle any more",
+    grab("gripApply").indexOf("scale(") > -1, false);
+  t("nor moves it", grab("gripApply").indexOf("translate3d(") > -1, false);
+  t("it is centred by the stylesheet instead",
+    page.indexOf(".hudcentre{position:absolute;left:50%;top:50%;") > -1, true);
+  t("and the words hang below it rather than pushing it up",
+    page.indexOf("#hfWords{") > -1 && /#hfWords{[^}]*position:absolute/.test(page), true);
+  t("anything saved from an older build is dropped, not restored",
+    grab("gripLoad").indexOf("delete g.size; delete g.scale;") > -1, true);
   t("and writes the change once a frame", grab("gripApply").indexOf("requestAnimationFrame") > -1, true);
   t("the ball and its words move together", grab("gripApply").indexOf(".hudcentre") > -1, true);
   t("where it was left is remembered", inSrc("function gripSave"), true);

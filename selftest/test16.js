@@ -77,6 +77,18 @@ const has = s => src.indexOf(s) > -1;
   t("only once", grab("elevenList").indexOf("if(elevenListed) return elevenListed") > -1, true);
   t("but a bad signal is not remembered forever",
     grab("elevenList").indexOf("elevenListed = null") > -1, true);
+  /* A voice that could not be chosen fell back to the phone on every sentence
+     and never said why, which looks exactly like nothing having changed. */
+  t("a failure to choose keeps its reason",
+    grab("elevenChooseVoice").indexOf("elevenWhy =") > -1, true);
+  t("an empty account is a reason too",
+    grab("elevenChooseVoice").indexOf("has no voices in it") > -1, true);
+  t("and it is said at start, not left silent",
+    has("Could not choose a voice."), true);
+  t("diagnostics reports it as a problem",
+    grab("runDiagnostics").indexOf("I could not read your voices") > -1, true);
+  t("as is having a key but no voice picked",
+    grab("runDiagnostics").indexOf("no voice chosen yet") > -1, true);
   t("a voice already chosen by hand is kept",
     grab("elevenChooseVoice").indexOf("list.some") > -1, true);
   t("and nothing is spoken in a voice that was never chosen",
@@ -293,6 +305,126 @@ const has = s => src.indexOf(s) > -1;
   t("a new key means a new list, not the old account's voices",
     src.indexOf("a different key is a different account") > -1, true);
 }
+
+
+/* ---------- the things Adam found on the phone ---------- */
+{
+  /* 1. The new words did nothing. rightNow answers through sayNow, which hands
+        the microphone back itself, and then hfAsk handed it back again. For
+        "status", which fetches the weather first, the second hand-back ran
+        BEFORE the answer existed: the microphone reopened, the screen said
+        Listening, and then he started talking into it. */
+  t("an answer can say it has handed the microphone back", has("var handedBack"), true);
+  t("and it is declared only once",
+    (src.match(/var handedBack/g) || []).length, 1);
+  t("rightNow says so the moment it takes the question, not when it answers",
+    grab("theSmallThings").indexOf("handedBack = true; return true;") > -1, true);
+  t("which is what makes it right for an answer that has to fetch something",
+    grab("theSmallThings").indexOf("have to fetch something first") > -1, true);
+  t("and hfAsk does not hand it back a second time",
+    grab("hfAsk").indexOf("if(!handedBack) carryOn();") > -1, true);
+  t("the same for opening something",
+    (grab("hfAsk").match(/if\(!handedBack\) carryOn\(\);/g) || []).length, 2);
+  /* the coin, the dice and the timer speak directly and still need it */
+  t("but a coin flip still gets its hand-back",
+    grab("theSmallThings").indexOf("speak('It is ' + side") > -1, true);
+
+  /* 2. Saying his name did nothing once he was already listening. */
+  const heard = grab("hfHeardText");
+  t("his name is heard while idle and while listening",
+    heard.indexOf('hf.phase === "wait" || hf.phase === "hear"') > -1, true);
+  t("and anything else said while listening carries on as a question",
+    heard.indexOf('if(hf.phase === "wait") return;') > -1, true);
+  const answers = new Function(decl("ANSWER_TO_NAME") + " return ANSWER_TO_NAME;")();
+  t("he has something to answer with", answers.length > 1, true);
+  t("and it is in character", answers.every(a => /sir/i.test(a)), true);
+  t("with the manner off he is plainer about it", heard.indexOf('"Yeah?"') > -1, true);
+  t("a name with a question after it is not answered, it is acted on",
+    heard.indexOf("hfSettle(after)") > -1, true);
+
+  /* 3 and 4. The ball is fixed: dead centre, one size, does not move. */
+  const page = fs.readFileSync("index.html", "utf8");
+  t("the middle is placed, not laid out",
+    page.indexOf(".hudcentre{position:absolute;left:50%;top:50%;") > -1, true);
+  t("so an open panel does not shove it sideways",
+    /\.hudcentre\{[^}]*translate\(-50%,-50%\)/.test(page), true);
+  t("the words hang below the ball rather than being stacked with it",
+    /#hfWords\{[^}]*position:absolute/.test(page), true);
+  t("which is what stopped the ball sitting above centre",
+    page.indexOf("pushed the ball up by half their own height") > -1, true);
+  t("a second finger does nothing", grab("handsOn").indexOf("if(grip.count >= 2) return;") > -1, true);
+  t("nothing writes a scale onto it", grab("gripApply").indexOf("scale(") > -1, false);
+  t("and a size saved by an older build is thrown away",
+    grab("gripLoad").indexOf("delete g.size; delete g.scale;") > -1, true);
+}
+
+/* ---------- where he is, and the weather ---------- */
+{
+  /* It has been wrong twice. getCurrentPosition cannot succeed on iOS without
+     a usage string in the Info.plist, and there was none - so it failed every
+     time, the tool errored, and the model invented a temperature. */
+  const wf = fs.readFileSync(".github/workflows/build-ios.yml", "utf8");
+  t("location is declared, or it can never succeed",
+    wf.indexOf("NSLocationWhenInUseUsageDescription") > -1, true);
+  t("and it is checked after the build",
+    wf.indexOf("NSContactsUsageDescription NSLocationWhenInUseUsageDescription") > -1, true);
+
+  /* and it no longer depends on that permission at all */
+  const clock = new Function(grab("placeFromClock") + " return placeFromClock;")();
+  t("the phone's time zone names the city", typeof clock(), "string");
+  t("which needs no permission and no waiting",
+    grab("placeFromClock").indexOf("resolvedOptions().timeZone") > -1, true);
+  t("a three-part zone still gives the city",
+    grab("placeFromClock").indexOf("bits[bits.length - 1]") > -1, true);
+  t("and an underscore is not read out as one",
+    grab("placeFromClock").indexOf('split("_").join(" ")') > -1, true);
+
+  const me = grab("whereAmI");
+  t("the clock is tried before the permission is", me.indexOf("byClock") > -1, true);
+  t("where he is, is remembered", me.indexOf("store.settings.home") > -1, true);
+  t("and not looked up again for a day", me.indexOf("24 * 3600 * 1000") > -1, true);
+  t("somewhere he typed in himself always wins", me.indexOf("kept.byHand") > -1, true);
+  t("and a stale answer beats no answer",
+    me.indexOf("stale is better than nothing") > -1, true);
+  t("he says the country, not just the city",
+    grab("weatherAt").indexOf("spot.country") > -1, true);
+  t("there is somewhere to set it by hand", has('id="setHome"'), true);
+  t("and clearing it goes back to the clock",
+    src.indexOf("Back to the phone's time zone.") > -1, true);
+}
+
+/* ---------- a voice id that stays put ---------- */
+{
+  t("there is a box to paste one into", has('id="setVoiceId"'), true);
+  t("it is remembered as having been set by hand", has("voiceByHand:false"), true);
+  t("choosing from the list leaves it alone",
+    grab("elevenChooseVoice").indexOf("store.settings.voiceByHand && store.settings.elevenVoice") > -1, true);
+  t("a new key does not clear it",
+    src.indexOf("if(!store.settings.voiceByHand) store.settings.elevenVoice = \"\";") > -1, true);
+  t("and neither does starting the app",
+    src.indexOf('elevenVoice === "IKne3meq5aSn9XLyUdCD" && !store.settings.voiceByHand') > -1, true);
+  t("clearing the box goes back to choosing",
+    src.indexOf("Back to choosing from your account.") > -1, true);
+  t("it carries to a new install", has("voiceByHand:s.voiceByHand"), true);
+}
+
+/* ---------- what he remembers ---------- */
+{
+  const MOST = new Function(decl("MEMORY_MOST") + " return MEMORY_MOST;")();
+  t("there is a ceiling", MOST > 0, true);
+  const add = grab("addMemory");
+  /* It used to drop whatever was oldest, which is backwards: the things worth
+     keeping are the ones he keeps needing, and those are the oldest of all. */
+  t("the least useful is dropped, not the oldest", add.indexOf("never used goes first") > -1, true);
+  t("and age only breaks the tie", add.indexOf("then oldest") > -1, true);
+  t("a new memory starts having been used nothing", add.indexOf("used: 0") > -1, true);
+  const recall = grab("recallFor");
+  t("being wanted is what earns its place", recall.indexOf("x.ref.used = (x.ref.used || 0) + 1") > -1, true);
+  t("but only when it was actually relevant", recall.indexOf("if(x.score > 0)") > -1, true);
+  t("and counting it does not write to storage on every question",
+    recall.indexOf("save()") === -1, true);
+}
+
 
 console.log(fail ? NL + fail + " FAILURES" : NL + "All " + pass + " JARVIS tests passed");
 process.exit(fail ? 1 : 0);

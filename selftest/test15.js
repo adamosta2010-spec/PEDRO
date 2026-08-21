@@ -96,12 +96,19 @@ const has = s => src.indexOf(s) > -1;
 {
   t("there is a weather tool", has('"weather.now"'), true);
   t("it needs no key and no account", has("open-meteo.com"), true);
-  t("naming a place sends only the place",
-    grab("whereIsIt").indexOf("geocoding-api.open-meteo.com") > -1, true);
-  t("and asking for here asks the phone, which asks you",
-    grab("whereIsIt").indexOf("navigator.geolocation") > -1, true);
+  t("naming a place looks it up",
+    grab("lookUpPlace").indexOf("geocoding-api.open-meteo.com") > -1, true);
   t("a place nobody has heard of is said, not guessed at",
-    grab("whereIsIt").indexOf("I could not find") > -1, true);
+    grab("lookUpPlace").indexOf("I could not find") > -1, true);
+  /* It was wrong twice. With no place named it asked the phone for a location,
+     which on iOS cannot succeed without a usage string that was never declared
+     - so it failed every time and the model invented a number. The time zone
+     answers at once, needs no permission, and cannot be refused. */
+  t("asking for here uses the phone's time zone first",
+    grab("whereAmI").indexOf("byClock") > -1, true);
+  t("and only then the location it has to ask permission for",
+    grab("whereAmI").indexOf("navigator.geolocation") > -1, true);
+  t("whichever answered is remembered", grab("whereAmI").indexOf("store.settings.home") > -1, true);
   const sky = new Function(decl("SKY") + " return SKY;")();
   t("the codes are turned into words", sky[0], "clear");
   t("including the bad ones", sky[95], "a thunderstorm");

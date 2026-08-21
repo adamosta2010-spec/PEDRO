@@ -46,7 +46,7 @@ eval((typeof declOf === "function" ? declOf : decl)("MANNERS"));
 eval((typeof declOf === "function" ? declOf : decl)("MANNER_REPLACES"));
 eval("var mannerBlock = " + grab("mannerBlock").replace("function mannerBlock", "function") + ";");
 eval("var promptWithout = " + grab("promptWithout").replace("function promptWithout", "function") + ";");
-eval(["MEMORY_RULES", "REMEMBER_RE", "FORGET_RE"].map(grabVar).join("\n") +
+eval(["MEMORY_RULES", "REMEMBER_RE", "FORGET_RE", "MEMORY_MOST"].map(grabVar).join("\n") +
      "\n" + names.map(grab).join("\n"));
 
 let fail = 0, pass = 0;

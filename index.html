@@ -361,13 +361,20 @@
   #hf{position:fixed;inset:0;z-index:70;background:var(--bg);display:none;
     padding:calc(var(--safe-t) + 14px) 14px calc(var(--safe-b) + 14px)}
   #hf.on{display:block}
+  /* Three columns, and the ball is the middle one - but the side columns are
+     empty until a panel is asked for, and two empty columns of different
+     content still push the middle off centre. Placing it absolutely at the
+     halfway point puts it in the middle of the screen and keeps it there. */
   .hudgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr) minmax(0,1fr);
     gap:12px;height:100%;position:relative;z-index:1}
   .hudcol{display:flex;flex-direction:column;gap:10px;min-width:0}
-  /* the whole middle moves and scales as one, from its own centre */
-  .hudcentre{display:flex;flex-direction:column;align-items:center;justify-content:center;
-    gap:16px;text-align:center;min-width:0;
-    transform-origin:50% 50%;touch-action:none}
+  /* Dead centre of the screen, whatever is in the columns either side. It used
+     to be a grid cell, so an open panel on one side shifted it. */
+  .hudcentre{position:absolute;left:50%;top:50%;
+    transform:translate(-50%,-50%);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;min-width:0;width:max-content;
+    transform-origin:50% 50%;touch-action:none;z-index:2}
 
   /* Panels stay out of the way until asked for, and once shown they can be
      picked up and put wherever suits. */
@@ -568,8 +575,13 @@
   #hfSaid{color:var(--tx2);font-size:15.5px;max-width:560px;line-height:1.6;min-height:24px;z-index:1}
   /* Scaled back by however much the ball was scaled up, so the words keep their
      own size - and moved on their own when you drag them. */
-  #hfWords{display:flex;flex-direction:column;align-items:center;gap:inherit;
-    transform-origin:top center;touch-action:none;position:relative;z-index:2}
+  #hfWords{display:flex;flex-direction:column;align-items:center;gap:6px;
+    transform-origin:top center;touch-action:none;z-index:2;
+    /* Hung below the ball rather than stacked with it. Inside the group they
+       pushed the ball up by half their own height, which is why it never
+       looked centred. */
+    position:absolute;top:calc(100% + 16px);left:50%;translate:-50% 0;
+    width:max-content;max-width:min(90vw,460px)}
   /* What he heard you say is worth seeing - it is how you know he got it right.
      What he said back is not: you just heard him say it. */
   #hfSaid{ display:none }
@@ -1101,9 +1113,17 @@
       <div class="hint">Their voices sound far better than the phone's. Free tier at
         elevenlabs.io &mdash; the key stays on this device. Without one, or with no signal,
         he uses the phone's own voice.</div>
+      <label for="setHome" style="margin-top:12px;display:block">Where you are</label>
+      <input type="text" id="setHome" placeholder="Dubai" autocomplete="off" spellcheck="false">
+      <div class="hint" id="homeHint">Left blank he works it out from the phone's time zone,
+        which needs no permission. Type a city here to fix it.</div>
       <label for="setElevenVoice" style="margin-top:12px;display:block">Which voice</label>
       <select id="setElevenVoice"></select>
       <div class="hint" id="elevenHint">Read from your account, British and steady first.</div>
+      <label for="setVoiceId" style="margin-top:10px;display:block">Or paste a voice ID</label>
+      <input type="text" id="setVoiceId" placeholder="paste the ID from elevenlabs.io" autocomplete="off" spellcheck="false">
+      <div class="hint" id="voiceIdHint">Set here it stays set - nothing overwrites it, ever.
+        Clear the box to go back to choosing from the list.</div>
       <label for="setVoice" style="margin-top:12px;display:block">Phone voice <small
         style="color:var(--tx3);font-weight:400">used with no key, or no signal</small></label>
       <select id="setVoice"></select>
@@ -1405,10 +1425,12 @@ var DEF = {
   tts:false, showThink:false, enterSends:true,
   voiceTalk:true,  /* talking sends straight away and the answer is read back */
   voiceName:"",    /* which of the phone's voices to speak with */
+  home:null,       /* where he is: {lat, lon, name, country, byHand} */
   manner:"jarvis", /* "jarvis" - composed, British, brief - or "plain" */
   headsUp:15,      /* minutes before something starts that he says so; 0 = never */
   elevenKey:"",    /* an ElevenLabs key of your own, if you want their voice */
   elevenVoice:"",  /* chosen from your ElevenLabs account, not guessed at here */
+  voiceByHand:false, /* an id typed in by hand - nothing is allowed to change it */
   elevenName:"AI",
   elevenOn:true,   /* use it when there is a key */
   volume:1,        /* how loud he is, on top of the phone's own volume */
@@ -1946,6 +1968,8 @@ function fillSettings(){
   }
   $("setLocalModel").value = s.localModel;
   $("setEleven").value = s.elevenKey || "";
+  $("setHome").value = (s.home && s.home.byHand && s.home.name) || "";
+  $("setVoiceId").value = s.voiceByHand ? (s.elevenVoice || "") : "";
   sw($("swManner"), s.manner !== "plain");
   $("setHeadsUp").value = String(s.headsUp === undefined ? 15 : s.headsUp);
   sw($("swFail"), s.autoFailover !== false);
@@ -2246,7 +2270,8 @@ bindInput("setEleven","elevenKey", function(){
   elevenFailed = false;
   elevenListed = null;            /* a different key is a different account */
   ELEVEN_VOICES = [];
-  store.settings.elevenVoice = "";  /* whatever was chosen was in the old one */
+  /* one set by hand survives a key change - that is what by hand means */
+  if(!store.settings.voiceByHand) store.settings.elevenVoice = "";
   save();
   fillElevenVoices();
 });
@@ -2308,6 +2333,27 @@ bindSwitch("swQuickVoice","quickVoice");
 bindSwitch("swVoiceTalk","voiceTalk");
 bindSwitch("swBackground","background", applyBackground);
 bindSwitch("swVoiceFirst","voiceFirst");
+$("setHome").addEventListener("change", function(){
+  var typed = this.value.trim();
+  var hint = $("homeHint");
+  if(!typed){
+    store.settings.home = null;      /* back to working it out from the clock */
+    save();
+    if(hint) hint.textContent = "Back to the phone's time zone.";
+    return;
+  }
+  if(hint) hint.textContent = "Looking that up…";
+  lookUpPlace(typed).then(function(spot){
+    spot.byHand = true;              /* typed in, so never overwritten */
+    spot.t = Date.now();
+    store.settings.home = spot;
+    save();
+    if(hint) hint.textContent = "Set to " + spot.name +
+      (spot.country ? ", " + spot.country : "") + ".";
+  }).catch(function(e){
+    if(hint) hint.textContent = String(e && e.message || e);
+  });
+});
 /* the switch is on for JARVIS, off for the plainer version - so it is stored
    the other way round from the setting, which is a name rather than a yes/no */
 $("swManner").addEventListener("click", function(){
@@ -2385,6 +2431,29 @@ function fillElevenVoices(){
     if(hint) hint.textContent = String(e && e.message || e);
   });
 }
+
+/* A voice id typed in by hand is final. Choosing from the list, changing the
+   key and starting the app all leave it alone - the whole complaint was that
+   an id he set kept being replaced. */
+$("setVoiceId").addEventListener("change", function(){
+  var id = this.value.trim();
+  var hint = $("voiceIdHint");
+  if(!id){
+    store.settings.voiceByHand = false;
+    save();
+    if(hint) hint.textContent = "Back to choosing from your account.";
+    elevenChooseVoice();
+    return;
+  }
+  store.settings.elevenVoice = id;
+  store.settings.voiceByHand = true;
+  store.settings.elevenName = "your voice";
+  elevenFailed = false;
+  elevenAhead = null;              /* anything fetched ahead is in the old one */
+  save();
+  if(hint) hint.textContent = "Set, and it will stay set.";
+  speak("This is how I sound.");
+});
 
 $("setElevenVoice").addEventListener("change", function(){
   if(!this.value) return;
@@ -2795,10 +2864,22 @@ function elevenList(){
   return elevenListed;
 }
 
+/* why the account could not be read, if it could not - so that a silent
+   fallback to the phone's voice has something to show for itself */
+var elevenWhy = "";
+
 /* If none has been chosen, choose the most JARVIS-sounding one there is. */
 function elevenChooseVoice(){
+  /* set by hand - there is nothing to choose */
+  if(store.settings.voiceByHand && store.settings.elevenVoice){
+    return Promise.resolve(store.settings.elevenVoice);
+  }
   return elevenList().then(function(list){
-    if(!list.length) return null;
+    elevenWhy = "";
+    if(!list.length){
+      elevenWhy = "that ElevenLabs account has no voices in it";
+      return null;
+    }
     if(store.settings.elevenVoice &&
        list.some(function(v){ return v.id === store.settings.elevenVoice; })){
       return store.settings.elevenVoice;
@@ -2807,7 +2888,10 @@ function elevenChooseVoice(){
     store.settings.elevenName = list[0].name;
     save();
     return list[0].id;
-  }).catch(function(){ return null; });
+  }).catch(function(e){
+    elevenWhy = String(e && e.message || e);
+    return null;
+  });
 }
 
 function elevenReady(){
@@ -5162,26 +5246,75 @@ var SKY = {
   80:"showers", 81:"showers", 82:"heavy showers", 85:"snow showers", 86:"snow showers",
   95:"a thunderstorm", 96:"a thunderstorm with hail", 99:"a thunderstorm with hail"
 };
+/* A named place, looked up. The country comes back too, so he can say where
+   he means rather than "here". */
+function lookUpPlace(name){
+  return fetch("https://geocoding-api.open-meteo.com/v1/search?count=1&name=" +
+               encodeURIComponent(name))
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      var hit = j && j.results && j.results[0];
+      if(!hit) throw new Error("I could not find " + name);
+      return { lat: hit.latitude, lon: hit.longitude, name: hit.name,
+               country: hit.country || "" };
+    });
+}
+
+/* The phone's own time zone names the city it is set to - "Asia/Dubai". No
+   permission, no prompt, no waiting, and right unless the phone's clock is
+   wrong. It is the fallback, and on iOS it is usually the only thing that
+   works, because location has to be granted and often is not. */
+function placeFromClock(){
+  var tz = "";
+  try{ tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; }catch(e){}
+  if(!tz || tz.indexOf("/") < 0) return null;
+  /* "America/Argentina/Buenos_Aires" - the city is the last part */
+  var bits = tz.split("/");
+  return bits[bits.length - 1].split("_").join(" ");
+}
+
+/* Where he is, worked out once and then remembered. Asking the phone every
+   time costs a permission prompt and up to eight seconds; the answer does not
+   change while he is standing still. */
+function whereAmI(){
+  var kept = store.settings.home;
+  /* somewhere he typed in himself always wins */
+  if(kept && kept.byHand && kept.lat != null) return Promise.resolve(kept);
+  /* and anything found in the last day is still true */
+  if(kept && kept.lat != null && Date.now() - (kept.t || 0) < 24 * 3600 * 1000){
+    return Promise.resolve(kept);
+  }
+
+  function keep(spot){
+    spot.t = Date.now();
+    store.settings.home = spot;
+    save();
+    return spot;
+  }
+  /* the clock first, because it always answers and answers at once */
+  var fromClock = placeFromClock();
+  var byClock = fromClock ? lookUpPlace(fromClock).then(keep) : Promise.reject(new Error("no time zone"));
+
+  return byClock.catch(function(){
+    /* no usable time zone - ask the phone, if it will say */
+    return new Promise(function(done, fail){
+      if(!navigator.geolocation){ fail(new Error("I do not know where you are - say the place")); return; }
+      navigator.geolocation.getCurrentPosition(
+        function(pos){ done(keep({ lat: pos.coords.latitude, lon: pos.coords.longitude,
+                                   name: "where you are", country: "" })); },
+        function(){ fail(new Error("I do not know where you are - say the place, or set it in Settings")); },
+        { timeout: 8000, maximumAge: 600000 });
+    });
+  }).catch(function(e){
+    if(kept && kept.lat != null) return kept;   /* stale is better than nothing */
+    throw e;
+  });
+}
+
 function whereIsIt(place){
   var name = String(place || "").trim();
-  if(name){
-    return fetch("https://geocoding-api.open-meteo.com/v1/search?count=1&name=" +
-                 encodeURIComponent(name))
-      .then(function(r){ return r.json(); })
-      .then(function(j){
-        var hit = j && j.results && j.results[0];
-        if(!hit) throw new Error("I could not find " + name);
-        return { lat: hit.latitude, lon: hit.longitude, name: hit.name };
-      });
-  }
-  /* no place named - ask the phone, which asks you */
-  return new Promise(function(done, fail){
-    if(!navigator.geolocation){ fail(new Error("this phone will not say where it is")); return; }
-    navigator.geolocation.getCurrentPosition(
-      function(p){ done({ lat: p.coords.latitude, lon: p.coords.longitude, name: "here" }); },
-      function(){ fail(new Error("I need permission to know where you are, or name a place")); },
-      { timeout: 8000, maximumAge: 600000 });
-  });
+  if(name) return lookUpPlace(name);
+  return whereAmI();
 }
 function weatherAt(spot){
   return fetch("https://api.open-meteo.com/v1/forecast?latitude=" + spot.lat +
@@ -5197,7 +5330,9 @@ function weatherAt(spot){
       var real = Math.round(now.temperature_2m);
       var high = j.daily && Math.round(j.daily.temperature_2m_max[0]);
       var low = j.daily && Math.round(j.daily.temperature_2m_min[0]);
-      return real + " degrees in " + spot.name + ", " + sky +
+      var place = spot.name + (spot.country && spot.country !== spot.name
+        ? ", " + spot.country : "");
+      return real + " degrees in " + place + ", " + sky +
         (feels !== real ? ", feels like " + feels : "") +
         (high != null ? ". High " + high + ", low " + low : "");
     });
@@ -6958,7 +7093,7 @@ $("dockEleven").addEventListener("input", function(){
   elevenFailed = false;
   elevenListed = null;
   ELEVEN_VOICES = [];
-  store.settings.elevenVoice = "";
+  if(!store.settings.voiceByHand) store.settings.elevenVoice = "";
   save();
   /* choosing takes a moment and a request - start it now, not at the first
      sentence he tries to say */
@@ -7108,6 +7243,8 @@ function decorateCode(el){
 function lessons(){ return store.settings.lessons || (store.settings.lessons = []); }
 function facts(){ return store.settings.facts || (store.settings.facts = []); }
 function memories(){ return store.settings.memories || (store.settings.memories = []); }
+/* how many he keeps - it shares the phone's storage with every conversation */
+var MEMORY_MOST = 200;
 
 /* ==================== memory ====================
    Things worth keeping tend to be said in a handful of shapes. Catching them
@@ -7156,9 +7293,22 @@ function addMemory(text){
   for(var i = 0; i < m.length; i++){
     if(sameMemory(m[i].text, text)){ m[i].t = Date.now(); save(); return false; }
   }
-  m.push({ id: uid(), text: text, t: Date.now() });
-  /* keep the newest - this shares localStorage with the chats */
-  if(m.length > 200) m.splice(0, m.length - 200);
+  m.push({ id: uid(), text: text, t: Date.now(), used: 0 });
+  /* This shares localStorage with the chats, so it has to have a ceiling. It
+     used to drop whatever was oldest, which is exactly backwards: the things
+     worth keeping are the ones he keeps needing - his name, what he is
+     building - and those are the oldest of all. Drop the least useful instead:
+     never recalled, and old. */
+  if(m.length > MEMORY_MOST){
+    var ranked = m.slice().sort(function(a, b){
+      var ua = a.used || 0, ub = b.used || 0;
+      if(ua !== ub) return ua - ub;             /* never used goes first */
+      return (a.t || 0) - (b.t || 0);           /* then oldest */
+    });
+    var drop = {};
+    ranked.slice(0, m.length - MEMORY_MOST).forEach(function(x){ drop[x.id] = true; });
+    store.settings.memories = m.filter(function(x){ return !drop[x.id]; });
+  }
   save();
   return true;
 }
@@ -7233,7 +7383,10 @@ function gripLoad(){
   var g = store.settings.orbGrip;
   if(!g) return;
   /* it used to be saved as a width in pixels; that no longer means anything */
-  if(g.size && !g.scale){ delete g.size; g.scale = 1; }
+  /* A phone that ran an older build has a size and an offset saved. It is not
+     moved or scaled any more, so those are dropped rather than restored. */
+  delete g.size; delete g.scale; delete g.x; delete g.y;
+  g.scale = 1; g.x = 0; g.y = 0;
   grip.spin = g.spin || 1;
   grip.wx = g.wx || 0; grip.wy = g.wy || 0;
   grip.scale = g.scale || 1; grip.x = g.x || 0; grip.y = g.y || 0;
@@ -7249,18 +7402,14 @@ function gripApply(){
     grip.pending = false;
     var stage = document.querySelector('.hudcentre');
     if(!stage) return;
-    var s = grip.scale || 1;
-    stage.style.willChange = 'transform';
-    stage.style.transform =
-      'translate3d(' + Math.round(grip.x) + 'px,' + Math.round(grip.y) + 'px,0) scale(' + s.toFixed(3) + ')';
-    /* The words sit inside the group being scaled, so scaling them back by the
-       same amount leaves them the size they started. Their own offset is in
-       that scaled space, hence the divide. */
+    /* The middle is centred by the stylesheet and no longer moved or scaled
+       from here - writing a transform at all would undo the centring. */
+    /* Nothing is scaled any more, so the words need no scaling back - they can
+       still be picked up and put where they suit. */
     var words = document.getElementById('hfWords');
-    if(words){
+    if(words && (grip.wx || grip.wy)){
       words.style.transform =
-        'translate(' + Math.round(grip.wx || 0) + 'px,' + Math.round(grip.wy || 0) + 'px) ' +
-        'scale(' + (1 / s).toFixed(3) + ')';
+        'translate(' + Math.round(grip.wx || 0) + 'px,' + Math.round(grip.wy || 0) + 'px)';
     }
     gripSpinApply();
   });
@@ -7363,21 +7512,10 @@ function handsOn(){
     if(!grip.pointers[ev.pointerId]) return;
     grip.pointers[ev.pointerId] = { x: ev.clientX, y: ev.clientY };
     grip.count = Object.keys(grip.pointers).length;
-    if(grip.count >= 2){
-      var dist = gripDistance();
-      if(grip.startDist > 10 && dist > 10){
-        var want = grip.startScale * (dist / grip.startDist);
-        /* room to push it right out when there is something to look at */
-        var most = $("hfOrb") && $("hfOrb").classList.contains("showing") ? 3.2 : 2.2;
-        grip.scale = Math.max(0.5, Math.min(most, want));
-      }
-      var mid = gripMiddle();
-      grip.x = grip.fromX + (mid.x - grip.startX);
-      grip.y = grip.fromY + (mid.y - grip.startY);
-      grip.turned = true;
-      gripApply();
-      return;
-    }
+    /* It used to be pinched bigger and smaller and dragged around the screen.
+       It stays where it is and stays one size now - a second finger does
+       nothing at all, rather than moving something he did not mean to move. */
+    if(grip.count >= 2) return;
     var dx = ev.clientX - grip.lastX, dy = ev.clientY - grip.lastY;
     grip.lastX = ev.clientX; grip.lastY = ev.clientY;
     if(Math.abs(dx) + Math.abs(dy) < 1) return;
@@ -7503,6 +7641,10 @@ function timerLeft(){
   return Math.floor(left / 60) + 'm ' + (left % 60) + 's left';
 }
 
+/* Set while an answer is handing the microphone back on its own, so whoever
+   asked does not do it a second time. */
+var handedBack = false;
+
 /* the ones that need nothing at all */
 /* ==================== answered on the spot ====================
    No model, no network, no wait. The phone knows the time; asking a language
@@ -7528,6 +7670,10 @@ var NOW_RE = {
   /* when something is wrong on a phone there is nowhere to look. Ask him. */
   check:    /^(?:run\s+)?(?:diagnostics|a\s+diagnostic|systems?\s+check|self\s*test|status\s+of\s+your\s+systems)$|^(?:are\s+)?(?:you|all\s+systems)\s+(?:ok|okay|alright|working|online)\??$|^what(?:'?s| is)\s+(?:wrong|broken)(?:\s+with\s+you)?$/i
 };
+
+/* What he says when you use his name and nothing else. Not always the same
+   word, because always the same word stops sounding like an answer. */
+var ANSWER_TO_NAME = ["Sir?", "Yes, sir?", "Sir.", "Listening, sir."];
 
 /* the last thing he said, so "again" can say it once more */
 var saidLast = "";
@@ -7786,8 +7932,10 @@ function runDiagnostics(){
   fine.push(providerLabel(s.provider) + " answering");
   if(!apiKeyNow()) wrong.push("no key for " + providerLabel(s.provider) + ", so nothing can answer");
 
-  if(elevenReady()) fine.push("speaking as " + (s.elevenName || "your chosen voice"));
+  if(elevenReady() && s.elevenVoice) fine.push("speaking as " + (s.elevenName || "your chosen voice"));
   else if(s.elevenKey && elevenFailed) wrong.push("that ElevenLabs key was refused - the phone's voice instead");
+  else if(s.elevenKey && elevenWhy) wrong.push("I could not read your voices - " + elevenWhy);
+  else if(s.elevenKey && !s.elevenVoice) wrong.push("no voice chosen yet, so the phone's voice is standing in");
   else if(!s.elevenKey) fine.push("using the phone's own voice");
 
   if(hf.on && hf.rec) fine.push("microphone live");
@@ -7836,6 +7984,7 @@ function watchBattery(){
 
 /* say it, write it down, and hand the microphone straight back */
 function sayNow(line){
+  handedBack = true;
   saidLast = line;
   hfSaid.textContent = line;
   hudLog("him", line, false);
@@ -7846,7 +7995,11 @@ function theSmallThings(said){
   var q = String(said || '').trim().replace(/[.?!]+$/, '');
   if(!q) return false;
 
-  if(rightNow(q)) return true;         /* the time, the date, the weather - now */
+  /* rightNow always answers through sayNow, which hands the microphone back
+     itself - including the ones that have to fetch something first and answer
+     a second later. Saying so here rather than when the answer arrives is what
+     stops "status" reopening the microphone before he has spoken. */
+  if(rightNow(q)){ handedBack = true; return true; }
 
   var t = q.match(TIMER_RE);
   if(t) return startTimer(t[1], t[2]);
@@ -8243,13 +8396,18 @@ function recallFor(text, max){
   var m = memories();
   if(!m.length) return [];
   var scored = m.map(function(x){
-    return { text: x.text, t: x.t || 0, score: relevance(text || "", { q: x.text }) };
+    return { ref: x, text: x.text, t: x.t || 0, score: relevance(text || "", { q: x.text }) };
   });
   scored.sort(function(a, b){
     if(b.score !== a.score) return b.score - a.score;
     return b.t - a.t;
   });
-  return scored.slice(0, max || 12).map(function(x){ return x.text; });
+  var picked = scored.slice(0, max || 12);
+  /* Being wanted is what earns a memory its place when the store fills up.
+     Counted here rather than saved here - saving on every question would write
+     to storage on every question. */
+  picked.forEach(function(x){ if(x.score > 0) x.ref.used = (x.ref.used || 0) + 1; });
+  return picked.map(function(x){ return x.text; });
 }
 
 /* crude but effective: how much do two bits of text overlap? */
@@ -8504,7 +8662,8 @@ function backupData(){
       localUrl:s.localUrl, localModel:s.localModel,
       effort:s.effort, tts:s.tts, voiceName:s.voiceName, voiceTalk:s.voiceTalk,
       volume:s.volume, rate:s.rate, elevenKey:s.elevenKey, elevenVoice:s.elevenVoice,
-      manner:s.manner, headsUp:s.headsUp, mood:s.mood,
+      manner:s.manner, headsUp:s.headsUp, mood:s.mood, home:s.home,
+      voiceByHand:s.voiceByHand,
       background:s.background, voiceFirst:s.voiceFirst, enterSends:s.enterSends,
       showThink:s.showThink, theme:s.theme, authEmail:s.authEmail
     },
@@ -9100,10 +9259,16 @@ function hfHeardText(live, finalTxt){
       hudLog("you", live, true);        /* written while you are still talking */
     }
 
-    if(hf.phase === "wait"){
+    /* His name on its own, whether he is idle or already listening. It used to
+       be handled only in "wait", so after the first answer saying his name did
+       nothing at all - it went to the model as a question. */
+    if(hf.phase === "wait" || hf.phase === "hear"){
       if(hf.answering) return;
       var m = live.match(wakeRe());
-      if(!m) return;
+      if(!m){
+        if(hf.phase === "wait") return;
+        /* in "hear" everything else carries on to the normal path below */
+      } else {
       var at = live.toLowerCase().indexOf(m[0].toLowerCase());
       var after = live.slice(at + m[0].length).replace(/^[\s,.:;!?-]+/, "").trim();
       if(after.split(/\s+/).filter(Boolean).length >= 3){
@@ -9111,16 +9276,19 @@ function hfHeardText(live, finalTxt){
         hfSet("hear", "Listening…");
         hfSettle(after);
       } else {
-        hf.answering = true;                 /* just the name - acknowledge, then listen */
-        hfSet("hear", "Yeah?");
+        hf.answering = true;                 /* just the name - answer to it, then listen */
+        var yes = store.settings.manner === "plain" ? "Yeah?" : ANSWER_TO_NAME[
+          Math.floor(Math.random() * ANSWER_TO_NAME.length)];
+        hfSet("hear", yes);
         hfHeard.textContent = "";
-        hfSpeak("Yeah?", function(){
+        hfSpeak(yes, function(){
           hf.answering = false;
           hfSet("hear", "Listening…");
           hfQuietTimer();
         });
       }
       return;
+      }
     }
 
     if(hf.phase === "hear"){
@@ -9457,15 +9625,19 @@ function hfAsk(question){
     return;
   }
 
-  /* the ones that need no model at all */
+  /* The ones that need no model at all. Some of them answer through sayNow,
+     which hands the microphone back itself - doing it again here is what broke
+     "status": the second hand-back ran before the weather had arrived. */
+  handedBack = false;
   if(theSmallThings(question)){
-    carryOn();
+    if(!handedBack) carryOn();
     return;
   }
 
   /* a request to open or close something, rather than a question */
+  handedBack = false;
   if(openByVoice(question)){
-    carryOn();
+    if(!handedBack) carryOn();
     return;
   }
 
@@ -9837,7 +10009,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.83";
+var BUILD = "2026-08-21.84";
 
 function banner(kind, html){
   var b = $("banner");
@@ -9881,14 +10053,23 @@ fixStrandedProvider();
 /* An older build wrote one particular voice id into the settings on every
    start, so choosing another never stuck. Clear that one out; from here the
    voice comes from the account, and picking one by hand is remembered. */
-if(store.settings.elevenVoice === "IKne3meq5aSn9XLyUdCD"){
+if(store.settings.elevenVoice === "IKne3meq5aSn9XLyUdCD" && !store.settings.voiceByHand){
   store.settings.elevenVoice = "";
   save();
 }
 
 /* If there is a key, find out which voices it has now rather than on the first
    sentence he tries to say. It is one request and it is not waited on. */
-if(store.settings.elevenKey) elevenChooseVoice();
+if(store.settings.elevenKey){
+  elevenChooseVoice().then(function(id){
+    if(id) return;
+    /* Silence here is what makes it look as though nothing changed - the app
+       falls back to the phone's voice on every sentence and says nothing. */
+    banner("warn", "<b>Could not choose a voice.</b> " +
+      esc(elevenWhy || "your ElevenLabs account would not answer") +
+      ". Open Settings to pick one, or he will use the phone's own voice.");
+  });
+}
 
 runEdits();              /* whatever he has been allowed to add to himself */
 applyBackground();       /* restore whatever was chosen last time */
