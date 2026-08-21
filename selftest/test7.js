@@ -491,7 +491,9 @@ function nativeFrom(cap, exp){
 
   const sc = grab("shortContext");
   t("the context is kept short", sc.indexOf("msgs.slice(msgs.length - keep)") > -1, true);
-  t("and shorter still when talking", inSrc("voiceMode ? 6 : 12"), true);
+  t("and shorter still when talking", inSrc("voiceMode ? SUM_KEEP : 12"), true);
+  t("with the older part carried as a summary instead of dropped",
+    inSrc("Earlier in this conversation"), true);
   t("the model on the PC uses the graphics card", inSrc("num_gpu: 99"), true);
   t("and stays loaded between questions", inSrc('keep_alive: "30m"'), true);
   t("the phone's model is warmed up at startup", inSrc("Native.warm({"), true);

@@ -29,6 +29,14 @@ const isLocked = () => false;
 /* the prompt is built from a plain declaration as well as from functions */
 const { decl: declOf } = require("./lib").reader(src);
 eval(declOf("MASTER_PROMPT"));
+/* the prompt now carries the tone of whichever mood he is in */
+eval(declOf("MOODS"));
+var moodNow = function(){ return MOODS.normal; };
+eval(declOf("SUM_KEEP"));
+/* the summary is looked up on the chat being answered in */
+var activeChat = function(){ return null; };
+eval(declOf("SUM_AFTER"));
+eval("var summaryOf = " + grab("summaryOf").replace("function summaryOf", "function") + ";");
 eval(declOf("MASTER_WRITTEN"));
 eval(names.map(grab).join("\n"));
 

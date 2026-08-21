@@ -34,6 +34,9 @@ function grabVar(name){
 /* the prompt is built from a plain declaration as well as from functions */
 const { decl: declOf } = require("./lib").reader(src);
 eval(declOf("MASTER_PROMPT"));
+/* the prompt now carries the tone of whichever mood he is in */
+eval(declOf("MOODS"));
+var moodNow = function(){ return MOODS.normal; };
 eval(declOf("MASTER_WRITTEN"));
 eval(["MEMORY_RULES", "REMEMBER_RE", "FORGET_RE"].map(grabVar).join("\n") +
      "\n" + names.map(grab).join("\n"));

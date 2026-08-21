@@ -2697,7 +2697,9 @@ function elevenSpeak(text, onEnd){
     body: JSON.stringify({
       text: text,
       model_id: "eleven_flash_v2_5",     /* the quick one - this is a conversation */
-      voice_settings: { stability: 0.4, similarity_boost: 0.75, speed: 1 }
+      /* the mood decides how steady the voice is and how fast it goes */
+      voice_settings: { stability: moodNow().stability, similarity_boost: 0.75,
+                        style: moodNow().style, speed: moodNow().speed }
     })
   }).then(function(res){
     if(!res.ok){
@@ -2965,6 +2967,7 @@ function systemPrompt(){
       "It is a conversation, so a short question back is fine. " +
       "Jokes, riddles, a verse of a song, a story - do them properly when asked, " +
       "rather than explaining that you are an assistant.\n" +
+      (moodNow().tone ? moodNow().tone + "\n" : "") +
       "This is speech that has been transcribed, so it is sometimes half-heard " +
       "or picked up by accident. If what you get does not make sense as something " +
       "said to you, say you did not catch that and stop. Never invent a situation, " +
@@ -3195,8 +3198,69 @@ function shortContext(msgs, turns){
   return msgs.length > keep ? msgs.slice(msgs.length - keep) : msgs;
 }
 
+/* ==================== what was said before ====================
+   The last few messages go with every question. Everything before that is
+   boiled down once and kept, so a long conversation still has a past without
+   being sent in full each time. */
+var SUM_KEEP = 6;        /* messages left alone at the end of a chat */
+var SUM_AFTER = 14;      /* how long a chat gets before it is worth summarising */
+
+function summaryOf(c){
+  return (c && c.summary && c.summary.text) ? String(c.summary.text) : "";
+}
+
+/* Everything the summary does not already cover, and is not about to be sent. */
+function toSumUp(c){
+  if(!c || !c.messages) return [];
+  var done = (c.summary && c.summary.upto) || 0;
+  var end = c.messages.length - SUM_KEEP;
+  if(end - done < SUM_AFTER - SUM_KEEP) return [];
+  return c.messages.slice(done, end);
+}
+
+/* Quietly, in the background. A failure leaves things exactly as they were. */
+var summaryBusy = false;
+function keepUp(c){
+  if(summaryBusy || !c || isDevice() || !apiKeyNow()) return;
+  var older = toSumUp(c);
+  if(!older.length) return;
+  summaryBusy = true;
+  var before = summaryOf(c);
+  var said = older.map(function(m){
+    return (m.role === "user" ? "They: " : "You: ") + String(m.content || "").slice(0, 400);
+  }).join("\n").slice(0, 6000);
+
+  var ask = (before ? "So far: " + before + "\n\n" : "") +
+    "Add what matters from this to the summary above, and give the whole thing " +
+    "back as at most five short lines. Keep names, decisions, numbers, and " +
+    "anything they asked you to remember. Drop small talk. No preamble.\n\n" + said;
+
+  var wasVoice = voiceMode, wasFast = fastMode;
+  voiceMode = false;
+  fastMode = true;
+  askStream({ messages: [{ role:"user", content: ask, t:Date.now() }] }, function(){})
+    .then(function(text){
+      voiceMode = wasVoice; fastMode = wasFast;
+      summaryBusy = false;
+      var line = String(text || "").trim();
+      if(!line || line.length < 8) return;
+      c.summary = { text: line.slice(0, 1200), upto: c.messages.length - SUM_KEEP, t: Date.now() };
+      save();
+    })
+    .catch(function(){
+      voiceMode = wasVoice; fastMode = wasFast;
+      summaryBusy = false;     /* leave the old summary alone */
+    });
+}
+
 function buildRequest(msgs){
-  msgs = shortContext(trimImages(msgs, 2), voiceMode ? 6 : 12);
+  msgs = shortContext(trimImages(msgs, 2), voiceMode ? SUM_KEEP : 12);
+  /* what came before the part being sent, in a few lines */
+  var past = summaryOf(activeChat());
+  if(past){
+    msgs = [{ role:"user", content:"Earlier in this conversation: " + past, t:0 },
+            { role:"assistant", content:"Understood.", t:0 }].concat(msgs);
+  }
   for(var i = msgs.length - 1; i >= 0; i--)
     if(msgs[i].role === "user"){ lastUserText = msgs[i].content || ""; break; }
   /* falling through to Claude for a provider that is not Claude produced a key
@@ -4659,13 +4723,77 @@ var TOOLS = {
   },
   "note.write": {
     needs: "what to write down",
-    hands: true,
-    tell: "start a note",
+    hands: false,
+    tell: "write something down",
     run: function(a){
       var text = String(a.text || a.note || a.title || "").trim();
       if(!text) return Promise.resolve({ ok:false, said:"nothing to write down" });
-      return openThing("mobilenotes://").then(function(){
-        return { ok:true, hands:true, said:"opened Notes - it needs typing in, iOS does not let an app write one" };
+      /* His own, kept on the phone. iOS gives no way to write into the Notes
+         app, so writing it here is the thing that actually works. */
+      notes().unshift({ id: uid(), text: text.slice(0, 2000), t: Date.now() });
+      if(notes().length > 200) notes().length = 200;
+      save();
+      return Promise.resolve({ ok:true, said:"written down: " + text.slice(0, 80) });
+    }
+  },
+  "note.find": {
+    needs: "a word to look for, or nothing for the last few",
+    hands: false,
+    tell: "read your notes back",
+    run: function(a){
+      var want = String(a.q || a.text || "").toLowerCase().trim();
+      var found = notes().filter(function(n){
+        return !want || n.text.toLowerCase().indexOf(want) > -1;
+      }).slice(0, 5);
+      if(!found.length){
+        return Promise.resolve({ ok:false, said: want ? "nothing written down about " + want
+                                                      : "nothing written down yet" });
+      }
+      return Promise.resolve({ ok:true, said: found.map(function(n){
+        return n.text.slice(0, 120);
+      }).join("; ") });
+    }
+  },
+  "weather.now": {
+    needs: "a place, or nothing for where you are",
+    hands: false,
+    tell: "look up the weather",
+    run: function(a){
+      var place = String(a.place || a.where || a.q || a.city || "").trim();
+      return whereIsIt(place)
+        .then(weatherAt)
+        .then(function(said){ return { ok:true, said:said }; })
+        .catch(function(e){ return { ok:false, said:String(e && e.message || e) }; });
+    }
+  },
+  "code.run": {
+    needs: "a line or two of JavaScript",
+    hands: false,
+    tell: "run a bit of code and say what it gives back",
+    run: function(a){
+      var code = String(a.code || a.js || a.q || "").slice(0, 2000).trim();
+      if(!code) return Promise.resolve({ ok:false, said:"nothing to run" });
+      return new Promise(function(done){
+        runInSandbox(code, function(said){ done({ ok:true, said:said }); });
+      });
+    }
+  },
+  "file.read": {
+    needs: "nothing - you choose the file",
+    hands: true,
+    tell: "read a file you pick",
+    run: function(a){
+      if(!(Native && Native.readFile)){
+        return Promise.resolve({ ok:false, said:"reading a file needs the app, not the web page" });
+      }
+      return Native.readFile({}).then(function(r){
+        var text = String((r && r.text) || "").trim();
+        if(!text) return { ok:false, said:"there was nothing readable in it" };
+        lastFile = { name: (r && r.name) || "the file", text: text };
+        return { ok:true, said:"read " + lastFile.name + ", " + text.length +
+                 " characters. First of it: " + text.slice(0, 300) };
+      }).catch(function(e){
+        return { ok:false, said:String(e && e.message || e) };
       });
     }
   },
@@ -4785,6 +4913,125 @@ function convert(amount, from, to){
   return null;
 }
 
+/* what he has written down, kept on the phone with everything else */
+function notes(){ return store.settings.notes || (store.settings.notes = []); }
+
+/* ---- the weather ----
+   Open-Meteo asks for nothing: no key, no account, no sign-up. A place name is
+   turned into a position by their own lookup; "here" asks the phone, which
+   means iOS asks you first. */
+var SKY = {
+  0:"clear", 1:"mostly clear", 2:"some cloud", 3:"overcast", 45:"foggy", 48:"freezing fog",
+  51:"light drizzle", 53:"drizzle", 55:"heavy drizzle", 56:"freezing drizzle", 57:"freezing drizzle",
+  61:"light rain", 63:"rain", 65:"heavy rain", 66:"freezing rain", 67:"freezing rain",
+  71:"light snow", 73:"snow", 75:"heavy snow", 77:"snow grains",
+  80:"showers", 81:"showers", 82:"heavy showers", 85:"snow showers", 86:"snow showers",
+  95:"a thunderstorm", 96:"a thunderstorm with hail", 99:"a thunderstorm with hail"
+};
+function whereIsIt(place){
+  var name = String(place || "").trim();
+  if(name){
+    return fetch("https://geocoding-api.open-meteo.com/v1/search?count=1&name=" +
+                 encodeURIComponent(name))
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        var hit = j && j.results && j.results[0];
+        if(!hit) throw new Error("I could not find " + name);
+        return { lat: hit.latitude, lon: hit.longitude, name: hit.name };
+      });
+  }
+  /* no place named - ask the phone, which asks you */
+  return new Promise(function(done, fail){
+    if(!navigator.geolocation){ fail(new Error("this phone will not say where it is")); return; }
+    navigator.geolocation.getCurrentPosition(
+      function(p){ done({ lat: p.coords.latitude, lon: p.coords.longitude, name: "here" }); },
+      function(){ fail(new Error("I need permission to know where you are, or name a place")); },
+      { timeout: 8000, maximumAge: 600000 });
+  });
+}
+function weatherAt(spot){
+  return fetch("https://api.open-meteo.com/v1/forecast?latitude=" + spot.lat +
+               "&longitude=" + spot.lon +
+               "&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m" +
+               "&daily=temperature_2m_max,temperature_2m_min&forecast_days=1&timezone=auto")
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      var now = j && j.current;
+      if(!now) throw new Error("no weather came back");
+      var sky = SKY[now.weather_code] || "hard to say";
+      var feels = Math.round(now.apparent_temperature);
+      var real = Math.round(now.temperature_2m);
+      var high = j.daily && Math.round(j.daily.temperature_2m_max[0]);
+      var low = j.daily && Math.round(j.daily.temperature_2m_min[0]);
+      return real + " degrees in " + spot.name + ", " + sky +
+        (feels !== real ? ", feels like " + feels : "") +
+        (high != null ? ". High " + high + ", low " + low : "");
+    });
+}
+
+/* ---- running a bit of code ----
+   In the sealed frame the simulations use: nothing it does can reach the app,
+   its keys or the network, and it is stopped if it runs away. */
+function runInSandbox(code, done){
+  /* The code runs in a worker inside a sealed frame. The frame has no network
+     and no way back into the app; the worker has no document at all. And a
+     worker can be terminated, which is the only thing that actually stops
+     "while(true){}" - taking the frame away does not, because the frame is too
+     busy spinning to notice. */
+  var frame = document.createElement("iframe");
+  frame.setAttribute("sandbox", "allow-scripts");
+  frame.style.cssText = "position:fixed;left:-9999px;width:10px;height:10px;border:0";
+  var over = false;
+  function finish(said){
+    if(over) return;
+    over = true;
+    clearTimeout(timer);
+    window.removeEventListener("message", listen);
+    if(frame.parentNode) frame.parentNode.removeChild(frame);
+    done(said);
+  }
+  function listen(ev){
+    if(ev.source !== frame.contentWindow) return;
+    var d = ev.data || {};
+    if(d.ran === undefined) return;
+    finish(String(d.ran).slice(0, 600));
+  }
+  window.addEventListener("message", listen);
+  var timer = setTimeout(function(){
+    /* tell the frame to kill it, then give up on it either way */
+    try{ frame.contentWindow.postMessage({ stop:true }, "*"); }catch(e){}
+    setTimeout(function(){ finish("that did not finish in time"); }, 60);
+  }, 3000);
+
+  var inner =
+    "var said=[];" +
+    "var console={log:function(){said.push([].slice.call(arguments).join(' '))}};" +
+    "var out;try{out=eval(" + JSON.stringify(code) + ");}catch(e){out='Error: '+e.message;}" +
+    "if(out!==undefined&&out!==null)said.push(String(out));" +
+    "postMessage(said.join('\\n')||'(nothing came back)');";
+
+  var page =
+    "<!doctype html><html><head><meta http-equiv='Content-Security-Policy' " +
+    "content=\"default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' blob:; " +
+    "worker-src blob:;\"></head><body><script>" +
+    "var w;" +
+    "function say(t){ parent.postMessage({ran:t}, '*'); }" +
+    "addEventListener('message', function(e){ if(e.data && e.data.stop && w) w.terminate(); });" +
+    "try{" +
+    "  var url=URL.createObjectURL(new Blob([" + JSON.stringify("SRC") + ".replace('SRC','')+" +
+    JSON.stringify(inner) + "],{type:'application/javascript'}));" +
+    "  w=new Worker(url);" +
+    "  w.onmessage=function(e){ say(String(e.data)); w.terminate(); };" +
+    "  w.onerror=function(e){ say('Error: '+(e.message||'it would not run')); };" +
+    "}catch(err){ say('Error: '+err.message); }" +
+    "<" + "/script></body></html>";
+  frame.srcdoc = page;
+  document.body.appendChild(frame);
+}
+
+/* the last file handed over, so it can be asked about afterwards */
+var lastFile = null;
+
 function openThing(url){
   if(Native && Native.openURL) return Native.openURL({ url: url });
   try{ window.open(url, "_blank"); }catch(e){}
@@ -4851,6 +5098,42 @@ function looksLikeDoing(text){
 }
 
 /* what he is told he can do - only when he might need it */
+/* ==================== how he sounds ====================
+   Stability holds the voice steady; style lets it move about. Serious wants
+   steady and a little slower, excited wants the opposite. */
+var MOODS = {
+  normal:  { say:"normal",  stability:0.45, style:0.35, speed:1,    tone:"" },
+  calm:    { say:"calm",    stability:0.80, style:0.10, speed:0.92,
+             tone:"Speak gently and unhurriedly. Short, settled sentences." },
+  excited: { say:"excited", stability:0.25, style:0.75, speed:1.08,
+             tone:"Be lively and up-front about it. Keep it quick and warm." },
+  serious: { say:"serious", stability:0.85, style:0.15, speed:0.96,
+             tone:"Be direct and plain. No jokes, no padding." },
+  gentle:  { say:"gentle",  stability:0.75, style:0.25, speed:0.94,
+             tone:"Be kind and careful with your words - they may have had bad news." }
+};
+function moodNow(){
+  return MOODS[store.settings.mood] || MOODS.normal;
+}
+function moodSet(name){
+  var key = String(name || "").toLowerCase().trim();
+  var found = MOODS[key] ? key : null;
+  if(!found){
+    /* the words people actually use */
+    if(/calm|quiet|relax|settle|chill/.test(key)) found = "calm";
+    else if(/excit|happy|cheer|lively|energ|hype/.test(key)) found = "excited";
+    else if(/serious|business|straight|focus|professional/.test(key)) found = "serious";
+    else if(/gentle|kind|soft|careful/.test(key)) found = "gentle";
+    else if(/normal|usual|default|back to normal/.test(key)) found = "normal";
+  }
+  if(!found) return null;
+  store.settings.mood = found;
+  save();
+  return MOODS[found];
+}
+var MOOD_RE = new RegExp("^(?:be|sound|talk|speak|act)" +
+  String.fromCharCode(92) + "s+(?:more" + String.fromCharCode(92) + "s+)?([a-z ]{3,20})$", "i");
+
 function toolsBlock(text){
   if(arguments.length && !looksLikeDoing(text)) return "";
   var lines = [];
@@ -4864,7 +5147,9 @@ function toolsBlock(text){
     "Only when asked to do something - answer questions with words.\n" +
     "Dates plainly: 2026-08-22T15:00, or tomorrow at 3pm.\n" +
     "You cannot send or dial yourself - no app on iOS can - so those two are put " +
-    "on screen ready and take one tap.";
+    "on screen ready and take one tap.\n" +
+    "You cannot go looking through their files either - file.read opens a picker " +
+    "and they choose one.";
 }
 
 /* reading what he chose, without trusting a word of it */
@@ -6967,6 +7252,15 @@ function openByVoice(said){
   var q = String(said || "").trim().replace(/[.?!]+$/, "");
   if(!q) return false;
 
+  var mood = q.match(MOOD_RE);
+  if(mood){
+    var got = moodSet(mood[1]);
+    if(got){
+      speak(got.say === "normal" ? "Back to normal." : "Alright - " + got.say + ".");
+      return true;
+    }
+  }
+
   if(STOP_RE.test(q)){ hfStopIt(); return true; }
   if(PAUSE_RE.test(q)){ hfPauseIt(); return true; }
 
@@ -8421,6 +8715,7 @@ function hfAsk(question){
     /* it has been speaking all along - wait for the last sentence, do not
        start the whole answer again, then hand the microphone back */
     sayWhenDone(function(){ carryOn(); });
+    setTimeout(function(){ keepUp(c); }, 1200);   /* boil the older part down */
     renderAll();
   }).catch(function(err){
     voiceMode = false;
@@ -8656,7 +8951,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.73";
+var BUILD = "2026-08-21.74";
 
 function banner(kind, html){
   var b = $("banner");

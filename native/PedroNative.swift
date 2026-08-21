@@ -7,6 +7,7 @@ import Vision
 import LocalAuthentication
 import EventKit
 import Contacts
+import UniformTypeIdentifiers
 
 #if canImport(FoundationModels)
 import FoundationModels
@@ -41,7 +42,8 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
         CAPPluginMethod(name: "authenticate",   returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "calendarAdd",    returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "reminderAdd",    returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "contactFind",    returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "contactFind",    returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "readFile",       returnType: CAPPluginReturnPromise)
     ]
 
     // MARK: - on-device model
@@ -339,6 +341,27 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
         DispatchQueue.main.async { [weak self] in
             self?.synth.stopSpeaking(at: .immediate)
             call.resolve(["speaking": false])
+        }
+    }
+
+    // MARK: - a file you hand over
+
+    /// iOS gives no app a way to go looking through your files. What it gives
+    /// is a picker: you choose one, and only that one is handed over. So that
+    /// is what this does - no searching, because there is none to be had.
+    private var pickedFile: CAPPluginCall?
+
+    @objc func readFile(_ call: CAPPluginCall) {
+        pickedFile = call
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            let kinds: [UTType] = [.plainText, .text, .json, .commaSeparatedText,
+                                   .xml, .yaml, .sourceCode, .pdf, .rtf]
+            let picker = UIDocumentPickerViewController(forOpeningContentTypes: kinds,
+                                                        asCopy: true)
+            picker.delegate = self
+            picker.allowsMultipleSelection = false
+            self.bridge?.viewController?.present(picker, animated: true)
         }
     }
 
@@ -660,6 +683,34 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
         }
     }
 
+    fileprivate func handPickedFile(_ url: URL?) {
+        guard let call = pickedFile else { return }
+        pickedFile = nil
+        guard let url = url else {
+            call.reject("no file was chosen")
+            return
+        }
+        let reached = url.startAccessingSecurityScopedResource()
+        defer { if reached { url.stopAccessingSecurityScopedResource() } }
+        do {
+            let data = try Data(contentsOf: url)
+            // a very large file is no use to a language model anyway
+            let slice = data.prefix(200_000)
+            guard let text = String(data: slice, encoding: .utf8)
+                    ?? String(data: slice, encoding: .isoLatin1) else {
+                call.reject("that file is not text I can read")
+                return
+            }
+            call.resolve([
+                "name": url.lastPathComponent,
+                "text": String(text.prefix(60_000)),
+                "bytes": data.count
+            ])
+        } catch {
+            call.reject("could not read it: " + error.localizedDescription)
+        }
+    }
+
     private func stopEverything() {
         if engine.isRunning {
             engine.stop()
@@ -672,5 +723,17 @@ public class PedroNative: CAPPlugin, CAPBridgedPlugin, AVSpeechSynthesizerDelega
         if !keepAlive {
             try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         }
+    }
+}
+
+/// The picker hands its choice back here. It is an extension so the class
+/// above stays about listening and speaking.
+extension PedroNative: UIDocumentPickerDelegate {
+    public func documentPicker(_ controller: UIDocumentPickerViewController,
+                               didPickDocumentsAt urls: [URL]) {
+        handPickedFile(urls.first)
+    }
+    public func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+        handPickedFile(nil)
     }
 }
