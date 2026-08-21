@@ -533,6 +533,27 @@
   @keyframes hudTalk{from{transform:scale(.94);opacity:.8}to{transform:scale(1.08);opacity:1}}
   @keyframes spin{to{transform:rotate(360deg)}}
 
+  /* ============ party mode ============
+     The one filter animation in the app: on a single element, only while this
+     is on, and the entire point of the feature - which is what makes it a cost
+     rather than a waste. Everything else here is still a transform. */
+  #hfOrb.party .disc{
+    animation: discBreathe 1.2s ease-in-out infinite, partyHue 3.4s linear infinite;
+  }
+  #hfOrb.party .disc .sheen.a{ animation-duration:1.6s }
+  #hfOrb.party .disc .sheen.b{ animation-duration:2.6s }
+  #hfOrb.party .disc .glow{ animation-duration:2.2s }
+  /* the words go with it, or the middle of the screen argues with itself */
+  #hf.party #hfState{ animation: partyHue 3.4s linear infinite }
+  /* and a wash behind everything, so it is the room and not just the ball */
+  #hf.party::after{
+    content:""; position:absolute; inset:0; z-index:0; pointer-events:none;
+    background:radial-gradient(circle at 50% 46%,
+      color-mix(in srgb,var(--hud) 16%,transparent), transparent 62%);
+    animation: partyHue 3.4s linear infinite;
+  }
+  @keyframes partyHue{ to{ filter:hue-rotate(360deg) } }
+
   /* ============ the hologram ============
      A real photograph of the actual thing, turned to light: cyan, floating,
      scan lines across it, edges bleeding. The picture is real - the treatment
@@ -1544,6 +1565,7 @@ var DEF = {
   manner:"jarvis", /* "jarvis" - composed, British, brief - or "plain" */
   patience:"normal", /* how long a silence means you have finished talking */
   claps:2,         /* how many claps wake him; 0 is off */
+  party:false,     /* colour, speed, and a livelier voice */
   headsUp:15,      /* minutes before something starts that he says so; 0 = never */
   elevenKey:"",    /* an ElevenLabs key of your own, if you want their voice */
   /* The voice Adam picked and asked for by id. It is from his own account, so
@@ -8124,6 +8146,8 @@ function rightNow(said){
     sayNow(was === now2 ? "That is already my name." : (now2 + ". Noted."));
     return true;
   }
+  if(PARTY_ON_RE.test(q)){ partyStart(); return true; }
+  if(PARTY_OFF_RE.test(q)){ partyStop(); return true; }
   if(NOW_RE.check.test(q)){
     hfSet("busy", "Checking");
     runDiagnostics().then(sayNow);
@@ -8184,6 +8208,81 @@ function rememberHarder(said){
     });
     if(kept.length) hudLog("him", "Remembered: " + kept.join("; "), false);
   }).catch(function(){ voiceMode = was; });
+}
+
+/* ==================== party mode ====================
+   Colour, speed, a livelier voice, and an offer of music - which is the only
+   part of a party a phone can actually supply. */
+var PARTY_ON_RE = /^(?:party|party time|party mode|let'?s party|start the party|it'?s a party)$/i;
+var PARTY_OFF_RE = /^(?:party(?:'?s)? over|stop the party|end the party|no more party|calm down|party off)$/i;
+
+function partySet(on){
+  var orb = $("hfOrb"), screen = $("hf");
+  if(orb) orb.classList.toggle("party", !!on);
+  if(screen) screen.classList.toggle("party", !!on);
+  store.settings.party = !!on;
+  /* the voice goes with it - composed is the wrong register for this */
+  store.settings.mood = on ? "excited"
+    : (store.settings.manner === "plain" ? "normal" : "composed");
+  save();
+}
+
+function partyStart(){
+  partySet(true);
+  var sir = store.settings.manner === "plain" ? "" : ", sir";
+  sayNow("Party mode" + sir + ". Say the word and I will put something on.");
+}
+
+function partyStop(){
+  partySet(false);
+  sayNow(store.settings.manner === "plain" ? "Party over." : "Party mode off, sir.");
+}
+
+/* ==================== looking it up when he does not know ====================
+   A model that does not know something says so rather than going to look. When
+   the answer is an admission rather than an answer, go and find out. */
+var DUNNO = new RegExp(
+  "i (?:do not|don't) (?:know|have)" +
+  "|i(?:'m| am) not (?:sure|certain|aware)" +
+  "|(?:i )?(?:can(?:not|'t)) (?:browse|access|look|search|check)" +
+  "|no access to (?:the )?(?:internet|web|live)" +
+  "|as of (?:my|the) (?:last|knowledge|training)" +
+  "|my (?:knowledge|training) (?:cut ?off|data)" +
+  "|i have no (?:information|data|way of knowing)" +
+  "|(?:you|you'd) (?:should|could|might want to|may want to) (?:check|search|look)" +
+  "|i(?:'m| am) unable to", "i");
+
+/* An answer short enough and shaped like an admission. A long answer that
+   happens to contain "I am not sure" somewhere in the middle is still an
+   answer, and re-asking it would throw away something useful. */
+function soundsUnsure(answer){
+  var t = String(answer || "").trim();
+  if(!t) return false;
+  if(t.length > 420) return false;
+  return DUNNO.test(t);
+}
+
+/* Go and find out, then answer again from what came back. */
+function lookItUp(question, c, onAnswer, onGiveUp){
+  hfSet("busy", "Looking it up");
+  webLook(question, 3).then(function(found){
+    if(!found.length){ onGiveUp(); return; }
+    var notes = found.map(function(f){ return f.title + ": " + f.said; })
+                     .join(String.fromCharCode(10, 10)).slice(0, 3000);
+    var only = { messages: [{ role:"user", t: Date.now(), content:
+      "Here is what the web says. Answer the question from it, in your own " +
+      "words and in one or two short sentences of plain speech. If it does not " +
+      "actually answer the question, say so plainly and briefly." +
+      String.fromCharCode(10, 10) + "Question: " + question +
+      String.fromCharCode(10, 10) + "What the web says:" + String.fromCharCode(10) + notes }] };
+    voiceMode = true;
+    askOnce(only).then(function(better){
+      voiceMode = false;
+      var said = String(better || "").trim();
+      if(!said){ onGiveUp(); return; }
+      onAnswer(said);
+    }).catch(function(){ voiceMode = false; onGiveUp(); });
+  }).catch(function(){ onGiveUp(); });
 }
 
 /* ==================== a hologram of the thing itself ====================
@@ -9367,7 +9466,7 @@ function backupData(){
       effort:s.effort, tts:s.tts, voiceName:s.voiceName, voiceTalk:s.voiceTalk,
       volume:s.volume, rate:s.rate, elevenKey:s.elevenKey, elevenVoice:s.elevenVoice,
       manner:s.manner, headsUp:s.headsUp, mood:s.mood, home:s.home, patience:s.patience,
-      claps:s.claps,
+      claps:s.claps, party:s.party,
       panelSpots:s.panelSpots, panelSizes:s.panelSizes,
       voiceByHand:s.voiceByHand, voiceMoved:s.voiceMoved,
       background:s.background, voiceFirst:s.voiceFirst, enterSends:s.enterSends,
@@ -9620,6 +9719,8 @@ function hfOpen(){
   /* the panels are picked up and resized on this screen, so this is where it
      belongs - it used to be set up only inside the app */
   handsOn();
+  /* a mode you have to turn on again every time you open the app is not a mode */
+  if(store.settings.party) partySet(true);
 
   if(!nativeMicSupported()){
     hf.want = false;
@@ -10502,6 +10603,7 @@ function hfAsk(question){
   sayStop();
   var spoken = 0;
 
+  var lookedUp = false;    /* the web is tried once, never twice */
   /* whatever survived the check above is this question's head start */
   var draft = hf.draft;
   hf.draft = null;
@@ -10548,6 +10650,30 @@ function hfAsk(question){
         askAgainPlainly(c, question);
         return;
       }
+    }
+    /* An admission rather than an answer: go and find out instead of saying
+       "I don't know" at somebody holding a phone that is online. Once only. */
+    if(!lookedUp && soundsUnsure(answer) && apiKeyNow() && !isDevice()){
+      lookedUp = true;
+      sayStop();
+      spoken = 0;
+      lookItUp(question, c, function(better){
+        voiceMode = false;
+        hfSaid.textContent = better;
+        hudLogDone();
+        hudLog("him", better, false);
+        c.messages.push({ role:"assistant", content: better, t:Date.now() });
+        save(); renderAll();
+        carryOn(better);
+      }, function(){
+        /* the web had nothing either - his own answer stands */
+        voiceMode = false;
+        hfSaid.textContent = answer;
+        hudLogDone();
+        hudLog("him", answer, false);
+        carryOn(answer);
+      });
+      return;
     }
     voiceMode = false;
     if(answer.length > spoken) sayChunk(answer.slice(spoken));
@@ -10801,7 +10927,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-21.91";
+var BUILD = "2026-08-21.92";
 
 function banner(kind, html){
   var b = $("banner");

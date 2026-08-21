@@ -814,5 +814,64 @@ const TOOLSRC = decl("TOOLS");
 }
 
 
+/* ---------- looking it up, and party mode ---------- */
+{
+  const page = fs.readFileSync("index.html", "utf8");
+  const inPage = s => page.indexOf(s) > -1;
+
+  /* He can read the web, but only when he reaches for the tool - and a model
+     that does not know something says so rather than going to look. */
+  const unsure = new Function("DUNNO", decl("DUNNO") + grab("soundsUnsure") + " return soundsUnsure;")();
+  ["I don't know.", "I'm not sure who that is.",
+   "I can't browse the internet, so I don't have current information.",
+   "As of my last knowledge update I do not have that.",
+   "I have no way of knowing that.", "I am unable to check that."]
+    .forEach(a => t('"' + a.slice(0, 30) + '" is an admission', unsure(a), true));
+  t("but an answer is not", unsure("Paris."), false);
+  /* a long answer that happens to contain "I am not sure" is still an answer,
+     and throwing it away to re-ask would lose something useful */
+  t("nor is a long answer that hedges in the middle",
+    unsure("The tower was finished in 1889. " + "x".repeat(430) + " I am not sure about the paint."), false);
+
+  const ask = grab("hfAsk");
+  t("an admission sends him to the web", ask.indexOf("soundsUnsure(answer)") > -1, true);
+  t("once, never twice", ask.indexOf("var lookedUp = false;") > -1 &&
+    ask.indexOf("lookedUp = true;") > -1, true);
+  t("and not at all without something to ask", ask.indexOf("apiKeyNow() && !isDevice()") > -1, true);
+  const look = grab("lookItUp");
+  t("it reads the web first", look.indexOf("webLook(question, 3)") > -1, true);
+  t("then answers from what came back", look.indexOf("What the web says") > -1, true);
+  t("in speech, because it is being said", look.indexOf("voiceMode = true") > -1, true);
+  t("and if the web has nothing, his own answer stands",
+    ask.indexOf("the web had nothing either") > -1, true);
+
+  /* ---- party mode ---- */
+  const on = new Function(decl("PARTY_ON_RE") + " return PARTY_ON_RE;")();
+  const off = new Function(decl("PARTY_OFF_RE") + " return PARTY_OFF_RE;")();
+  ["party", "party time", "party mode", "let's party", "start the party"]
+    .forEach(q => t('"' + q + '" starts it', on.test(q), true));
+  ["party's over", "stop the party", "party off", "calm down"]
+    .forEach(q => t('"' + q + '" ends it', off.test(q), true));
+  t("but talking about a party does not start one",
+    on.test("a party for my birthday"), false);
+  t("nor does asking about one", on.test("when is the party"), false);
+
+  t("the circle runs through colour", inPage("@keyframes partyHue"), true);
+  t("and quickens", inPage("#hfOrb.party .disc{"), true);
+  t("the words go with it", inPage("#hf.party #hfState{"), true);
+  t("and there is a wash behind it all", inPage("#hf.party::after{"), true);
+  /* the one filter animation in the app - on one element, only while this is
+     on, and the entire point of the feature */
+  t("it is the only filter animation, and it says why",
+    inPage("The one filter animation in the app"), true);
+  t("the voice goes with it", grab("partySet").indexOf('"excited"') > -1, true);
+  t("and comes back afterwards", grab("partySet").indexOf('"composed"') > -1, true);
+  t("it is remembered", grab("partySet").indexOf("store.settings.party") > -1, true);
+  t("and still on when he opens it again",
+    grab("hfOpen").indexOf("if(store.settings.party) partySet(true)") > -1, true);
+  t("and carried to a new install", has("party:s.party"), true);
+}
+
+
 console.log(fail ? NL + fail + " FAILURES" : NL + "All " + pass + " JARVIS tests passed");
 process.exit(fail ? 1 : 0);
