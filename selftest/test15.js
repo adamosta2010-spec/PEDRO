@@ -229,7 +229,6 @@ const has = s => src.indexOf(s) > -1;
   t("not while he is talking", should(Object.assign({}, on, {phase:"talk"}), {open:false})(), false);
   t("not when hands-free is off", should(Object.assign({}, on, {want:false}), {open:false})(), false);
   t("not when you paused him", should(Object.assign({}, on, {paused:true}), {open:false})(), false);
-  t("not while the camera is up", should(on, {open:true})(), false);
 
   const keep = grab("keepHearing");
   t("a stopped microphone is started again", keep.indexOf("hfListen()") > -1, true);

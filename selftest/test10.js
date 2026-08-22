@@ -16,10 +16,10 @@ const t = (n, g, w) => {
 
 /* worthAnswering asks isACommand first, and that reads every command pattern,
    so the harness has to carry all of them */
-const COMMAND_PATTERNS = ["BUILD_MODE_RE", "OPEN_RE", "CLOSE_RE", "HIDE_RE", "STOP_RE",
+const COMMAND_PATTERNS = ["OPEN_RE", "CLOSE_RE", "HIDE_RE", "STOP_RE",
   "PAUSE_RE", "RESUME_RE", "VIZ_RE", "VIZ_HINT_RE", "STUDY_RE", "UNSTUDY_RE", "EDIT_RE",
-  "UNDO_RE", "TIMER_RE", "COIN_RE", "DICE_RE", "CAM_RE", "REMEMBER_RE",
-  "FORGET_RE", "HIGHLIGHT_RE"];
+  "UNDO_RE", "TIMER_RE", "COIN_RE", "DICE_RE", "REMEMBER_RE",
+  "FORGET_RE"];
 const worth = new Function("appNamed",
   COMMAND_PATTERNS.map(decl).join("\n") + "\n" +
   decl("PEDRO_PANELS") + "\n" +
@@ -70,7 +70,7 @@ t("so does a one word answer to his question", worth("yes"), true);
 /* ---- a command is never noise, however short ---- */
 {
   /* these were all being thrown away as if they were ums */
-  ["build", "settings", "open settings", "building mode", "teach", "workbench",
+  ["settings", "open settings", "teach",
    "stop", "pause", "close", "undo that change", "flip a coin"]
     .forEach(c => t('"' + c + '" is a command, not noise', worth(c), true));
   ["um yeah", "the", "uh", "ok so like", ""]

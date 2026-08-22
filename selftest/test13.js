@@ -151,45 +151,11 @@ const KNOWN = new Function(decl("SPEC3D_KNOWN") + " return SPEC3D_KNOWN;")();
     has("H / 2 - y1 * mid * 0.78 * persp"), true);
   t("and the outside of a shape faces you", has("if(cross >= 0) continue;"), true);
   t("the ball turns into the thing", has("f.from = f.pts.map"), true);
-  t("a tap tells the app which part it was", has("pedroPart"), true);
-  t("and the app only listens to its own frames",
-    has("if(!mine) return;"), true);
+  /* tapping a part and labelling them both went - what is left is the thing
+     itself, every part showing through the ones in front of it, turning */
+  t("nothing is tapped to be named", has("pedroPart"), false);
+  t("and no labels are drawn", has("LABELS_ON"), false);
 }
 
-/* ---- building anything, in the workbench ---- */
-{
-  const has = x => src.indexOf(x) > -1;
-  t("the workbench has somewhere to stand what is built",
-    has(String.fromCharCode(60) + 'iframe id="wbBuilt"'), true);
-  t("and what is built takes over from the parts board",
-    has("#wb.built #wbBoard{display:none}"), true);
-  const build = grab("wbBuild");
-  t("what he already knows goes up at once",
-    build.indexOf("spec3dKnownAll(what)") > -1, true);
-  t("anything else he works out", build.indexOf("spec3dAsk(what)") > -1, true);
-  t("and it stops as soon as the model is whole",
-    build.indexOf("abortCtl.abort()") > -1, true);
-  t("he says plainly when he cannot do it without a signal",
-    build.indexOf("I need the online model") > -1, true);
-  t("what arrives is checked before it is used",
-    build.indexOf("spec3dRead(text)") > -1, true);
-  const add2 = grab("wbBuiltAdd");
-  t("things stack up rather than replacing each other",
-    add2.indexOf("wb.built.push(spec)") > -1, true);
-  t("with a limit on how many stand there", add2.indexOf("length >= 4") > -1, true);
-  const show = grab("wbShowBuilt");
-  t("two or more are stood side by side", show.indexOf("spec3dMerge") > -1, true);
-  t("and the page is built here, from the spec", show.indexOf("spec3dPage(whole)") > -1, true);
-  const voice = grab("wbVoice");
-  t("asking for something not in the tray builds it",
-    voice.indexOf("wbBuild(asked || want") > -1, true);
-  t("and the article is kept, so it reads properly",
-    voice.indexOf("asked = s.replace") > -1, true);
-  t("just naming a thing builds it too", voice.indexOf("wbBuild(s,") > -1, true);
-  t("clearing takes the built things away as well",
-    grab("wbWipe").indexOf("wb.built = []") > -1, true);
-  t("a tap inside what was built is heard", has("built.contentWindow"), true);
-}
-
-console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " model tests passed");
+console.log(fail ? fail + " FAILURES" : "All " + pass + " model tests passed");
 process.exit(fail ? 1 : 0);

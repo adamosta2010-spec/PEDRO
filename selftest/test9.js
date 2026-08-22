@@ -51,9 +51,9 @@ function canDraft(text, world){
   const fn = new Function(
     "appNamed",
     "DRAFT_WORDS", "isDevice", "isGemini", "apiKeyNow", "hf", "wb", "cam", "viz",
-    "VIZ_RE", "VIZ_HINT_RE", "BUILD_MODE_RE", "STUDY_RE", "UNSTUDY_RE", "EDIT_RE", "UNDO_RE",
+    "VIZ_RE", "VIZ_HINT_RE", "STUDY_RE", "UNSTUDY_RE", "EDIT_RE", "UNDO_RE",
     "OPEN_RE", "CLOSE_RE", "HIDE_RE", "STOP_RE", "PAUSE_RE", "RESUME_RE", "TIMER_RE",
-    "COIN_RE", "DICE_RE", "CAM_RE", "REMEMBER_RE", "FORGET_RE", "HIGHLIGHT_RE",
+    "COIN_RE", "DICE_RE", "REMEMBER_RE", "FORGET_RE",
     declOf("HF_FILLER") + "\n" + declOf("HF_SHORT_ASK") + "\n" +
     declOf("PEDRO_PANELS") + "\n" +
     declOf("NOW_RE") + "\n" +
@@ -68,11 +68,10 @@ function canDraft(text, world){
     () => !!world.device, () => world.gemini !== false, () => world.key !== false,
     Object.assign({ answering:false, talking:false }, world.hf || {}),
     { on: !!world.wb }, { open: !!world.cam }, { busy: !!world.viz },
-    pat("VIZ_RE"), pat("VIZ_HINT_RE"), pat("BUILD_MODE_RE"), pat("STUDY_RE"), pat("UNSTUDY_RE"),
+    pat("VIZ_RE"), pat("VIZ_HINT_RE"), pat("STUDY_RE"), pat("UNSTUDY_RE"),
     pat("EDIT_RE"), pat("UNDO_RE"), pat("OPEN_RE"), pat("CLOSE_RE"), pat("HIDE_RE"),
     pat("STOP_RE"), pat("PAUSE_RE"), pat("RESUME_RE"), pat("TIMER_RE"), pat("COIN_RE"),
-    pat("DICE_RE"), pat("CAM_RE"), pat("REMEMBER_RE"), pat("FORGET_RE"),
-    pat("HIGHLIGHT_RE"))(text);
+    pat("DICE_RE"), pat("REMEMBER_RE"), pat("FORGET_RE"))(text);
 }
 
 t("an ordinary question gets a head start",
@@ -84,9 +83,7 @@ t("and neither is a noise picked up in passing", canDraft("um yeah ok"), false);
 t("nothing at all is not either", canDraft(""), false);
 
 /* the important half: things that DO something must never run twice */
-[["build me an engine", "building"],
- ["simulate a volcano", "simulating"],
- ["build", "building mode"],
+[["simulate a plane", "simulating"],
  ["go learn about electronics", "learning"],
  ["set a timer for 5 minutes", "a timer"],
  ["flip a coin", "a coin"],
@@ -99,11 +96,8 @@ t("nothing at all is not either", canDraft(""), false);
  ["change your code so the orb is red", "editing himself"],
  ["undo that change", "undoing"],
  ["remember that i hate coriander", "remembering"],
- ["look at this", "the camera"]
 ].forEach(([say, what]) => t("no head start for " + what, canDraft(say), false));
 
-t("not while the workbench is open", canDraft("what is the capital of france", { wb:true }), false);
-t("not while the camera is open", canDraft("what is the capital of france", { cam:true }), false);
 t("not while a build is running", canDraft("what is the capital of france", { viz:true }), false);
 t("not while he is already talking",
   canDraft("what is the capital of france", { hf:{ talking:true } }), false);

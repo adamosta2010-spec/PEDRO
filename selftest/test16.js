@@ -454,57 +454,12 @@ const TOOLSRC = decl("TOOLS");
 }
 
 
-/* ---------- the camera ---------- */
+/* The camera is gone. What used to be tested here - the shutter, the
+   listen button, the corner brackets - went with it. */
 {
-  const page = fs.readFileSync("index.html", "utf8");
-  const inPage = s => page.indexOf(s) > -1;
-
-  /* Why it did nothing: the one button started the microphone and relied on
-     its done callback to ask the question six seconds later. nativeMicStop
-     clears micHandlers.done before stopping - on purpose, so nothing stale
-     fires - so that callback was destroyed every single time. */
-  t("the microphone's done callback is cleared when it stops",
-    grab("nativeMicStop").indexOf("micHandlers.done = null") > -1, true);
-  t("so nothing in the camera depends on it",
-    src.indexOf("function(){ camAsk(said); });") > -1, false);
-  t("and the six second wait is gone", src.indexOf("}, 6000);") > -1, false);
-
-  /* the shutter looks now - no microphone, nothing that can be lost */
-  t("there is a shutter", inPage('id="camAsk"'), true);
-  t("and it looks straight away", src.indexOf("camFlashNow();\n  camAsk('');") > -1, true);
-  t("asking out loud is its own button", inPage('id="camSpeak"'), true);
-  t("which ends when you stop talking, not on a timer",
-    src.indexOf("a second of quiet after words means you have finished") > -1, true);
-  t("and asks from there rather than from a callback that gets cleared",
-    grab("camListenStop").indexOf("camAsk(said)") > -1, true);
-  t("tapping it again finishes at once",
-    src.indexOf("if(camHearing){ camListenStop(true); return; }") > -1, true);
-  t("there is still a cap, in case the quiet never comes",
-    grab("camListenStop").indexOf("clearTimeout(camHearing.cap)") > -1, true);
-  t("a microphone that will not start says so, and still looks",
-    src.indexOf("The microphone would not start") > -1, true);
-  t("closing the camera stops it listening",
-    grab("camClose").indexOf("camListenStop(false)") > -1, true);
-  t("and a phone with no microphone still gets an answer",
-    src.indexOf("Ask by tapping the button") > -1, true);
-
-  /* and it looks like something looking */
-  t("four corners, not two", (page.match(/#camFrame i:nth-child/g) || []).length, 4);
-  t("a line sweeps while he is thinking", inPage("#cam.busy #camScan"), true);
-  t("but only while he is", inPage("#camScan{position:absolute") &&
-    /#camScan\{[^}]*display:none/.test(page), true);
-  t("it flashes when it takes the picture", inPage("function camFlashNow"), true);
-  t("and flashes again on the next tap, not only the first",
-    grab("camFlashNow").indexOf("void f.offsetWidth") > -1, true);
-  /* white text over a bright room is unreadable, and a camera gets pointed at
-     bright rooms */
-  t("the answer sits on a card", inPage("#camSaid:not(:empty){padding:14px 16px"), true);
-  t("which is not there when there is nothing to say",
-    /#camSaid\{[^}]*background:transparent/.test(page), true);
-  t("and a long answer can be scrolled", /#camSaid\{[^}]*overflow-y:auto/.test(page), true);
-  t("the shutter is the big round one", inPage(".camshot{width:74px"), true);
-  t("and cannot be pressed while he is already looking",
-    inPage("#cam.busy .camshot{pointer-events:none}"), true);
+  t("nothing opens a lens", src.indexOf("function camOpen") > -1, false);
+  t("no camera in the page", fs.readFileSync("index.html", "utf8").indexOf('id="cam"') > -1, false);
+  t("and no tool reaches for one", src.indexOf('"camera.look"') > -1, false);
 }
 
 
@@ -517,17 +472,9 @@ const TOOLSRC = decl("TOOLS");
   t("a refused key is not reached for again", has("var visionRefused"), true);
   t("and visionProvider skips it",
     grab("visionProvider").indexOf("!visionRefused[mine]") > -1, true);
-  const ask = grab("camAsk");
-  t("a failed request falls back to the phone's own eyes",
-    ask.indexOf("return lookOnDevice(shot,") > -1, true);
-  t("and a key failure is recorded as one",
-    ask.indexOf("visionRefused[usedKey] = true") > -1, true);
-  t("what went wrong is written down", ask.indexOf("noteTrouble(") > -1, true);
-  t("the screen says it is looking itself", ask.indexOf("Looking myself") > -1, true);
-  t("it does not tell you to add a key and that your key was refused at once",
-    grab("lookOnDevice").indexOf("keyWasRefused") > -1, true);
-  t("and if there is no way to look at all, it says what would fix that",
-    ask.indexOf("I cannot look at pictures on this device") > -1, true);
+  /* the camera used those, and it is gone - but a refused key still matters,
+     because building a hologram from a web photograph goes the same way */
+  t("nothing asks a lens any more", src.indexOf("function camAsk") > -1, false);
 
   /* the voice he asked for by id */
   t("his voice is what it starts with", has('elevenVoice:"wDsJlOXPqcvIUKdLXjDs"'), true);
@@ -1028,13 +975,12 @@ const TOOLSRC = decl("TOOLS");
       () => null, () => {}, () => Promise.resolve([]), () => "", () => Promise.resolve({}),
       () => {}, () => {}, () => true, { settings:{} }, () => []);
 
-  t("there are twenty-seven of them", Object.keys(TOOLS).length, 27);
   t("every one says what it needs, what it does, and what words reach it",
     Object.keys(TOOLS).filter(k => !(TOOLS[k].needs && TOOLS[k].tell &&
       typeof TOOLS[k].run === "function" && TOOLS[k].words && TOOLS[k].words.length)).length, 0);
 
   ["calendar.list", "reminder.list", "notify.at", "media.control",
-   "camera.look", "maps.show"].forEach(k =>
+   "maps.show"].forEach(k =>
     t(k + " is one of them", !!TOOLS[k], true));
 
   /* the phone's side of each */
@@ -1141,6 +1087,14 @@ const TOOLSRC = decl("TOOLS");
     t('"' + q + '" starts trivia', TRIVIA_RE.test(q), true));
   ["truth or dare", "play truth or dare"].forEach(q =>
     t('"' + q + '" starts truth or dare', TD_RE.test(q), true));
+  /* the regex was tested and the wiring was not, so this was dead for a whole
+     build with every test green - a pattern nothing consults is not a feature */
+  t("and something actually consults them",
+    grab("rightNow").indexOf("TRIVIA_RE.test(q)") > -1 &&
+    grab("rightNow").indexOf("TD_RE.test(q)") > -1, true);
+  t("as it does for every other word he answers to",
+    ["PARTS_RE", "PARTY_ON_RE", "PARTY_OFF_RE"].every(function(n){
+      return grab("rightNow").indexOf(n + ".test(q)") > -1; }), true);
   t("but talking about trivia does not start it", TRIVIA_RE.test("that is trivia"), false);
 }
 
@@ -1152,7 +1106,7 @@ const TOOLSRC = decl("TOOLS");
 
   /* there were four ways out of four things and you had to know which you were in */
   const back = grab("backToNormal");
-  ["gameOn()", "holoHide()", "vizStop()", "camClose()", "partySet(false)"]
+  ["gameOn()", "holoHide()", "vizStop()", "partySet(false)"]
     .forEach(x => t("stop puts away " + x, back.indexOf(x) > -1, true));
   t("and every panel with it", back.indexOf(".hudpanel[data-panel].on") > -1, true);
   t("and it says when there was nothing to stop",
@@ -1178,39 +1132,13 @@ const TOOLSRC = decl("TOOLS");
   t("the panel scrolls, because the list is long",
     /#featuresList\{[^}]*overflow-y:auto/.test(page), true);
 
-  /* the camera was being judged by the spoken prompt, which says nothing about
-     a picture and does tell him what he has may be misheard speech to refuse */
-  t("he knows when he is looking at something", has("var lookingAt"), true);
-  const sp = grab("systemPrompt");
-  t("a picture is announced as a picture", sp.indexOf("PHOTOGRAPH attached") > -1, true);
-  t("and the clause about mishearing is not applied to it",
-    sp.indexOf("lookingAt") > -1 && sp.indexOf("half-heard") > -1, true);
-  t("it is told to read writing in any language",
-    sp.indexOf("in whatever language it is in") > -1, true);
-  t("and to say when the picture is too poor rather than guess",
-    sp.indexOf("too dark or blurred") > -1, true);
-  t("it is set while a photograph is in flight",
-    grab("camAsk").indexOf("lookingAt = true") > -1, true);
-  t("and cleared whether it works or not",
-    (grab("camAsk").match(/lookingAt = false/g) || []).length, 2);
-
-  const camQ = new Function("CAM_ONLY_RE", "TRANSLATE_RE", "READ_RE",
-    decl("CAM_ONLY_RE") + decl("TRANSLATE_RE") + decl("READ_RE") +
-    grab("camQuestion") + " return camQuestion;")();
-  t("translate this into english asks for a translation",
-    camQ("translate this into english").indexOf("translate it into english") > -1, true);
-  t("and says which language it was", camQ("translate this").indexOf("what language") > -1, true);
-  t("what does this say reads it out",
-    camQ("what does this say").indexOf("exactly as it is written") > -1, true);
-  t("and nothing said still just looks", camQ(""), "What am I looking at?");
-
-  const sw = fs.readFileSync("native/PedroNative.swift", "utf8");
-  /* a sign in Arabic came back as nothing at all, which is indistinguishable
-     from there being no sign */
-  t("the phone's own reader is not limited to English",
-    sw.indexOf("supportedRecognitionLanguages") > -1, true);
+  /* The camera is gone, and with it the branch of the spoken prompt that
+     announced a photograph. What is left is one thing, not a choice. */
+  t("nothing announces a photograph", has("PHOTOGRAPH attached"), false);
+  t("and nothing tracks one in flight", has("var lookingAt"), false);
+  t("the spoken prompt says what it always said about misheard speech",
+    grab("systemPrompt").indexOf("sometimes half-heard") > -1, true);
 }
-
 
 console.log(fail ? NL + fail + " FAILURES" : NL + "All " + pass + " JARVIS tests passed");
 process.exit(fail ? 1 : 0);

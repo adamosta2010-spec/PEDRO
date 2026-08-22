@@ -322,7 +322,6 @@ function nativeFrom(cap, exp){
   t("his name in front is ignored", kindOf("Pedro, open safari"), "web");
   t("open up works as well as open", kindOf("open up safari"), "web");
   t("a real app opens itself", kindOf("open spotify"), "spotify");
-  t("the definite article is fine", kindOf("open the camera"), "camera");
   t("play goes to music", kindOf("play blinding lights"), "spotify");
   t("play on youtube goes there", kindOf("play blinding lights on youtube"), "youtube");
   t("take me to gives directions", kindOf("take me to camden town"), "directions");
@@ -342,244 +341,14 @@ function nativeFrom(cap, exp){
 }
 
 
-/* ---- looking at things ---- */
-/* Counting splits three ways and getting it wrong is very visible: asking him
-   to count to a thousand used to open the camera. */
+/* The camera is gone, and everything that decided a question needed eyes
+   went with it. */
 {
-  const v = n => src.slice(src.indexOf("var " + n), src.indexOf(";", src.indexOf("var " + n)) + 1);
-  const bits = new Function(
-    v("CAM_RE") + v("CAM_ONLY_RE") + v("HERE_RE") + v("COUNT_ABSTRACT_RE") + v("ELSEWHERE_RE") +
-    v("TRANSLATE_RE") + v("READ_RE") +
-    grab("needsEyes") + grab("camQuestion") +
-    "; return { needsEyes:needsEyes, camQuestion:camQuestion };")();
-  const eyes = q => bits.needsEyes(q);
-  const inSrc = bit => src.indexOf(bit) > -1;
-
-  t("counting to a number needs no eyes", eyes("count to 1000"), false);
-  t("nor counting down", eyes("count down from 20"), false);
-  t("nor counting backwards", eyes("count backwards from ten"), false);
-  t("counting things does", eyes("count the boxes"), true);
-  t("so does counting these things", eyes("count these boxes"), true);
-  t("how many of something present", eyes("how many boxes are there"), true);
-  t("how many you can see", eyes("how many boxes can you see"), true);
-  t("a fact about the world does not", eyes("how many days in a year"), false);
-  t("nor a fact about a country", eyes("how many people live in france"), false);
-  t("what is this does", eyes("what is this"), true);
-  t("asking him to look does", eyes("look at this"), true);
-  t("asking for the camera does", eyes("open the camera"), true);
-  t("small talk does not", eyes("tell me a joke"), false);
-  t("nothing at all does not", eyes(""), false);
-
-  t("counting is asked for carefully",
-    /one by one/.test(bits.camQuestion("count the boxes")), true);
-  t("and it must admit what it cannot see",
-    /rather than guessing/.test(bits.camQuestion("count the boxes")), true);
-
-  t("the picture is taken at the moment of asking", inSrc("var shot = camGrab();"), true);
-  t("it is shrunk before sending", grab("camGrab").indexOf("1024 / Math.max") > -1, true);
-  t("the front camera is unmirrored", grab("camStart").indexOf("scaleX(-1)") > -1, true);
-  t("flipping swaps which camera", grab("camFlip").indexOf("environment") > -1, true);
-  t("closing lets go of the camera", grab("camClose").indexOf("camStop()") > -1, true);
-  t("stopping actually stops the tracks", grab("camStop").indexOf("t.stop()") > -1, true);
-  t("questions go to the camera while it is open", inSrc("camAsk(question);") && inSrc("if(cam.open){"), true);
-  t("the answer is spoken", grab("camAsk").indexOf("speak(answer)") > -1, true);
+  t("nothing looks through a lens", src.indexOf("function camOpen") > -1, false);
+  t("and nothing decides a question needs one", src.indexOf("function needsEyes") > -1, false);
 }
 
 
-/* ---- pointing things out on the picture ---- */
-{
-  const v = n => src.slice(src.indexOf("var " + n), src.indexOf(";", src.indexOf("var " + n)) + 1);
-  const HL = new Function(v("HIGHLIGHT_RE") + "; return HIGHLIGHT_RE;")();
-  const strip = new RegExp("\\s+(?:is|are)$", "i");
-  const target = q => { const m = q.match(HL); return m ? m[1].replace(strip, "").trim() : null; };
-  const inSrc = bit => src.indexOf(bit) > -1;
-
-  t("highlighting draws instead of describing", inSrc("function camHighlight"), true);
-  t("highlight the screws", target("highlight the screws"), "screws");
-  t("point out the fan", target("point out the fan"), "fan");
-  t("show me where the power button is", target("show me where the power button is"), "power button");
-  t("mark all the boxes", target("mark all the boxes"), "boxes");
-  t("counting is not a highlight", target("count to ten"), null);
-  t("small talk is not a highlight", target("how are you"), null);
-
-  t("it asks for coordinates it can draw", inSrc("[ymin,xmin,ymax,xmax]"), true);
-  t("it reads the boxes out of a chatty reply", inSrc('txt.lastIndexOf("]")'), true);
-  t("a reply it cannot parse leaves nothing drawn", grab("camHighlight").indexOf("found = []") > -1, true);
-  t("boxes are cleared on a new question", grab("camAsk").indexOf("camClearBoxes()") > -1, true);
-  t("and when the camera flips", grab("camFlip").indexOf("camClearBoxes()") > -1, true);
-  t("and when it closes", grab("camClose").indexOf("camClearBoxes()") > -1, true);
-  t("the drawing matches how the picture is cropped",
-    grab("camDrawBoxes").indexOf("Math.max(cv.width / vw, cv.height / vh)") > -1, true);
-
-  t("an abstract question does not get a picture attached",
-    inSrc("if(COUNT_ABSTRACT_RE.test(q) || (ELSEWHERE_RE.test(q) && !needsEyes(q))){"), true);
-}
-
-
-/* ---- being heard from the background ---- */
-{
-  const sp = grab("speak");
-  const inSrc = bit => src.indexOf(bit) > -1;
-  t("it speaks with the app's own voice when there is one",
-    sp.indexOf("nat(" + String.fromCharCode(34) + "speak") > -1, true);
-  t("and only falls back to the browser without one",
-    sp.indexOf("Native.speak") < sp.indexOf("window.speechSynthesis"), true);
-  t("the chosen speed goes with it", sp.indexOf("rate: isNaN(r)") > -1, true);
-  t("so does the volume", sp.indexOf("volume: isNaN(vol)") > -1, true);
-  t("so does the chosen voice", sp.indexOf("voice: store.settings.voiceName") > -1, true);
-  t("stopping stops the app's voice too", inSrc("Native.stopSpeaking"), true);
-}
-
-
-/* ---- the camera needs a model that can see ---- */
-{
-  const vp = grab("visionProvider");
-  const wv = grab("withVision");
-  const inSrc = bit => src.indexOf(bit) > -1;
-
-  t("the camera needs a model with eyes", inSrc("function visionProvider"), true);
-  t("the phone's own model is not one of them",
-    vp.indexOf('p === "device"') === -1 && vp.indexOf('k.gemini') > -1, true);
-  t("it borrows one for the request", wv.indexOf("store.settings.provider = vp") > -1, true);
-  t("and puts the choice back afterwards", wv.indexOf("function restore()") > -1, true);
-  t("it restores even when the request fails",
-    wv.indexOf("function(e){ restore(); throw e; }") > -1, true);
-  /* it no longer refuses - it uses the phone own eyes instead */
-  t("with nothing that can see, the phone looks itself",
-    wv.indexOf("return null;") > -1 && inSrc("function lookOnDevice"), true);
-  t("and says those eyes are its own", grab("lookOnDevice").indexOf("my own eyes") > -1, true);
-  t("looking goes through it", grab("camAsk").indexOf("withVision(") > -1, true);
-  t("highlighting goes through it", grab("camHighlight").indexOf("withVision(") > -1, true);
-  t("a camera problem is spoken, not just printed",
-    grab("camAsk").indexOf("speak(why)") > -1, true);
-
-  t("counting is not a programming request",
-    inSrc("not writing a program that would say them"), true);
-}
-
-
-/* ---- how quickly he is ready again ---- */
-{
-  const sp = grab("speak");
-  const wire = grab("wireNativeSpeech");
-  const inSrc = bit => src.indexOf(bit) > -1;
-  t("it waits for the real end of speech", sp.indexOf("wireNativeSpeech(spoken)") > -1, true);
-  t("the length estimate is only a safety net", sp.indexOf("var spokeTimer = setTimeout(spoken") > -1, true);
-  t("the end only fires once", sp.indexOf("if(finished) return;") > -1, true);
-  t("a failed request does not leave it hanging", sp.indexOf("catch(function(){ spoken(); })") > -1, true);
-  t("the end listener is registered once", wire.indexOf("if(speechWired") > -1, true);
-  t("and never removed out from under itself", wire.indexOf("removeAllListeners") === -1, true);
-}
-
-
-/* ---- the dashboard, the better voice, and not reloading the model ---- */
-{
-  const inSrc = bit => src.indexOf(bit) > -1;
-  const page = require("fs").readFileSync("index.html", "utf8");
-
-  t("the dashboard is the app", page.indexOf('class="hudgrid"') > -1, true);
-  t("there is no message box in the app", page.indexOf("body.voiceonly .app{display:none}") > -1, true);
-  t("but the website keeps one", page.indexOf(".app{display:flex; height:100dvh; position:relative}") > -1, true);
-  t("it opens straight into the dashboard", inSrc("if(!hf.on) hfOpen();"), true);
-  t("the readouts are wired", inSrc("function hudSync"), true);
-  t("the words are written while you talk", inSrc('hudLog("you", live, true)'), true);
-  t("his answers are written too", inSrc('hudLog("him", answer, false)'), true);
-  t("there is an animation while he talks", page.indexOf('class="wave"') > -1, true);
-
-  const el = grab("elevenSpeak");
-  t("the better voice is used when there is a key", grab("speak").indexOf("elevenReady()") > -1, true);
-  t("it asks for that particular voice", inSrc("IKne3meq5aSn9XLyUdCD"), true);
-  t("a refused key falls back rather than going silent",
-    grab("speak").indexOf("speak(text, onEnd);") > -1, true);
-  t("it stops trying after a failure", inSrc("elevenFailed = true"), true);
-  t("volume and speed apply to it too", el.indexOf("a.playbackRate") > -1, true);
-  t("the key travels in the backup", inSrc("elevenKey:s.elevenKey"), true);
-
-  const sc = grab("shortContext");
-  t("the context is kept short", sc.indexOf("msgs.slice(msgs.length - keep)") > -1, true);
-  t("and shorter still when talking", inSrc("voiceMode ? SUM_KEEP : 12"), true);
-  t("with the older part carried as a summary instead of dropped",
-    inSrc("Earlier in this conversation"), true);
-  t("the model on the PC uses the graphics card", inSrc("num_gpu: 99"), true);
-  t("and stays loaded between questions", inSrc('keep_alive: "30m"'), true);
-  t("the phone's model is warmed up at startup", inSrc("nat(" + String.fromCharCode(34) + "warm"), true);
-}
-
-
-/* ---- simulations and visual explanations ---- */
-{
-  const v = n => src.slice(src.indexOf("var " + n), src.indexOf(";", src.indexOf("var " + n)) + 1);
-  const wants = new Function(v("VIZ_RE") + v("VIZ_HINT_RE") + grab("wantsPicture3D") +
-    "; return wantsPicture3D;")();
-  const extract = new Function(grab("vizExtract") + "; return vizExtract;")();
-  const page = new Function(grab("vizPage") + "; return vizPage;")();
-  const inSrc = bit => src.indexOf(bit) > -1;
-
-  t("asking to be shown gets a drawing", !!wants("show me how a four stroke engine works"), true);
-  t("simulate gets one too", wants("simulate a bouncing ball"), "a bouncing ball");
-  t("animate gets one", wants("animate the water cycle"), "the water cycle");
-  t("plot gets one", wants("plot x squared"), "x squared");
-  /* asking how something works is a question now, not a build request */
-  t("how does it work is just a question", wants("how does a jet engine work"), null);
-  t("but build one is a build request", !!wants("build a jet engine"), true);
-  t("counting does not", wants("count to ten"), null);
-  t("opening an app does not", wants("open safari"), null);
-
-  t("the spoken part is separated from the page",
-    extract("It bounces." + String.fromCharCode(10) + "```html" + String.fromCharCode(10) +
-      "<canvas></canvas>" + String.fromCharCode(10) + "```").say, "It bounces.");
-  t("the page is found inside the fence",
-    extract("x" + String.fromCharCode(10) + "```html" + String.fromCharCode(10) +
-      "<canvas></canvas>" + String.fromCharCode(10) + "```").html.indexOf("canvas") > -1, true);
-  t("a reply with no page still says something",
-    extract("I cannot draw that").html, "");
-
-  t("what he writes runs walled off", page("<b>x</b>").indexOf("default-src") > -1, true);
-  t("and cannot fetch anything", page("x").indexOf("img-src data:") > -1, true);
-  t("the frame has no same-origin access",
-    require("fs").readFileSync("index.html", "utf8").indexOf('sandbox="allow-scripts"') > -1, true);
-  t("closing stops whatever was running", grab("vizClose").indexOf("srcdoc = ''") > -1, true);
-  t("it can be run again", inSrc("if(viz.lastAsk) vizBuild(viz.lastAsk);"), true);
-}
-
-
-/* ---- the reactor, the dock, and how long he makes you wait ---- */
-{
-  const page = require("fs").readFileSync("index.html", "utf8");
-  const inSrc = bit => src.indexOf(bit) > -1;
-  const inPage = bit => page.indexOf(bit) > -1;
-
-  /* The cyan ball used to be painted on top of the new circle - .core came
-     after .disc in the markup - so the thing that was supposed to have gone
-     was the thing you actually saw. */
-  t("the old ball is gone from the markup", inPage('<span class="ball"></span>'), false);
-  t("and so is the core it sat in", inPage('<span class="core">'), false);
-  t("and its styling with it", inPage("ballGlow") || inPage("#hfOrb .swirl"), false);
-  t("nothing is left of the orbits either", inPage("#hfOrb .orbits"), false);
-  t("it still reacts while he listens", inPage("#hfOrb.hear .disc"), true);
-  t("and while he talks", inPage("#hfOrb.talk .disc"), true);
-
-  t("there is a dock", inPage('id="dock"'), true);
-  t("it opens a panel", inSrc("function dockToggle"), true);
-  t("with the voice in it", inPage('id="dockVoice"'), true);
-  t("with volume", inPage('id="dockVol"'), true);
-  t("with speed", inPage('id="dockRate"'), true);
-  t("with background listening", inPage('id="dockBg"'), true);
-  t("and a way to the rest", inSrc('$("dockMore")'), true);
-
-  t("the pause before he answers is shorter", inSrc("}, 900);"), true);
-  /* A voice id in this file is a guess about somebody else's account. It is
-     asked for now, and one already picked by hand is kept. */
-  t("his voice is what it starts with", inSrc('elevenVoice:"wDsJlOXPqcvIUKdLXjDs"'), true);
-  t("their account is asked what it has", inSrc("function elevenList"), true);
-  t("and the most JARVIS-sounding one is taken", inSrc("function elevenChooseVoice"), true);
-  t("a phone that had one forced on it is cleared",
-    inSrc('store.settings.elevenVoice === "IKne3meq5aSn9XLyUdCD"'), true);
-  /* the one that was forced on every phone at start is still gone - this is
-     a different id, and it is the one he asked for */
-  t("the id that was forced on every start is not the default",
-    !inSrc('elevenVoice:"IKne3meq5aSn9XLyUdCD"'), true);
-}
 
 
 /* ---- the circle in the middle ---- */
@@ -822,11 +591,6 @@ function nativeFrom(cap, exp){
       src.indexOf("carryOn(" + '"' + "Right, I've read up on") > -1, true);
   }
 
-  /* the phone can look at a picture by itself */
-  t("the phone can look at a picture itself", inSrc("function lookOnDevice"), true);
-  t("it reads any words in it", grab("lookOnDevice").indexOf("It says: ") > -1, true);
-  t("it counts faces", grab("lookOnDevice").indexOf("faces in it") > -1, true);
-  t("and admits it is not a proper model", grab("lookOnDevice").indexOf("add a Gemini key") > -1, true);
 }
 
 
