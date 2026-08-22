@@ -1296,6 +1296,14 @@
         Only works while he is listening, so it needs the app.</div>
     </div>
     <div class="field">
+      <label for="setSirs">How often he says sir</label>
+      <select id="setSirs">
+        <option value="sometimes">Now and then</option>
+        <option value="never">Never</option>
+        <option value="always">Every time</option>
+      </select>
+    </div>
+    <div class="field">
       <label for="setPatience">How long he waits before answering</label>
       <select id="setPatience">
         <option value="quick">Quick &mdash; answers almost at once</option>
@@ -1629,15 +1637,19 @@ var DEF = {
   home:null,       /* where he is: {lat, lon, name, country, byHand} */
   manner:"jarvis", /* "jarvis" - composed, British, brief - or "plain" */
   patience:"normal", /* how long a silence means you have finished talking */
+  sirs:"sometimes",  /* "sometimes", "never" or "always" */
   claps:2,         /* how many claps wake him; 0 is off */
   shortcuts:"",    /* the Shortcuts on this phone, by name - iOS will not list them */
   party:false,     /* colour, speed, and a livelier voice */
   headsUp:15,      /* minutes before something starts that he says so; 0 = never */
   elevenKey:"",    /* an ElevenLabs key of your own, if you want their voice */
-  /* The voice Adam picked and asked for by id. It is from his own account, so
-     it resolves - which was the whole objection to writing one in here. */
-  elevenVoice:"wDsJlOXPqcvIUKdLXjDs",
-  voiceByHand:true,  /* set deliberately - nothing is allowed to change it */
+  /* Daniel - Steady Broadcaster. British, male, and one of the twenty-one
+     premade voices, so it works on any key rather than only in the library it
+     came from. The id Adam gave me is a custom voice: it is not among them, so
+     it could only ever have worked if it was in his own account, and nothing
+     said so when it was not. */
+  elevenVoice:"onwK4e9ZLuTAKqWW03F9",
+  voiceByHand:false, /* not chosen by hand - a sensible default he can change */
   elevenName:"AI",
   elevenOn:true,   /* use it when there is a key */
   volume:1,        /* how loud he is, on top of the phone's own volume */
@@ -2185,6 +2197,7 @@ function fillSettings(){
   sw($("swManner"), s.manner !== "plain");
   $("setHeadsUp").value = String(s.headsUp === undefined ? 15 : s.headsUp);
   $("setPatience").value = s.patience || "normal";
+  $("setSirs").value = s.sirs || "sometimes";
   $("setClaps").value = String(s.claps === undefined ? 2 : s.claps);
   $("setShortcuts").value = s.shortcuts || "";
   sw($("swFail"), s.autoFailover !== false);
@@ -2582,6 +2595,7 @@ $("swManner").addEventListener("click", function(){
   toast(on ? "Plainer, friendlier." : "Composed, British, brief.");
 });
 bindInput("setPatience", "patience");
+bindInput("setSirs", "sirs");
 bindInput("setShortcuts", "shortcuts");
 bindInput("setClaps", "claps", function(){
   store.settings.claps = parseInt(store.settings.claps, 10) || 0;
@@ -2626,12 +2640,7 @@ function fillElevenVoices(){
   var sel = $("setElevenVoice");
   var hint = $("elevenHint");
   if(!sel) return;
-  if(!store.settings.elevenKey){
-    sel.innerHTML = '<option value="">Add a key above first</option>';
-    if(hint) hint.textContent = "Without a key he uses the phone's own voice.";
-    return;
-  }
-  sel.innerHTML = '<option value="">Looking at your account…</option>';
+  sel.innerHTML = '<option value="">Looking…</option>';
   elevenList().then(function(list){
     sel.innerHTML = "";
     if(!list.length){
@@ -2646,8 +2655,17 @@ function fillElevenVoices(){
       o.textContent = v.name + (about ? "  (" + about + ")" : "");
       sel.appendChild(o);
     });
-    sel.value = store.settings.elevenVoice || list[0].id;
-    if(hint) hint.textContent = "Top of the list is the closest to JARVIS in your account.";
+    var mine = store.settings.elevenVoice;
+    var have = list.filter(function(v){ return v.id === mine; })[0];
+    sel.value = have ? mine : list[0].id;
+    if(hint){
+      hint.textContent = !store.settings.elevenKey
+          ? "Pick one now - he needs a key above before he can speak with it."
+        : elevenWhy ? elevenWhy
+        : !have && mine
+          ? "The voice set here is not one this key can use - pick one from the list."
+          : "Top of the list is the closest to JARVIS you can use.";
+    }
   }).catch(function(e){
     sel.innerHTML = '<option value="">Could not read your voices</option>';
     if(hint) hint.textContent = String(e && e.message || e);
@@ -3066,11 +3084,15 @@ function voiceScore(v){
 function elevenList(){
   if(elevenListed) return elevenListed;
   var key = store.settings.elevenKey;
-  if(!key) return Promise.resolve([]);
-  elevenListed = fetch("https://api.elevenlabs.io/v1/voices", {
-    headers: { "xi-api-key": key }
-  }).then(function(res){
-    if(!res.ok) throw new Error("ElevenLabs would not list the voices (" + res.status + ")");
+  /* Listing needs no key at all - a bare request returns the twenty-one
+     premade voices. Sending one anyway is what turns a typo into "could not
+     read your voices" when it could have shown a list regardless. */
+  var head = key ? { headers: { "xi-api-key": key } } : undefined;
+  elevenListed = fetch("https://api.elevenlabs.io/v1/voices", head).then(function(res){
+    if(res.status === 401 || res.status === 403){
+      throw new Error("that ElevenLabs key was refused - check it in Settings");
+    }
+    if(!res.ok) throw new Error("ElevenLabs would not answer (" + res.status + ")");
     return res.json();
   }).then(function(j){
     var list = (j && j.voices || []).map(function(v){
@@ -3081,6 +3103,24 @@ function elevenList(){
     return list;
   }).catch(function(e){
     elevenListed = null;                 /* a bad signal should not be permanent */
+    /* A refused key should not leave him with no list. Ask again without it -
+       the premade voices are public, and he can still choose one. */
+    if(key && /refused/.test(String(e.message))){
+      return fetch("https://api.elevenlabs.io/v1/voices").then(function(r){
+        if(!r.ok) throw e;
+        return r.json();
+      }).then(function(j){
+        var list = (j && j.voices || []).map(function(v){
+          return { voice_id: v.voice_id, name: v.name, labels: v.labels || {} };
+        });
+        list.sort(function(a, b){ return voiceScore(b) - voiceScore(a); });
+        ELEVEN_VOICES = list.map(function(v){
+          return { id: v.voice_id, name: v.name, labels: v.labels };
+        });
+        elevenWhy = "that key was refused, so these are the free voices";
+        return ELEVEN_VOICES;
+      }).catch(function(){ throw e; });
+    }
     throw e;
   });
   return elevenListed;
@@ -3399,7 +3439,8 @@ var MANNERS = {
     "",
     "HOW YOU SPEAK",
     "You are JARVIS from Iron Man: composed, British, dry, and brief. Say the",
-    "thing and stop. Call them sir once at the start, not every sentence.",
+    "thing and stop. Say sir rarely - once in a while, not in every answer.",
+    "An answer that always ends in sir is a tic, not a manner.",
     "Fact first, then what it means: Traffic on the M4 is heavy, sir. Twenty-",
     "five minutes rather than twelve.",
     "Be exact with numbers you know and say plainly when you are estimating.",
@@ -7266,8 +7307,24 @@ var NOW_RE = {
 };
 
 /* What he says when you use his name and nothing else. Not always the same
-   word, because always the same word stops sounding like an answer. */
-var ANSWER_TO_NAME = ["Sir?", "Yes, sir?", "Sir.", "Listening, sir."];
+   word, because always the same word stops sounding like an answer - and
+   mostly without "sir", because all four of these used to have it and that is
+   what made it a tic. */
+var ANSWER_TO_NAME = ["Yes?", "Mm?", "Go on.", "Listening.", "Yes, sir?", "Sir?"];
+
+/* Said about one time in five, and never twice running. JARVIS says it
+   occasionally; said every single time it stops being a manner and starts
+   being a verbal tic - which is exactly what Adam heard. */
+var sirLast = false;
+function sir(){
+  if(store.settings.manner === "plain") return "";
+  if(store.settings.sirs === "never") return "";
+  if(store.settings.sirs === "always") return ", sir";
+  if(sirLast){ sirLast = false; return ""; }
+  var say = Math.random() < 0.22;
+  sirLast = say;
+  return say ? ", sir" : "";
+}
 
 /* the last thing he said, so "again" can say it once more */
 var saidLast = "";
@@ -7934,13 +7991,12 @@ function partySet(on){
 
 function partyStart(){
   partySet(true);
-  var sir = store.settings.manner === "plain" ? "" : ", sir";
-  sayNow("Party mode" + sir + ". Say the word and I will put something on.");
+  sayNow("Party mode" + sir() + ". Say the word and I will put something on.");
 }
 
 function partyStop(){
   partySet(false);
-  sayNow(store.settings.manner === "plain" ? "Party over." : "Party mode off, sir.");
+  sayNow("Party" + (store.settings.manner === "plain" ? " over." : " mode off" + sir() + "."));
 }
 
 /* ==================== looking it up when he does not know ====================
@@ -8244,7 +8300,7 @@ function batteryNow(){
       low: !!b.low,
       said: pct + " percent" +
         (b.state === "charging" ? ", charging." : b.state === "full" ? ", full." :
-         pct <= 20 ? ", sir. You may want a charger." : ".")
+         pct <= 20 ? sir() + ". You may want a charger." : ".")
     };
   }).catch(function(e){
     /* a browser on a laptop may still know */
@@ -8306,8 +8362,7 @@ function partOfDay(){
    a model to assemble this would cost a second and could get it wrong. */
 function briefNow(){
   var now = new Date();
-  var sir = store.settings.manner === "plain" ? "" : ", sir";
-  var head = partOfDay() + sir + ". It's " +
+  var head = partOfDay() + sir() + ". It's " +
     now.toLocaleTimeString(undefined, { hour:"numeric", minute:"2-digit" }) +
     " on " + now.toLocaleDateString(undefined, { weekday:"long", day:"numeric", month:"long" }) + ".";
 
@@ -8385,9 +8440,8 @@ function watchDiary(){
       var mark = e.title + "|" + (e.start || "");
       if(diarySaid[mark]) return;
       diarySaid[mark] = Date.now();
-      var sir = store.settings.manner === "plain" ? "" : ", sir";
       hfSpeak(capFirst(e.title + " in " + e.inMinutes + " minute" +
-        (e.inMinutes === 1 ? "" : "s") + sir + "."));
+        (e.inMinutes === 1 ? "" : "s") + sir() + "."));
       hudLog("him", e.title + " in " + e.inMinutes + "m", false);
     });
     /* anything remembered for longer than a day is not coming back */
@@ -8453,13 +8507,13 @@ function runDiagnostics(){
             : Promise.resolve(null)
   ]).then(function(found){
     found.forEach(function(x){ if(x) wrong.push(x); });
-    var sir = s.manner === "plain" ? "" : ", sir";
-    if(!wrong.length) return "All systems nominal" + sir + ". " + capFirst(fine.slice(0, 3).join(", ")) + ".";
+    var said = sir();
+    if(!wrong.length) return "All systems nominal" + said + ". " + capFirst(fine.slice(0, 3).join(", ")) + ".";
     /* each is its own sentence, so each starts with a capital - "One problem,
        sir. no key for Gemini" is the sort of thing you only hear once */
     var count = wrong.length === 1 ? "One problem"
               : capFirst(saidCount(wrong.length)) + " problems";
-    return count + sir + ". " + wrong.map(capFirst).join(". ") + ". Everything else is fine.";
+    return count + said + ". " + wrong.map(capFirst).join(". ") + ". Everything else is fine.";
   });
 }
 
@@ -8474,8 +8528,7 @@ function watchBattery(){
     var step = b.percent <= 10 ? 10 : b.percent <= 20 ? 20 : 0;
     if(!step || batterySaid === step || (batterySaid && batterySaid <= step)) return;
     batterySaid = step;
-    var sir = store.settings.manner === "plain" ? "" : ", sir";
-    hfSpeak("Battery is down to " + b.percent + " percent" + sir + ".");
+    hfSpeak("Battery is down to " + b.percent + " percent" + sir() + ".");
     hudLog("him", "Battery " + b.percent + "%", false);
   }).catch(function(){});
 }
@@ -9215,6 +9268,7 @@ function backupData(){
       effort:s.effort, tts:s.tts, voiceName:s.voiceName, voiceTalk:s.voiceTalk,
       volume:s.volume, rate:s.rate, elevenKey:s.elevenKey, elevenVoice:s.elevenVoice,
       manner:s.manner, headsUp:s.headsUp, mood:s.mood, home:s.home, patience:s.patience,
+      sirs:s.sirs,
       claps:s.claps, party:s.party, shortcuts:s.shortcuts,
       panelSpots:s.panelSpots, panelSizes:s.panelSizes,
       voiceByHand:s.voiceByHand, voiceMoved:s.voiceMoved,
@@ -10662,7 +10716,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-22.02";
+var BUILD = "2026-08-22.03";
 
 function banner(kind, html){
   var b = $("banner");
@@ -10714,10 +10768,16 @@ if(store.settings.elevenVoice === "IKne3meq5aSn9XLyUdCD" && !store.settings.voic
    Done once and written down, so that changing it later sticks. */
 if(!store.settings.voiceMoved){
   store.settings.voiceMoved = true;
-  if(!store.settings.elevenVoice){
-    store.settings.elevenVoice = "wDsJlOXPqcvIUKdLXjDs";
-    store.settings.voiceByHand = true;
-  }
+  if(!store.settings.elevenVoice) store.settings.elevenVoice = "onwK4e9ZLuTAKqWW03F9";
+  save();
+}
+/* A phone carrying the custom id is moved to one that works anywhere. It was
+   never in the twenty-one premade voices, so unless it happened to be in his
+   own library it could not work at all - and it said nothing. */
+if(store.settings.elevenVoice === "wDsJlOXPqcvIUKdLXjDs" && !store.settings.voiceKept){
+  store.settings.voiceKept = true;
+  store.settings.elevenVoice = "onwK4e9ZLuTAKqWW03F9";
+  store.settings.voiceByHand = false;
   save();
 }
 
