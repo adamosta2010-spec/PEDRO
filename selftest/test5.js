@@ -13,7 +13,7 @@ function grab(name){
 }
 /* the prompt names the apps Pedro can open; the list itself is not what these test */
 const appList = () => "maps, music, spotify, messages, phone, web";
-const names = ["studies","studyFor","studyOf","forgetStudy","lessons","facts","relevance","pickLessons","taughtBlock","addLesson","addFact",
+const names = ["studies","studyFor","namesTopic","studyOf","forgetStudy","lessons","facts","relevance","pickLessons","taughtBlock","addLesson","addFact",
                "isGemini","isGroq","isLocal","allKeys","apiKeyNow","providerLabel",
                "memories","recallFor","sameMemory","addMemory","forgetMemory","rememberFrom",
                "systemPrompt"];

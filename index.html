@@ -7560,6 +7560,9 @@ function rememberHarder(said){
 function backToNormal(){
   var out = [];
   if(gameOn()){ out.push("game"); game.kind = null; game.step = null; game.q = null; game.pool = []; }
+  /* ten passes is a minute or so, and a minute is a long time to be unable to
+     change your mind about it */
+  if(learnStop){ out.push("reading up"); var end = learnStop; learnStop = null; end(); }
   if($("hf") && $("hf").classList.contains("bg")){ out.push("hologram"); holoHide(); }
   if($("hfOrb") && $("hfOrb").classList.contains("holo")){ holoHide(); }
   if($("hfOrb") && $("hfOrb").classList.contains("showing")){ out.push("what was showing"); vizStop(); }
@@ -8155,6 +8158,9 @@ function holoPhoto(what){
     return false;
   });
 }
+
+/* set while he is reading up on something, so stop can end it */
+var learnStop = null;
 
 /* ==================== reading the web ====================
    None of this needs a key or an account. Wikipedia and DuckDuckGo both send
@@ -8836,10 +8842,20 @@ function studyOf(topic){
 /* Ask for the groundwork, not an essay: short facts that answer later questions. */
 /* The ground to cover. Three passes rather than one, because asking for
    everything at once gets a shallow list of headlines. */
+/* Ten angles, because three of them is a summary rather than an education.
+   Each one is a different question about the same subject, so the notes do not
+   all say the same thing in different words. */
 var LEARN_PASSES = [
-  { name: 'the basics',   ask: 'what it is, the words used for it, and the ideas someone must have before the rest makes sense' },
-  { name: 'how it works', ask: 'the parts, how they work together, and the rules or laws that govern it' },
-  { name: 'using it',     ask: 'what it is used for in practice, the common mistakes, and the things people get wrong' }
+  { name: 'the basics',    ask: 'what it is, the words used for it, and the ideas someone must have before the rest makes sense' },
+  { name: 'how it works',  ask: 'the parts, how they work together, and the rules or laws that govern it' },
+  { name: 'the numbers',   ask: 'the figures that matter - sizes, ranges, speeds, costs, typical values - with units' },
+  { name: 'using it',      ask: 'what it is used for in practice, and how it is actually done step by step' },
+  { name: 'going wrong',   ask: 'how it fails, what breaks, the warning signs, and what to do about each' },
+  { name: 'the mistakes',  ask: 'what people commonly get wrong about it, and what is actually true instead' },
+  { name: 'the history',   ask: 'where it came from, who worked it out, and what changed it along the way' },
+  { name: 'the neighbours',ask: 'the things it is often confused with, and exactly how it differs from each' },
+  { name: 'the edges',     ask: 'the unusual cases, the exceptions to the rules, and where the ordinary explanation stops being true' },
+  { name: 'the deep end',  ask: 'what somebody who works with this every day knows that a beginner would not' }
 ];
 
 /* How long a pass has taken lately, so the estimate is measured, not guessed. */
@@ -8911,14 +8927,41 @@ function learnAbout(topic, onDone){
       ? (topic + ' - ' + doneEnough + ', ' + saySeconds(left) + ' left')
       : (topic + ' - ' + doneEnough + ', nearly there'));
   }, 900);
-  function stopTicking(){ clearInterval(tick); }
+  function stopTicking(){ clearInterval(tick); learnStop = null; }
+  /* ten passes is a minute or so, and a minute is a long time to be unable to
+     change your mind */
+  learnStop = function(){
+    stopTicking();
+    pass = LEARN_PASSES.length;
+    carryOn(notes.length
+      ? 'Stopped. I got ' + notes.length + ' notes on ' + topic + ' before you did.'
+      : 'Stopped.');
+  };
+
+  /* What the web says about it, read once and handed to every pass. Without
+     this he is only writing down what the model happens to remember, which is
+     the difference between reading up on something and reciting it. */
+  var fromWeb = "";
+  function readFirst(next){
+    if(typeof webLook !== "function"){ next(); return; }
+    hfSet('busy', 'Reading about ' + topic);
+    webLook(topic, 3).then(function(found){
+      fromWeb = found.map(function(f){ return f.title + ": " + f.said; })
+                     .join(String.fromCharCode(10)).slice(0, 2500);
+      next();
+    }).catch(function(){ next(); });
+  }
 
   function runPass(){
     if(pass >= LEARN_PASSES.length) return finish();
     var p = LEARN_PASSES[pass];
     var passBegan = Date.now();
     var ask = 'Teach yourself ' + topic + ', covering ' + p.ask + '. ' +
-      'Reply with ONLY a JSON array of 8 short factual notes, each one sentence: ' +
+      (fromWeb ? 'Here is what the web says about it - use it, and go beyond it:' +
+        String.fromCharCode(10) + fromWeb + String.fromCharCode(10, 10) : '') +
+      'Reply with ONLY a JSON array of 12 short factual notes, each one sentence. ' +
+      'Be specific: names, numbers, units, real examples. No note that could be ' +
+      'said about any other subject. Do not repeat anything you have already said. ' +
       '["...","..."]';
     var only = { messages: [{ role:'user', content: ask, t:Date.now() }] };
     var wasVoice = voiceMode;
@@ -8952,7 +8995,18 @@ function learnAbout(topic, onDone){
 
   function finish(){
     stopTicking();
-    notes = notes.slice(0, 30);
+    /* A hundred and twenty rather than thirty. He asked for everything, and
+       thirty notes is a summary. Duplicates are dropped first, because ten
+       passes over one subject will say some things twice however carefully
+       they are asked. */
+    var seen = {}, kept = [];
+    notes.forEach(function(n){
+      var key = String(n).toLowerCase().replace(/[^a-z0-9 ]/g, "").slice(0, 60);
+      if(seen[key]) return;
+      seen[key] = 1;
+      kept.push(n);
+    });
+    notes = kept.slice(0, 120);
     if(!notes.length){
       carryOn('I could not get anywhere with ' + topic + '.');
       if(onDone) onDone(false);
@@ -8970,7 +9024,7 @@ function learnAbout(topic, onDone){
     if(onDone) onDone(true);
   }
 
-  runPass();
+  readFirst(runPass);
 }
 
 function forgetStudy(topic){
@@ -8984,12 +9038,52 @@ function forgetStudy(topic){
 }
 
 /* whichever subject bears on this question */
+/* The same subject, give or take a plural. He reads up on "diodes" and is then
+   asked about a "diode" - which is the same thing to everyone except a string
+   comparison. */
+function namesTopic(said, topic){
+  /* Every way a word might be written, rather than one stem for both - a stem
+     that strips "es" before "s" turns diodes into diod while diode stays
+     diode, so the two never meet. Comparing sets of forms cannot fail that
+     way: if any form of one is any form of the other, it is the same word. */
+  function forms(x){
+    var all = [x];
+    if(/ies$/.test(x)) all.push(x.replace(/ies$/, "y"));
+    if(/y$/.test(x)) all.push(x.replace(/y$/, "ies"));
+    if(/s$/.test(x) && !/ss$/.test(x)) all.push(x.slice(0, -1));
+    all.push(x + "s");
+    if(/(?:s|x|z|ch|sh)$/.test(x)) all.push(x + "es");
+    if(/es$/.test(x)) all.push(x.slice(0, -2));
+    return all;
+  }
+  var mine = {};
+  (String(said || "").toLowerCase().match(/[a-z0-9']+/g) || []).forEach(function(w){
+    if(w.length > 2) forms(w).forEach(function(f){ mine[f] = 1; });
+  });
+  var want = (String(topic || "").toLowerCase().match(/[a-z0-9']+/g) || [])
+    .filter(function(w){ return w.length > 2; });
+  if(!want.length) return false;
+  var hits = 0;
+  want.forEach(function(w){
+    if(forms(w).some(function(f){ return mine[f]; })) hits++;
+  });
+  /* one word of a one-word topic, half the words of a longer one */
+  return hits >= Math.ceil(want.length / 2);
+}
+
 function studyFor(text){
   var all = studies();
   if(!all.length) return null;
   var best = null, bestScore = 0;
   all.forEach(function(s){
     var score = relevance(text || "", { q: s.topic + " " + s.notes.slice(0, 6).join(" ") });
+    /* Naming the subject is the whole point of having read up on it, so it
+       counts for far more than a word that happens to be in the notes.
+       relevance gives a word of six letters two points and one of five only
+       one, so "what is a diode" against a study of "diodes" came to exactly
+       one and missed the threshold by a single point - which is why he could
+       read up on something and then know nothing about it. */
+    if(namesTopic(text, s.topic)) score += 4;
     if(score > bestScore){ bestScore = score; best = s; }
   });
   return bestScore >= 2 ? best : null;
@@ -10716,7 +10810,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-22.03";
+var BUILD = "2026-08-22.04";
 
 function banner(kind, html){
   var b = $("banner");
