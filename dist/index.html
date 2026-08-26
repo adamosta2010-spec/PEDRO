@@ -4665,10 +4665,7 @@ function wantsPicture3D(q){
   return null;
 }
 
-function vizOpen(){
-  viz.open = true;
-  $('viz').classList.add('on');
-}
+
 function vizClose(){
   viz.open = false;
   $('viz').classList.remove('on');
@@ -5981,7 +5978,7 @@ function looksLikeDoing(text){
   return doingPattern().test(s);
 }
 /* kept so anything still looking for it finds a working pattern */
-var DOING_RE = { test: function(s){ return looksLikeDoing(s); } };
+
 
 /* what he is told he can do - only when he might need it */
 /* ==================== how he sounds ====================
@@ -6446,7 +6443,7 @@ function spec3dKnown(about){
    through it actually makes it. No model involved - it is instant and it works
    with no signal. */
 
-var WB_W = 84, WB_H = 46, WB_PIN = 7;
+
 /* what a part is called out loud, which is not always what is printed on it */
 
 
@@ -6509,25 +6506,16 @@ var wb = { on:false, parts:[], wires:[], seq:0, sel:null, power:true,
    out, and it goes up when it arrives. */
 
 /* what the stream had got to when it was stopped */
-var wbSeen = "";
-function seenLast(){ return wbSeen; }
+
+
 
 /* ---- what he says about it ---- */
 
 
 /* the words that work inside building mode. Returns null when it is not one
    of them, so the question carries on to the model as usual. */
-var WB_ADD_RE = /^(?:add|put|drop|give me|i want|place|stick)\s+(?:me\s+)?(?:(?:another|an|a|the)\s+)?([a-z0-9 ]+?)(?:\s+(?:on|to|in)\s+(?:the\s+)?board)?\s*$/i;
-var WB_NAMES = {
-  battery:"battery", batteries:"battery", cell:"cell", "aa":"cell", "aa cell":"cell",
-  lamp:"lamp", bulb:"lamp", light:"lamp", "light bulb":"lamp", "lightbulb":"lamp",
-  led:"led", diode:"led", resistor:"resistor", resistance:"resistor",
-  motor:"motor", fan:"fan", buzzer:"buzzer", speaker:"buzzer",
-  "switch":"toggle", button:"toggle", toggle:"toggle",
-  gear:"gear", cog:"gear", "small gear":"gear", "big gear":"biggear",
-  biggear:"biggear", "large gear":"biggear", pinion:"pinion",
-  wheel:"wheel", tyre:"wheel", tire:"wheel"
-};
+
+
 
 
 /* tap the ball to put the globe back */
@@ -6565,7 +6553,7 @@ var camEl, camVid;
 
 
 /* words that mean "the thing in front of me" rather than a number in the abstract */
-var HERE_RE = /\b(?:this|these|those|here|in front|on the (?:table|desk|floor|shelf)|i(?:\'m| am) holding|you (?:can )?see|in the (?:picture|photo|room)|there are)\b/i;
+
 /* counting a number sequence - no eyes needed */
 
 /* "how many days in a year" is about the world, not about the room */
@@ -9183,9 +9171,7 @@ var HOUSE_LESSONS = [
 
 /* Adam's own teaching first, then these. His always wins - if he has taught him
    something that contradicts one of these, that is the answer. */
-function allLessons(){
-  return lessons().concat(HOUSE_LESSONS);
-}
+
 
 function pickLessons(text, max){
   function best(list){
@@ -9643,18 +9629,7 @@ function hfOpen(){
   hfListen();
   hfQuietTimer();
 }
-function hfClose(){
-  hf.on = false; hf.want = false;
-  hfEl.classList.remove("on");
-  clearTimeout(hf.restart); clearTimeout(hf.quiet); clearTimeout(hf.settle);
-  try{
-    if(hf.rec && hf.rec.native) nativeMicStop();
-    else if(hf.rec) hf.rec.abort();
-  }catch(e){}
-  hf.rec = null;
-  if(window.speechSynthesis) speechSynthesis.cancel();
-  keepAwake(false);
-}
+
 
 /* Listening while the app is behind something else. iOS only permits this for
    apps genuinely using audio, which a microphone session is - the app declares
@@ -10810,7 +10785,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-22.04";
+var BUILD = "2026-08-22.05";
 
 function banner(kind, html){
   var b = $("banner");

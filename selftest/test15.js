@@ -287,8 +287,10 @@ const has = s => src.indexOf(s) > -1;
     pick.indexOf("never the built-in ones") > -1, true);
   t("and the fallback shows only what Adam taught",
     pick.indexOf("return mine.slice(") > -1, true);
+  /* allLessons went - nothing called it. pickLessons reaches HOUSE_LESSONS
+     itself, and puts what Adam taught in front of them. */
   t("and what Adam teaches him comes first",
-    grab("allLessons").indexOf("lessons().concat(HOUSE_LESSONS)") > -1, true);
+    pick.indexOf("best(mine).concat(best(HOUSE_LESSONS))") > -1, true);
 }
 
 console.log(fail ? "\n" + fail + " FAILURES" : "\nAll " + pass + " everything-else tests passed");

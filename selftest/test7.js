@@ -79,7 +79,6 @@ t("and no setting for which model drew them", src.indexOf("imageModel") > -1, fa
   const nat    = grab("hfListenNative");
   const heard  = grab("hfHeardText");
   const pause  = grab("hfPause");
-  const close  = grab("hfClose");
   const inIt = (src, bit) => src.indexOf(bit) > -1;
 
   t("hands-free listens through the phone", inIt(listen, "hfListenNative()"), true);
@@ -91,7 +90,6 @@ t("and no setting for which model drew them", src.indexOf("imageModel") > -1, fa
   t("both recognisers share the wake-word logic", inIt(heard, "wakeRe()"), true);
   t("the shared handler still gathers what was said", inIt(heard, "hf.said"), true);
   t("pausing stops the native microphone too", inIt(pause, "nativeMicStop()"), true);
-  t("closing stops the native microphone too", inIt(close, "nativeMicStop()"), true);
 }
 
 
@@ -289,7 +287,6 @@ function nativeFrom(cap, exp){
   t("it only fires while still listening", inIt(settle, 'hf.phase !== "hear"'), true);
   t("anything new resets it", inIt(settle, "clearTimeout(hf.settle)"), true);
   t("pausing the mic disarms it", inIt(grab("hfPause"), "clearTimeout(hf.settle)"), true);
-  t("closing disarms it", inIt(grab("hfClose"), "clearTimeout(hf.settle)"), true);
 }
 
 
