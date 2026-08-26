@@ -802,38 +802,10 @@ const TOOLSRC = decl("TOOLS");
   t("and if the web has nothing, his own answer stands",
     ask.indexOf("the web had nothing either") > -1, true);
 
-  /* ---- party mode ---- */
-  const on = new Function(decl("PARTY_ON_RE") + " return PARTY_ON_RE;")();
-  const off = new Function(decl("PARTY_OFF_RE") + " return PARTY_OFF_RE;")();
-  ["party", "party time", "party mode", "let's party", "start the party"]
-    .forEach(q => t('"' + q + '" starts it', on.test(q), true));
-  ["party's over", "stop the party", "party off", "calm down"]
-    .forEach(q => t('"' + q + '" ends it', off.test(q), true));
-  t("but talking about a party does not start one",
-    on.test("a party for my birthday"), false);
-  t("nor does asking about one", on.test("when is the party"), false);
-
-  t("the circle runs through colour", inPage("@keyframes partyHue"), true);
-  t("and quickens", inPage("#hfOrb.party .disc{"), true);
-  t("the words go with it", inPage("#hf.party #hfState{"), true);
-  t("and there is a wash behind it all", inPage("#hf.party::after{"), true);
-  /* They are over the top of everything now, where a beam has to read as
-     light falling on the room rather than paint over it - so screen is on
-     purpose. Four elements, only while a party is on. Nothing is blurred. */
-  t("the beams fall as light rather than paint",
-    /#partyLights i{[^}]*mix-blend-mode:screen/.test(page), true);
-  t("but nothing is blurred", /#partyLights i{[^}]*filter:s*blur/.test(page), false);
-  t("and they are over everything, not under it",
-    /#partyLights{[^}]*z-index:8/.test(page), true);
-  t("without taking any taps", /#partyLights{[^}]*pointer-events:none/.test(page), true);
-  t("the voice goes with it", grab("partySet").indexOf('"excited"') > -1, true);
-  t("and comes back afterwards", grab("partySet").indexOf('"composed"') > -1, true);
-  t("it is remembered", grab("partySet").indexOf("store.settings.party") > -1, true);
-  t("and still on when he opens it again",
-    grab("hfOpen").indexOf("if(store.settings.party) partySet(true)") > -1, true);
-  t("and carried to a new install", has("party:s.party"), true);
+  /* Party mode is gone: the rainbow, the beams, the bulbs and the hat. */
+  t("nothing throws a party", src.indexOf("function partySet") > -1, false);
+  t("and no lights are hung", src.indexOf("partyLights") > -1, false);
 }
-
 
 /* ---------- the hologram is a 3D thing you can handle ---------- */
 {
@@ -961,17 +933,8 @@ const TOOLSRC = decl("TOOLS");
     grab("rightNow").indexOf("There is nothing up to take apart") > -1, true);
 
   /* ---- the party hat and the lights ---- */
-  t("the ball gets a hat", inPage('<span class="hat"'), true);
-  t("which is a striped cone", /#hfOrb\.party \.hat\{[\s\S]*?repeating-linear-gradient/.test(page), true);
-  t("with a pompom", inPage("#hfOrb.party .hat .pom{"), true);
-  t("and it bobs", inPage("@keyframes hatBob"), true);
-  t("but only during a party", /#hfOrb \.hat\{display:none\}/.test(page), true);
-  t("there is a string of bulbs along the top", inPage("#partyLights .bulbs{"), true);
-  t("that blink out of step with each other", inPage("#partyLights .bulbs s:nth-child(9)"), true);
   /* the beams hung from one point in the middle, which put their length down
      the centre where the ball already is */
-  t("the beams are spread across the top", inPage("#partyLights i:nth-child(4){left:84%"), true);
-  t("and they are bright", /#partyLights i\{[^}]*opacity:1/.test(page), true);
 }
 
 
@@ -1046,8 +1009,6 @@ const TOOLSRC = decl("TOOLS");
 
   /* there were four ways out of four things and you had to know which you were in */
   const back = grab("backToNormal");
-  ["holoHide()", "vizStop()", "partySet(false)"]
-    .forEach(x => t("stop puts away " + x, back.indexOf(x) > -1, true));
   t("and every panel with it", back.indexOf(".hudpanel[data-panel].on") > -1, true);
   t("and it says when there was nothing to stop",
     grab("rightNow").indexOf("Nothing to stop.") > -1, true);
