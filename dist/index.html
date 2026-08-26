@@ -1134,8 +1134,6 @@
 
 <div class="scrim" id="scrim"></div>
 
-
-
 <section class="panel" id="settings">
   <div class="phead"><h3>Settings</h3><button class="icobtn" data-close><svg><use href="#i-x"/></svg></button></div>
   <div class="pbody">
@@ -5124,8 +5122,6 @@ function vizAsk(question){
     });
 }
 
-
-
 /* ==================== things he can do ====================
    Each one says what it needs and what it gives back. "hands" means it opens
    the phone's own screen with everything filled in and waits for a tap - iOS
@@ -6446,8 +6442,6 @@ function spec3dKnown(about){
 
 /* what a part is called out loud, which is not always what is printed on it */
 
-
-
 var wb = { on:false, parts:[], wires:[], seq:0, sel:null, power:true,
            drag:null, run:null, board:null };
 
@@ -6457,9 +6451,6 @@ var wb = { on:false, parts:[], wires:[], seq:0, sel:null, power:true,
    node also gets a vanishingly small leak to ground: without it a part sitting
    on the board with nothing attached makes the matrix unsolvable. */
 
-
-
-
 /* Turning. A motor with current in it drives its shaft; anything meshed with
    that turns too - the other way round, and by the ratio of the teeth. Follow
    it out from the motors until nothing new turns. */
@@ -6467,56 +6458,30 @@ var wb = { on:false, parts:[], wires:[], seq:0, sel:null, power:true,
 
 /* ---- where things are ---- */
 
-
-
-
-
-
 /* wire everything into one loop, in the order it was put down */
 
 
 /* ---- drawing it ---- */
 
-
-
-
-
-
-
 /* ---- fingers ---- */
 
-
-
-
 /* ---- opening and closing ---- */
-
-
-
-
 
 /* ---- things he is asked to build ----
    The same describing that the simulations use: he says what it is made of and
    the app stands it up. They stack, so asking for a second thing puts it next
    to the first rather than replacing it. */
 
-
-
-
 /* Ask for anything. What he knows already goes up at once; the rest he works
    out, and it goes up when it arrives. */
 
 /* what the stream had got to when it was stopped */
-
-
 
 /* ---- what he says about it ---- */
 
 
 /* the words that work inside building mode. Returns null when it is not one
    of them, so the question carries on to the model as usual. */
-
-
-
 
 /* tap the ball to put the globe back */
 function vizStop(){
@@ -6543,8 +6508,6 @@ $('vizAgain').addEventListener('click', function(){
 var cam = { stream:null, facing:'environment', open:false, busy:false };
 var camEl, camVid;
 
-
-
 /* Questions that only make sense if he can see - counting especially, which
    fails quietly when it is answered from memory instead of from the picture. */
 /* Asking him to look. Counting is the awkward one: "count the boxes" is about
@@ -6564,19 +6527,6 @@ var camEl, camVid;
 
 
 /* does this question need him to look? */
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 /* one frame, as small as is still worth looking at */
 
@@ -6624,8 +6574,6 @@ function withVision(run){
   return run().then(function(r){ restore(); return r; },
                     function(e){ restore(); throw e; });
 }
-
-
 
 /* ---- the dock ---- */
 function dockFill(){
@@ -6789,8 +6737,6 @@ window.addEventListener("paste", function(e){
     if(ev === "drop" && e.dataTransfer) addFiles(e.dataTransfer.files);
   });
 });
-
-
 
 /* ---- code blocks get a copy button ---- */
 function decorateCode(el){
@@ -7466,8 +7412,6 @@ function rightNow(said){
     });
     return true;
   }
-  if(TRIVIA_RE.test(q)){ triviaStart(); return true; }
-  if(TD_RE.test(q)){ tdStart(); return true; }
   /* Asking what it is made of names them out loud. Nothing is written on the
      model any more - the parts show through each other instead. */
   if(PARTS_RE.test(q)){
@@ -7547,7 +7491,6 @@ function rememberHarder(said){
    ways out of four things and you had to know which one you were in. */
 function backToNormal(){
   var out = [];
-  if(gameOn()){ out.push("game"); game.kind = null; game.step = null; game.q = null; game.pool = []; }
   /* ten passes is a minute or so, and a minute is a long time to be unable to
      change your mind about it */
   if(learnStop){ out.push("reading up"); var end = learnStop; learnStop = null; end(); }
@@ -7563,265 +7506,17 @@ function backToNormal(){
   return out;
 }
 
-/* ==================== games ====================
-   Things to do with him rather than ask him. While one is on, what you say
-   goes to the game - otherwise "seven" is answered as a question about the
-   number seven. */
-var game = { kind: null, step: null, topic: "", players: 1, turn: 0,
-             scores: [], asked: 0, q: null, pool: [], seenTD: { truth: [], dare: [] } };
-
-function gameOn(){ return !!game.kind; }
-function gameEnd(say){
-  game.kind = null; game.step = null; game.q = null; game.pool = [];
-  if(say) sayNow(say);
-}
-
 /* ---- ten topics, and the Open Trivia Database's numbers for them ---- */
-var TRIVIA_TOPICS = [
-  { say: "general knowledge", id: 9 },
-  { say: "film",              id: 11 },
-  { say: "music",             id: 12 },
-  { say: "television",        id: 14 },
-  { say: "video games",       id: 15 },
-  { say: "science and nature",id: 17 },
-  { say: "computers",         id: 18 },
-  { say: "history",           id: 23 },
-  { say: "geography",         id: 22 },
-  { say: "sport",             id: 21 }
-];
+
 
 /* what somebody said, matched to a topic - "films", "the movies", "movie" */
-function triviaTopic(said){
-  var q = String(said || "").toLowerCase().replace(/[^a-z ]/g, " ").trim();
-  if(!q) return null;
-  var alias = { movies:"film", movie:"film", films:"film", cinema:"film",
-                songs:"music", song:"music", tv:"television", telly:"television",
-                games:"video games", gaming:"video games", videogames:"video games",
-                tech:"computers", computer:"computers", science:"science and nature",
-                nature:"science and nature", sports:"sport", football:"sport",
-                maps:"geography", countries:"geography", general:"general knowledge",
-                anything:"general knowledge", history:"history" };
-  var words = q.split(/\s+/);
-  for(var i = 0; i < words.length; i++){
-    if(alias[words[i]]) q = alias[words[i]];
-  }
-  for(var k = 0; k < TRIVIA_TOPICS.length; k++){
-    var t = TRIVIA_TOPICS[k];
-    if(q.indexOf(t.say) > -1 || t.say.indexOf(q) > -1) return t;
-  }
-  return null;
-}
+
 
 /* The questions themselves. They arrive with HTML entities in them, which
    would be read out as "quot" if they were not turned back into characters. */
-function triviaPlain(s){
-  var box = document.createElement("textarea");
-  box.innerHTML = String(s || "");
-  return box.value;
-}
-
-function triviaFetch(topic){
-  return fetch("https://opentdb.com/api.php?amount=20&type=multiple&category=" + topic.id)
-    .then(function(r){ return r.json(); })
-    .then(function(j){
-      if(!j || j.response_code !== 0 || !j.results || !j.results.length){
-        throw new Error("no questions came back");
-      }
-      return j.results.map(function(row){
-        var wrong = row.incorrect_answers.map(triviaPlain);
-        var right = triviaPlain(row.correct_answer);
-        var all = wrong.concat([right]);
-        /* shuffled, or the answer is always last */
-        for(var i = all.length - 1; i > 0; i--){
-          var j2 = Math.floor(Math.random() * (i + 1));
-          var tmp = all[i]; all[i] = all[j2]; all[j2] = tmp;
-        }
-        return { q: triviaPlain(row.question), right: right, all: all };
-      });
-    });
-}
-
-function triviaStart(){
-  game.kind = "trivia";
-  game.step = "topic";
-  sayNow("Trivia. Pick one: " + TRIVIA_TOPICS.map(function(t){ return t.say; }).join(", ") + ".");
-}
-
-function triviaAskPlayers(topic){
-  game.topic = topic;
-  game.step = "players";
-  sayNow(topic.say + ". How many are playing?");
-}
-
-function triviaBegin(howMany){
-  game.players = Math.max(1, Math.min(8, howMany));
-  game.scores = [];
-  for(var i = 0; i < game.players; i++) game.scores.push(0);
-  game.turn = 0;
-  game.asked = 0;
-  game.step = "loading";
-  hfSet("busy", "Getting questions");
-  triviaFetch(game.topic).then(function(list){
-    game.pool = list;
-    game.step = "asking";
-    sayNow(game.players === 1 ? "Right. First to five points." :
-      game.players + " players. First to five points. Player one, you're up.");
-    setTimeout(triviaNext, 900);
-  }).catch(function(e){
-    gameEnd("I could not get the questions - " + String(e && e.message || e));
-  });
-}
-
-function triviaNext(){
-  if(game.kind !== "trivia") return;
-  if(!game.pool.length){
-    gameEnd("I have run out of questions. " + triviaScores());
-    return;
-  }
-  game.q = game.pool.shift();
-  game.asked++;
-  game.step = "answer";
-  var who = game.players > 1 ? "Player " + (game.turn + 1) + ". " : "";
-  sayNow(who + game.q.q + " Is it: " + game.q.all.join(", ") + "?");
-}
-
-function triviaScores(){
-  if(game.players === 1) return "You got " + game.scores[0] + ".";
-  return game.scores.map(function(s, i){ return "player " + (i + 1) + " " + s; }).join(", ") + ".";
-}
 
 /* Said aloud, an answer is either the answer itself or its place in the list.
    Both have to work, because people do both. */
-function triviaJudge(said){
-  var t = String(said || "").toLowerCase().trim().replace(/[.?!]+$/, "");
-  var right = game.q.right.toLowerCase();
-  if(t === right) return true;
-  /* "a", "b", "the second one", "number three" */
-  var spot = -1;
-  var letters = { a:0, b:1, c:2, d:3, one:0, two:1, three:2, four:3,
-                  first:0, second:1, third:2, fourth:3 };
-  var m = t.match(/^(?:the\s+)?(?:number\s+|option\s+|answer\s+)?([a-d]|one|two|three|four|first|second|third|fourth)(?:\s+one)?$/);
-  if(m && letters[m[1]] !== undefined) spot = letters[m[1]];
-  if(spot > -1 && game.q.all[spot]) return game.q.all[spot].toLowerCase() === right;
-  /* near enough - people shorten what they say */
-  if(right.length > 4 && (t.indexOf(right) > -1 || right.indexOf(t) > -1) && t.length > 2) return true;
-  return false;
-}
-
-function triviaAnswer(said){
-  var got = triviaJudge(said);
-  if(got) game.scores[game.turn]++;
-  var who = game.players > 1 ? "Player " + (game.turn + 1) : "You";
-  var line = got ? "Correct." : "No - it was " + game.q.right + ".";
-  if(game.scores[game.turn] >= 5){
-    gameEnd(line + " " + who + " wins with five. " + triviaScores());
-    return;
-  }
-  game.turn = (game.turn + 1) % game.players;
-  sayNow(line + " " + (game.players > 1 ? triviaScores() : "That's " + game.scores[0] + "."));
-  setTimeout(triviaNext, 1200);
-}
-
-/* ---- truth or dare ---- */
-var TRUTHS = [
-  "What is the last thing you searched for on your phone?",
-  "What is something you pretend to understand but do not?",
-  "Who in this room would you call first in a crisis?",
-  "What is the worst haircut you have ever had?",
-  "What is a small thing that makes you unreasonably angry?",
-  "What is the last lie you told?",
-  "What is the most embarrassing thing in your camera roll?",
-  "What is something you have never told anyone here?",
-  "Who was your first crush?",
-  "What is the longest you have gone without a shower?",
-  "What is a talent you wish you had?",
-  "What is the worst gift you have ever been given?",
-  "What is the last thing that made you cry?",
-  "What is your most irrational fear?",
-  "If you could delete one memory, would you, and would you say which?"
-];
-var DARES = [
-  "Speak in an accent until your next turn.",
-  "Let the person on your left post something as you.",
-  "Do your best impression of somebody in this room.",
-  "Sing the chorus of the last song you listened to.",
-  "Hold a plank until the next person answers.",
-  "Text the fifth person in your messages a single word: pineapple.",
-  "Swap one item of clothing with the person on your right.",
-  "Say the alphabet backwards. No help.",
-  "Do twenty star jumps.",
-  "Let somebody here look at your last five photos.",
-  "Talk without using the letter E until your next turn.",
-  "Do your best dance to whatever is playing.",
-  "Call somebody and sing them happy birthday. It is not their birthday.",
-  "Balance something on your head until your next turn.",
-  "Compliment everybody here, and mean it."
-];
-
-/* Nothing repeats until the whole list has been round once - a game that asks
-   you the same question twice in five minutes stops being a game. */
-function pickFresh(list, seen){
-  if(seen.length >= list.length) seen.length = 0;
-  var left = [];
-  for(var i = 0; i < list.length; i++) if(seen.indexOf(i) === -1) left.push(i);
-  var pick = left[Math.floor(Math.random() * left.length)];
-  seen.push(pick);
-  return list[pick];
-}
-
-function tdStart(){
-  game.kind = "td";
-  game.step = "choose";
-  sayNow("Truth or dare?");
-}
-
-function tdGive(which){
-  var one = which === "truth"
-    ? pickFresh(TRUTHS, game.seenTD.truth)
-    : pickFresh(DARES, game.seenTD.dare);
-  game.step = "choose";
-  sayNow(one + " Say truth or dare for another, or stop.");
-}
-
-/* ---- what somebody says while a game is on ---- */
-function gameHeard(said){
-  var q = String(said || "").trim().replace(/[.?!]+$/, "");
-  if(!q) return false;
-  if(/^(?:stop|quit|end|enough|done|finish|cancel)(?:\s+(?:the\s+)?(?:game|trivia|quiz))?$/i.test(q)){
-    gameEnd(game.kind === "trivia" ? "Stopped. " + triviaScores() : "Stopped.");
-    return true;
-  }
-  if(game.kind === "td"){
-    if(/^(?:truth)$/i.test(q)){ tdGive("truth"); return true; }
-    if(/^(?:dare)$/i.test(q)){ tdGive("dare"); return true; }
-    sayNow("Truth, or dare?");
-    return true;
-  }
-  if(game.kind === "trivia"){
-    if(game.step === "topic"){
-      var topic = triviaTopic(q);
-      if(topic){ triviaAskPlayers(topic); return true; }
-      sayNow("Pick one of: " + TRIVIA_TOPICS.map(function(t){ return t.say; }).join(", ") + ".");
-      return true;
-    }
-    if(game.step === "players"){
-      var words = { one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8,
-                    just_me:1 };
-      var n = parseInt(q, 10);
-      if(isNaN(n)){
-        var key = q.toLowerCase().replace(/\s+/g, "_");
-        n = words[key] || words[q.toLowerCase()] || 0;
-        if(/^(?:just me|me|only me|alone|solo)$/i.test(q)) n = 1;
-      }
-      if(n > 0){ triviaBegin(n); return true; }
-      sayNow("How many are playing?");
-      return true;
-    }
-    if(game.step === "answer"){ triviaAnswer(q); return true; }
-    return true;                  /* loading - swallow it rather than answering it */
-  }
-  return false;
-}
 
 /* ==================== what he can do ====================
    Every word that does something, in alphabetical order. Written out rather
@@ -7870,8 +7565,6 @@ var FEATURES = [
   { say: "stop", does: "put everything away and go back to the plain screen" },
   { say: "text mum I am late", does: "start a message - iOS needs the tap" },
   { say: "time / what time is it", does: "the time" },
-  { say: "trivia", does: "a quiz, ten topics, first to five" },
-  { say: "truth or dare", does: "exactly that" },
   { say: "what am I holding", does: "open the camera and say what it sees" },
   { say: "what do I have to do", does: "your reminders" },
   { say: "what have I got on today", does: "your calendar" },
@@ -7964,8 +7657,8 @@ var GUI_CLOSE_RE = new RegExp("^(?:close|hide)\\s*(?:the\\s*)?" +
   "|^close everything open$", "i");
 var WHERE_RE = /^(?:where am i|where are we|what'?s my location|where do you think i am)\??$/i;
 var PINPOINT_RE = /^(?:pinpoint(?: me)?|exact location|precise location|use gps|find me|locate me)\??$/i;
-var TRIVIA_RE = /^(?:trivia|quiz|let'?s play trivia|play trivia|start (?:a )?quiz|trivia time)$/i;
-var TD_RE = /^(?:truth or dare|lets play truth or dare|let'?s play truth or dare|play truth or dare)$/i;
+
+
 var PARTY_ON_RE = /^(?:party|party time|party mode|let'?s party|start the party|it'?s a party)$/i;
 var PARTY_OFF_RE = /^(?:party(?:'?s)? over|stop the party|end the party|no more party|calm down|party off)$/i;
 
@@ -10358,14 +10051,6 @@ function hfAsk(question){
   /* If he is already looking, the question is usually about what he can see -
      but "count to a hundred" is not, and attaching a picture to it made him
      describe the room as well. */
-  /* A game is on, so what was said is a move in it rather than a question.
-     Without this, "seven" gets answered as a question about the number seven. */
-  if(gameOn()){
-    handedBack = true;
-    if(gameHeard(question)) return;
-    handedBack = false;
-  }
-
   /* A picture of a thing: a real photograph of it, shown as light. This comes
      before the 3D builder, or "show me a picture of a plane" builds one. */
   var toHolo = holoOf(question);
@@ -10785,7 +10470,7 @@ hfOrb.addEventListener("click", function(){
 /* ==================== visible diagnostics ====================
    Silent failures cost us two rounds of guessing. Anything that goes wrong
    now says so on screen, with enough detail to act on. */
-var BUILD = "2026-08-22.05";
+var BUILD = "2026-08-22.06";
 
 function banner(kind, html){
   var b = $("banner");

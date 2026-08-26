@@ -1030,82 +1030,12 @@ const TOOLSRC = decl("TOOLS");
 }
 
 
-/* ---------- games ---------- */
+/* Trivia and truth or dare are gone. */
 {
-  const TOPICS = new Function(decl("TRIVIA_TOPICS") + " return TRIVIA_TOPICS;")();
-  t("there are ten topics", TOPICS.length, 10);
-  t("each has something to say and a number to fetch by",
-    TOPICS.every(x => x.say && x.id), true);
-  t("saying trivia lists them", grab("triviaStart").indexOf("Pick one:") > -1, true);
-  t("then asks how many are playing", grab("triviaAskPlayers").indexOf("How many are playing") > -1, true);
-  t("and the questions come from the web, with no key",
-    grab("triviaFetch").indexOf("opentdb.com") > -1, true);
-  t("twenty at a time, so a game does not stop halfway",
-    grab("triviaFetch").indexOf("amount=20") > -1, true);
-  /* they arrive with HTML entities in them, which would be read out as "quot" */
-  t("the questions are turned back into readable text",
-    grab("triviaFetch").indexOf("triviaPlain") > -1, true);
-  t("and the answers are shuffled, or the right one is always last",
-    grab("triviaFetch").indexOf("Math.floor(Math.random() * (i + 1))") > -1, true);
-  t("first to five wins", grab("triviaAnswer").indexOf(">= 5") > -1, true);
-  t("and turns go round the players", grab("triviaAnswer").indexOf("(game.turn + 1) % game.players") > -1, true);
-  t("running out of questions ends it rather than hanging",
-    grab("triviaNext").indexOf("I have run out of questions") > -1, true);
-
-  const topic = new Function(decl("TRIVIA_TOPICS") + grab("triviaTopic") + " return triviaTopic;")();
-  [["film", "film"], ["films", "film"], ["movies", "film"], ["the movies", "film"],
-   ["music", "music"], ["songs", "music"], ["tv", "television"], ["video games", "video games"],
-   ["gaming", "video games"], ["sport", "sport"], ["football", "sport"],
-   ["geography", "geography"], ["countries", "geography"], ["history", "history"]]
-    .forEach(([said, want]) => t('"' + said + '" is ' + want,
-      (topic(said) || {}).say, want));
-  t("and something that is not a topic is not guessed at", topic("bananas"), null);
-
-  /* said aloud, an answer is either the answer or its place in the list */
-  const judge = new Function("game", grab("triviaJudge") + " return triviaJudge;")(
-    { q: { right: "Mercury", all: ["Venus", "Mercury", "Mars", "Earth"] } });
-  [["Mercury", true], ["mercury", true], ["Mercury.", true],
-   ["b", true], ["the second one", true], ["number two", true], ["second", true],
-   ["Venus", false], ["a", false], ["the third one", false], ["bananas", false]]
-    .forEach(([said, want]) => t('"' + said + '" judged right', judge(said), want));
-
-  /* truth or dare */
-  const TRUTHS = new Function(decl("TRUTHS") + " return TRUTHS;")();
-  const DARES = new Function(decl("DARES") + " return DARES;")();
-  t("there are plenty of truths", TRUTHS.length >= 15, true);
-  t("and plenty of dares", DARES.length >= 15, true);
-  t("none of them are questions to a machine",
-    TRUTHS.every(x => x.length > 20) && DARES.every(x => x.length > 20), true);
-  /* a game that asks you the same question twice in five minutes stops being
-     a game */
-  const fresh = new Function(grab("pickFresh") + " return pickFresh;")();
-  const seen = [], got = new Set();
-  for(let i = 0; i < TRUTHS.length; i++) got.add(fresh(TRUTHS, seen));
-  t("nothing repeats until the list has been round once", got.size, TRUTHS.length);
-  t("and then it starts again rather than running out",
-    (() => { const s = []; for(let i = 0; i < TRUTHS.length + 3; i++) fresh(TRUTHS, s);
-             return s.length <= TRUTHS.length; })(), true);
-
-  /* while a game is on, what you say is a move in it */
-  t("a game takes what is said", grab("hfAsk").indexOf("if(gameOn())") > -1, true);
-  t("and it is not answered as a question as well",
-    grab("hfAsk").indexOf("if(gameHeard(question)) return;") > -1, true);
-  t("stop ends any of them", grab("gameHeard").indexOf("stop|quit|end|enough") > -1, true);
-  const TRIVIA_RE = new Function(decl("TRIVIA_RE") + " return TRIVIA_RE;")();
-  const TD_RE = new Function(decl("TD_RE") + " return TD_RE;")();
-  ["trivia", "quiz", "play trivia", "trivia time"].forEach(q =>
-    t('"' + q + '" starts trivia', TRIVIA_RE.test(q), true));
-  ["truth or dare", "play truth or dare"].forEach(q =>
-    t('"' + q + '" starts truth or dare', TD_RE.test(q), true));
-  /* the regex was tested and the wiring was not, so this was dead for a whole
-     build with every test green - a pattern nothing consults is not a feature */
-  t("and something actually consults them",
-    grab("rightNow").indexOf("TRIVIA_RE.test(q)") > -1 &&
-    grab("rightNow").indexOf("TD_RE.test(q)") > -1, true);
-  t("as it does for every other word he answers to",
-    ["PARTS_RE", "PARTY_ON_RE", "PARTY_OFF_RE"].every(function(n){
-      return grab("rightNow").indexOf(n + ".test(q)") > -1; }), true);
-  t("but talking about trivia does not start it", TRIVIA_RE.test("that is trivia"), false);
+  t("nothing plays trivia", src.indexOf("function triviaStart") > -1, false);
+  t("nor truth or dare", src.indexOf("function tdStart") > -1, false);
+  t("and nothing takes what you say as a move in a game",
+    src.indexOf("function gameHeard") > -1, false);
 }
 
 
@@ -1116,7 +1046,7 @@ const TOOLSRC = decl("TOOLS");
 
   /* there were four ways out of four things and you had to know which you were in */
   const back = grab("backToNormal");
-  ["gameOn()", "holoHide()", "vizStop()", "partySet(false)"]
+  ["holoHide()", "vizStop()", "partySet(false)"]
     .forEach(x => t("stop puts away " + x, back.indexOf(x) > -1, true));
   t("and every panel with it", back.indexOf(".hudpanel[data-panel].on") > -1, true);
   t("and it says when there was nothing to stop",
